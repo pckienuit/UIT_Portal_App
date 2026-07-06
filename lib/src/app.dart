@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
-import 'features/web_fallback/portal_web_fallback_screen.dart';
+import 'features/modules/native_module_screen.dart';
 import 'portal_module_registry.dart';
 
 class UitPortalApp extends StatelessWidget {
@@ -20,7 +20,7 @@ class UitPortalApp extends StatelessWidget {
           final moduleId = state.pathParameters['moduleId'] ?? '';
           final module = PortalModuleRegistry.byId(moduleId);
 
-          return PortalWebFallbackScreen(module: module);
+          return NativeModuleScreen(module: module);
         },
       ),
     ],

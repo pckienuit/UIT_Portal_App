@@ -17,4 +17,15 @@ void main() {
       '${PortalConstants.portalOrigin}/notifications',
     );
   });
+
+  test('tracks native implementation status', () {
+    expect(
+      PortalModuleRegistry.byId('dashboard').status,
+      PortalModuleStatus.nativeImplemented,
+    );
+    expect(
+      PortalModuleRegistry.byId('profile').status,
+      PortalModuleStatus.pendingApi,
+    );
+  });
 }

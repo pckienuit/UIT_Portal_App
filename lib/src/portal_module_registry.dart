@@ -1,6 +1,6 @@
 import 'portal_constants.dart';
 
-enum PortalModuleStatus { nativePlanned, webFallback }
+enum PortalModuleStatus { nativeImplemented, pendingApi }
 
 class PortalModule {
   const PortalModule({
@@ -27,30 +27,30 @@ class PortalModuleRegistry {
     PortalModule(
       id: 'dashboard',
       title: 'Trang chủ',
-      description: 'Điểm vào portal sau khi đăng nhập SSO.',
+      description: 'Tổng quan phiên đăng nhập và các lối tắt portal.',
       path: '/',
-      status: PortalModuleStatus.webFallback,
+      status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
       id: 'profile',
       title: 'Thông tin cá nhân',
       description: 'Hồ sơ người học và thông tin tài khoản.',
       path: '/profile',
-      status: PortalModuleStatus.webFallback,
+      status: PortalModuleStatus.pendingApi,
     ),
     PortalModule(
       id: 'services',
       title: 'Dịch vụ',
       description: 'Các dịch vụ trực tuyến của UIT Portal.',
       path: '/services',
-      status: PortalModuleStatus.webFallback,
+      status: PortalModuleStatus.pendingApi,
     ),
     PortalModule(
       id: 'notifications',
       title: 'Thông báo',
-      description: 'Thông báo từ portal; sẽ là nền cho push notification.',
+      description: 'Thông báo từ portal; nền cho push notification sau này.',
       path: '/notifications',
-      status: PortalModuleStatus.webFallback,
+      status: PortalModuleStatus.pendingApi,
     ),
   ];
 

@@ -143,6 +143,7 @@ class _ModuleTile extends StatelessWidget {
         leading: const Icon(Icons.apps_outlined),
         title: Text(module.title),
         subtitle: Text(module.description),
+        isThreeLine: true,
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/module/${module.id}'),
       ),
