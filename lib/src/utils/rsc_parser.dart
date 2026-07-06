@@ -62,4 +62,69 @@ class RscParser {
     }
     return null;
   }
+
+  /// Trích xuất danh sách các đối tượng JSON từ chuỗi RSC dựa vào một trường đặc trưng (keyword).
+  /// Ví dụ: keyword = 'tenMonHoc' hoặc 'phongHoc'
+  static List<Map<String, dynamic>> extractObjectsWithKey(String rscPayload, String requiredKey) {
+    final results = <Map<String, dynamic>>[];
+    
+    // RSC payload chia thành các dòng
+    final lines = rscPayload.split('\n');
+    for (final line in lines) {
+      if (!line.contains(requiredKey)) continue;
+      
+      try {
+        // Các dòng RSC thường bắt đầu bằng id:[...] hoặc id:I[...] hoặc id:{...}
+        // Ta tìm vị trí bắt đầu của cấu trúc JSON hợp lệ gần nhất
+        int startIndex = line.indexOf(':[');
+        if (startIndex == -1) startIndex = line.indexOf(':{');
+        if (startIndex == -1) startIndex = line.indexOf(':I[');
+        
+        if (startIndex != -1) {
+          // Cắt bỏ phần prefix `id:`
+          final jsonPart = line.substring(line.indexOf(':', startIndex) + 1);
+          // Xóa chữ I nếu có (id:I[...])
+          final cleanJsonPart = jsonPart.startsWith('I') ? jsonPart.substring(1) : jsonPart;
+          
+          final decoded = jsonDecode(cleanJsonPart);
+          _traverseAndFind(decoded, requiredKey, results);
+        }
+      } catch (e) {
+        // Bỏ qua nếu dòng này không parse được
+      }
+    }
+    
+    // Loại bỏ các đối tượng trùng lặp (dựa trên việc so sánh nội dung chuỗi JSON)
+    final uniqueResults = <String, Map<String, dynamic>>{};
+    for (final item in results) {
+      uniqueResults[jsonEncode(item)] = item;
+    }
+    
+    return uniqueResults.values.toList();
+  }
+  
+  static void _traverseAndFind(dynamic node, String requiredKey, List<Map<String, dynamic>> results) {
+    if (node is Map<String, dynamic>) {
+      bool hasMatch = node.containsKey(requiredKey);
+      if (!hasMatch) {
+        for (final value in node.values) {
+          if (value?.toString().contains(requiredKey) == true) {
+            hasMatch = true;
+            break;
+          }
+        }
+      }
+      
+      if (hasMatch) {
+        results.add(node);
+      }
+      for (final value in node.values) {
+        _traverseAndFind(value, requiredKey, results);
+      }
+    } else if (node is List) {
+      for (final item in node) {
+        _traverseAndFind(item, requiredKey, results);
+      }
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
@@ -42,6 +43,52 @@ class PortalApiClient {
     return response;
   }
 
+  Future<Response<String>> getWithRsc(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    // Tự động build Next-Router-State-Tree dựa trên path và queryParameters
+    String searchParamsString = '';
+    String searchParamsObj = '{}';
+    if (queryParameters != null && queryParameters.isNotEmpty) {
+      // Ví dụ: {"hocKy":"2","namHoc":"2025-2026"}
+      final jsonParams = jsonEncode(queryParameters);
+      searchParamsString = '?$jsonParams';
+      searchParamsObj = jsonParams;
+    }
+    
+    // Tách path thành các segments
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    
+    // Xây dựng cây Router State từ dưới lên
+    // Bắt đầu với __PAGE__
+    dynamic currentTree = ["__PAGE__$searchParamsString", jsonDecode(searchParamsObj)];
+    
+    // Cuộn ngược các segments để bọc vào children
+    for (int i = segments.length - 1; i >= 0; i--) {
+      currentTree = [segments[i], {"children": currentTree}];
+    }
+    
+    // Root Node
+    final rootTree = ["", {"children": currentTree}];
+    
+    final options = Options(
+      headers: {
+        'RSC': '1',
+        'Next-Router-State-Tree': Uri.encodeComponent(jsonEncode(rootTree)),
+      },
+      responseType: ResponseType.plain,
+    );
+    final resolvedOptions = await _withAuth(options);
+    final response = await _dio.get<String>(
+      path,
+      queryParameters: queryParameters,
+      options: resolvedOptions,
+    );
+    _throwIfPortalError(response);
+    return response;
+  }
+
   Future<Response<T>> post<T>(
     String path, {
     Object? data,
@@ -77,6 +124,7 @@ class PortalApiClient {
       throw PortalApiException(
         statusCode: statusCode,
         path: response.requestOptions.path,
+        responseData: response.data,
       );
     }
   }
@@ -106,13 +154,14 @@ class PortalApiClient {
 }
 
 class PortalApiException implements Exception {
-  const PortalApiException({required this.statusCode, required this.path});
+  const PortalApiException({required this.statusCode, required this.path, this.responseData});
 
   final int statusCode;
   final String path;
+  final dynamic responseData;
 
   @override
   String toString() {
-    return 'PortalApiException(statusCode: $statusCode, path: $path)';
+    return 'PortalApiException(statusCode: $statusCode, path: $path, data: $responseData)';
   }
 }

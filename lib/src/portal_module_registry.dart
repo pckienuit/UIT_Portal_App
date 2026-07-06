@@ -61,6 +61,13 @@ class PortalModuleRegistry {
       status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
+      id: 'tkb',
+      title: 'Thời khóa biểu',
+      description: 'Lịch học trong tuần, phòng học, giảng viên.',
+      path: '/sinh-vien/tkb',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
       id: 'profile',
       title: 'Thông tin cá nhân',
       description: 'Hồ sơ người học và thông tin tài khoản.',
