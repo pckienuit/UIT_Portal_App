@@ -9,13 +9,12 @@ class ExtracurricularScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final state = ref.watch(extracurricularProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ngoại trú'), centerTitle: true),
+      appBar: AppBar(title: const Text('Lịch sinh hoạt'), centerTitle: true),
       body: state.when(
-        data: (data) => _buildContent(context, data, theme),
+        data: (data) => _buildContent(context, data, Theme.of(context)),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
@@ -46,64 +45,60 @@ class ExtracurricularScreen extends ConsumerWidget {
     ExtracurricularResponse data,
     ThemeData theme,
   ) {
-    return ListView(
+    if (data.items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_busy, size: 64, color: theme.colorScheme.onSurface.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            const Text('Hiện không có lịch sinh hoạt nào'),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      children: [
-        if (data.presentStatusName != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
+      itemCount: data.items.length,
+      itemBuilder: (context, index) {
+        final item = data.items[index];
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Trạng thái: ${data.presentStatusName}',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  item.tenHoatDong ?? 'Hoạt động ngoại khóa',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16),
+                    const SizedBox(width: 8),
+                    Text(item.ngayBatDau ?? 'Chưa rõ ngày'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 8),
+                    Text(item.diaDiem ?? 'Chưa rõ địa điểm'),
+                  ],
                 ),
               ],
             ),
           ),
-        if (data.records == null || data.records!.isEmpty)
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: theme.dividerColor),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: Text('Không có dữ liệu ngoại trú')),
-            ),
-          )
-        else
-          ...data.records!.map(
-            (record) => Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: theme.dividerColor),
-              ),
-              child: ListTile(
-                title: const Text('Bản ghi ngoại trú'),
-                subtitle: Text(record.toString()),
-              ),
-            ),
-          ),
-      ],
+        );
+      },
     );
   }
 }

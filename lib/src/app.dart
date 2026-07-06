@@ -24,6 +24,8 @@ import 'features/health_insurance/health_insurance_screen.dart';
 import 'features/tuition_extension/tuition_extension_screen.dart';
 import 'features/study_reservation/study_reservation_screen.dart';
 import 'features/debug/api_debugger_screen.dart';
+import 'features/exam_schedule/exam_schedule_screen.dart';
+import 'features/teaching_survey/teaching_survey_screen.dart';
 import 'portal_module_registry.dart';
 
 class UitPortalApp extends StatelessWidget {
@@ -40,61 +42,27 @@ class UitPortalApp extends StatelessWidget {
         builder: (context, state) {
           final moduleId = state.pathParameters['moduleId'] ?? '';
           print('GoRoute routing to: $moduleId');
-          if (moduleId == 'grades') {
-            return const GradesScreen();
-          }
-          if (moduleId == 'tkb') {
-            return const ScheduleScreen();
-          }
           
-          if (moduleId == 'confirmation_paper') {
-            return const ConfirmationPaperScreen();
-          }
-          if (moduleId == 'certificate_validation') {
-            return const CertificateValidationScreen();
-          }
-          if (moduleId == 'student_card') {
-            return const StudentCardScreen();
-          }
-          if (moduleId == 'parking_registration') {
-            return const ParkingRegistrationScreen();
-          }
-          if (moduleId == 'khoa-luan') {
-            return const ThesisRegistrationScreen();
-          }
-          if (moduleId == 'tot-nghiep') {
-            return const GraduationRegistrationScreen();
-          }
-          if (moduleId == 'hoc-bong') {
-            return const ScholarshipRegistrationScreen();
-          }
-          if (moduleId == 'ho-tro') {
-            return const StudentSupportScreen();
-          }
-          if (moduleId == 'training_point') {
-            return const TrainingPointScreen();
-          }
-          if (moduleId == 'transcript_request') {
-            return const TranscriptRequestScreen();
-          }
-          if (moduleId == 'exam_postponement') {
-            return const ExamPostponementScreen();
-          }
-          if (moduleId == 'revaluation') {
-            return const RevaluationScreen();
-          }
-          if (moduleId == 'ngoai-tru') {
-            return const ExtracurricularScreen();
-          }
-          if (moduleId == 'bao-hiem') {
-            return const HealthInsuranceScreen();
-          }
-          if (moduleId == 'gia-han-hoc-phi') {
-            return const TuitionExtensionScreen();
-          }
-          if (moduleId == 'thoi-hoc-bao-luu') {
-            return const StudyReservationScreen();
-          }
+          if (moduleId == 'grades') return const GradesScreen();
+          if (moduleId == 'tkb') return const ScheduleScreen();
+          if (moduleId == 'confirmation_paper') return const ConfirmationPaperScreen();
+          if (moduleId == 'certificate_validation') return const CertificateValidationScreen();
+          if (moduleId == 'student_card') return const StudentCardScreen();
+          if (moduleId == 'parking_registration') return const ParkingRegistrationScreen();
+          if (moduleId == 'khoa-luan') return const ThesisRegistrationScreen();
+          if (moduleId == 'tot-nghiep') return const GraduationRegistrationScreen();
+          if (moduleId == 'hoc-bong') return const ScholarshipRegistrationScreen();
+          if (moduleId == 'ho-tro') return const StudentSupportScreen();
+          if (moduleId == 'training_point') return const TrainingPointScreen();
+          if (moduleId == 'transcript_request') return const TranscriptRequestScreen();
+          if (moduleId == 'exam_postponement') return const ExamPostponementScreen();
+          if (moduleId == 'revaluation') return const RevaluationScreen();
+          if (moduleId == 'ngoai-tru' || moduleId == 'lich-sinh-hoat') return const ExtracurricularScreen();
+          if (moduleId == 'bao-hiem') return const HealthInsuranceScreen();
+          if (moduleId == 'gia-han-hoc-phi') return const TuitionExtensionScreen();
+          if (moduleId == 'thoi-hoc-bao-luu') return const StudyReservationScreen();
+          if (moduleId == 'lich-thi') return const ExamScheduleScreen();
+          if (moduleId == 'khao-sat-giang-day') return const TeachingSurveyScreen();
 
           final module = PortalModuleRegistry.byId(moduleId);
           return NativeModuleScreen(module: module);

@@ -152,10 +152,10 @@ class PortalModuleRegistry {
       status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
-      id: 'ngoai-tru',
-      title: 'Ngoại trú',
-      description: 'Thông tin hồ sơ ngoại trú.',
-      path: '/sinh-vien/ngoai-tru',
+      id: 'lich-sinh-hoat',
+      title: 'Lịch sinh hoạt',
+      description: 'Lịch sinh hoạt, sự kiện ngoại khóa.',
+      path: '/sinh-vien/lich-sinh-hoat',
       status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
@@ -177,6 +177,20 @@ class PortalModuleRegistry {
       title: 'Bảo lưu',
       description: 'Đăng ký thôi học hoặc bảo lưu.',
       path: '/sinh-vien/thoi-hoc-bao-luu',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'lich-thi',
+      title: 'Lịch thi',
+      description: 'Xem lịch thi các học kỳ.',
+      path: '/sinh-vien/lich-thi',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'khao-sat-giang-day',
+      title: 'Khảo sát',
+      description: 'Thực hiện khảo sát đánh giá giảng dạy.',
+      path: '/sinh-vien/khao-sat-giang-day',
       status: PortalModuleStatus.nativeImplemented,
     ),
   ];

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import '../../data/portal_api_providers.dart';
 import '../../utils/rsc_parser.dart';
 
@@ -35,13 +36,14 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
         queryParams = jsonDecode(_paramsController.text) as Map<String, dynamic>;
       }
 
-      final options = _useRscHeader 
-          ? Options(headers: {'RSC': '1', 'Next-Router-State-Tree': '%5B%22%22%2C%7B%22children%22%3A%5B%22sinh-vien%22%2C%7B%22children%22%3A%5B%22tkb%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%5D%7D%5D%7D%5D'}) 
-          : null;
-
-      final response = isPost 
-          ? await client.post(url, data: queryParams, queryParameters: queryParams, options: options)
-          : await client.get(url, queryParameters: queryParams, options: options);
+      Response<dynamic> response;
+      if (_useRscHeader && !isPost) {
+        response = await client.getWithRsc(url, queryParameters: queryParams);
+      } else {
+        response = isPost 
+            ? await client.post(url, data: queryParams, queryParameters: queryParams)
+            : await client.get(url, queryParameters: queryParams);
+      }
           
       String formattedData;
       if (response.data is String && _useRscHeader) {
@@ -97,10 +99,12 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
                   spacing: 4,
                   children: [
                     _buildTestButton('/api/sinh-vien/tkb', queryParameters: {'hocKy': '2', 'namHoc': '2025', 'yearId': '17', 'startDate': '2026-03-01'}),
-                    _buildTestButton('/api/sinh-vien/lich-sinh-hoat', queryParameters: {'year': '2024', 'semester': '1'}),
-                    _buildTestButton('/api/sinh-vien/lich-thi', isPost: true),
+                    _buildTestButton('/api/sinh-vien/ho-so'),
+                    _buildTestButton('/api/sinh-vien/lich-sinh-hoat', queryParameters: {'hocKy': '2', 'namHoc': '2025', 'yearId': '17'}),
+                    _buildTestButton('/api/sinh-vien/lich-thi', isPost: true, queryParameters: {'hocKy': '2', 'namHoc': '2025', 'yearId': '17'}),
                     _buildTestButton('/api/sinh-vien/khao-sat-giang-day', isPost: true),
-                    _buildTestButton('/api/sinh-vien/hoc-phi'),
+                    _buildTestButton('/sinh-vien/hoc-phi', isRsc: true),
+                    _buildTestButton('/sinh-vien/dang-vien', isRsc: true),
                   ],
                 ),
                 const Divider(),
@@ -160,14 +164,31 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               color: Colors.black87,
-              child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : SingleChildScrollView(
-                    child: Text(
-                      _result,
-                      style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'),
+              child: Stack(
+                children: [
+                  _isLoading 
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    : SingleChildScrollView(
+                        child: Text(
+                          _result,
+                          style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace'),
+                        ),
+                      ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.copy, color: Colors.white70),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: _result));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã copy kết quả vào Clipboard')),
+                        );
+                      },
                     ),
                   ),
+                ],
+              ),
             ),
           ),
         ],
@@ -175,7 +196,7 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
     );
   }
 
-  Widget _buildTestButton(String path, {bool isPost = false, Map<String, dynamic>? queryParameters}) {
+  Widget _buildTestButton(String path, {bool isPost = false, bool isRsc = false, Map<String, dynamic>? queryParameters}) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.grey[200],
@@ -187,6 +208,9 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
         setState(() {
           _pathController.text = path;
           _paramsController.text = queryParameters != null ? const JsonEncoder.withIndent('  ').convert(queryParameters) : '{}';
+          if (isRsc) {
+            _useRscHeader = true;
+          }
         });
         if (isPost) {
           _testApi(true);
@@ -194,7 +218,8 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
           _testApi(false);
         }
       },
-      child: Text('${isPost ? "POST" : "GET"} $path', overflow: TextOverflow.ellipsis),
+      child: Text('${isRsc ? "RSC" : (isPost ? "POST" : "GET")} $path', overflow: TextOverflow.ellipsis),
     );
   }
 }
+

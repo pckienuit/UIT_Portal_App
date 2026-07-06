@@ -84,3 +84,82 @@ Response shape:
 Native status: implemented
 Notes: Trả về toàn bộ lịch sử điểm của sinh viên trong một lần gọi.
 ```
+
+## 3. Lịch Thi
+
+```text
+Module: Lịch thi
+Screen: ExamScheduleScreen (planned)
+Endpoint: /api/sinh-vien/lich-thi
+Method: POST
+Auth source: server session cookie
+Request shape:
+  JSON Body:
+  - hocKy (int | string)
+  - namHoc (int | string)
+  - yearId (int | string)
+Response shape:
+  JSON Object:
+  - items (List of Objects):
+    - id (string)
+    - maMonHoc (string)
+    - tenMonHoc (string)
+    - maLop (string)
+    - ngayThi (string - YYYY-MM-DD)
+    - caThi (int)
+    - gioBatDau (string - HH:MM)
+    - gioKetThuc (string - HH:MM)
+    - tietBatDau (int)
+    - tietKetThuc (int)
+    - phong (string)
+    - hinhThuc (string)
+    - kyThi (string)
+Native status: planned
+Notes: Bắt buộc dùng POST thay vì GET.
+```
+
+## 4. Lịch Sinh Hoạt
+
+```text
+Module: Lịch sinh hoạt (Ngoại khóa)
+Screen: ExtracurricularScreen (planned)
+Endpoint: /api/sinh-vien/lich-sinh-hoat
+Method: GET
+Auth source: server session cookie
+Request shape:
+  Query Parameters:
+  - hocKy (int | string)
+  - namHoc (int | string)
+  - yearId (int | string)
+Response shape:
+  JSON Object:
+  - items (List of Objects)
+Native status: planned
+Notes: Có thể trả về danh sách trống `{"items": []}` nếu không có lịch.
+```
+
+## 5. Khảo sát giảng dạy
+
+```text
+Module: Khảo sát
+Screen: TeachingSurveyScreen (planned)
+Endpoint: /api/sinh-vien/khao-sat-giang-day
+Method: POST
+Auth source: server session cookie
+Request shape:
+  JSON Body: {} (Chưa rõ tham số bắt buộc)
+Response shape:
+  JSON Object:
+  - items (List)
+  - pendingCount (int)
+  - doneCount (int)
+Native status: planned
+Notes: Bắt buộc dùng POST thay vì GET.
+```
+
+## 6. Các API 404 (Không có JSON Endpoint, cần dùng RSC Fallback)
+
+- **Hồ sơ sinh viên**: `/api/sinh-vien/ho-so` -> 404 Not Found.
+- **Học phí**: `/api/sinh-vien/hoc-phi` -> 404 Not Found.
+- **Đảng viên**: `/api/sinh-vien/dang-vien` -> 404 Not Found.
+*Giải pháp*: Cần gọi trực tiếp URL giao diện `/sinh-vien/...` kèm header `RSC: 1` và `Next-Router-State-Tree` để lấy chuỗi RSC, sau đó dùng Regex hoặc `RscParser` bóc tách dữ liệu JSON bị nhúng trong Component Tree.
