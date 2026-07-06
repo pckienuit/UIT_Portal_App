@@ -28,6 +28,12 @@ flutter test
 flutter build apk --debug
 ```
 
+Or run the project script:
+
+```powershell
+.\scripts\verify_android.ps1 -BuildApk
+```
+
 The debug APK is written to:
 
 ```text
