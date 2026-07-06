@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'auth_controller.dart';
 import 'auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -11,21 +13,29 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+
   @override
-  void initState() {
-    super.initState();
-    Future.microtask(() {
-      final auth = ref.read(authControllerProvider);
-      if (auth.config.canStartNativeAuth) {
-        auth.signIn();
-      }
-    });
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthController>(authControllerProvider, (previous, next) {
+      if (next.isSignedIn) {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+      }
+    });
+
     final auth = ref.watch(authControllerProvider);
-    final configProblem = auth.config.configurationProblem;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Đăng nhập UIT SSO')),
@@ -34,84 +44,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             Text(
-              'Đăng nhập native',
+              'Đăng nhập trực tiếp',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             const Text(
-              'App sẽ mở UIT SSO bằng trình duyệt hệ thống/Custom Tabs theo chuẩn OAuth, không dùng WebView đăng nhập.',
+              'Đăng nhập nội bộ (Native scraping) không thông qua trình duyệt.',
             ),
             const SizedBox(height: 20),
-            if (configProblem != null)
-              _ConfigWarning(
-                message: configProblem,
-                redirectUrl: auth.config.redirectUrl,
+            TextField(
+              controller: _usernameController,
+              decoration: const InputDecoration(
+                labelText: 'Mã sinh viên / Username',
+                border: OutlineInputBorder(),
               ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(
+                labelText: 'Mật khẩu',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+            ),
             if (auth.isBusy) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               const LinearProgressIndicator(),
             ],
             if (auth.lastError != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Text(
                 auth.lastError!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: auth.isBusy || configProblem != null
-                  ? null
-                  : () => ref.read(authControllerProvider).signIn(),
+              onPressed: auth.isBusy ? null : _submit,
               icon: const Icon(Icons.login),
-              label: const Text('Mở UIT SSO'),
+              label: const Text('Đăng nhập'),
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class _ConfigWarning extends StatelessWidget {
-  const _ConfigWarning({required this.message, required this.redirectUrl});
-
-  final String message;
-  final String redirectUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      color: colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cần cấu hình OAuth mobile client',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: colorScheme.onErrorContainer,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: TextStyle(color: colorScheme.onErrorContainer),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Redirect URI cần whitelist: $redirectUrl',
-              style: TextStyle(color: colorScheme.onErrorContainer),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _submit() {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    if (username.isEmpty || password.isEmpty) return;
+    ref.read(authControllerProvider).signInWithCredentials(username, password);
   }
 }

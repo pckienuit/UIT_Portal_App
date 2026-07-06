@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/auth/login_screen.dart';
 
 void main() {
-  testWidgets('shows mobile OAuth configuration warning by default', (
+  testWidgets('shows native scraping login form by default', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -13,14 +13,19 @@ void main() {
 
     await tester.pump();
 
-    expect(find.text('Cần cấu hình OAuth mobile client'), findsOneWidget);
+    expect(find.text('Đăng nhập trực tiếp'), findsOneWidget);
     expect(
-      find.text('Chưa cấu hình UIT_OIDC_CLIENT_ID cho OAuth mobile client.'),
+      find.widgetWithText(TextField, 'Mã sinh viên / Username'),
       findsOneWidget,
     );
-    expect(find.text('Mở UIT SSO'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextField, 'Mật khẩu'),
+      findsOneWidget,
+    );
+    expect(find.text('Đăng nhập'), findsOneWidget);
 
     final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNull);
+    // The button should be enabled by default (auth.isBusy is false)
+    expect(button.onPressed, isNotNull);
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../portal_constants.dart';
 import 'oidc_config.dart';
+import 'sso_scraper_service.dart';
 
 enum AuthStatus { signedOut, signedIn }
 
@@ -12,9 +13,11 @@ class AuthController extends ChangeNotifier {
     FlutterSecureStorage? secureStorage,
     FlutterAppAuth? appAuth,
     OidcConfig? config,
+    SsoScraperService? scraperService,
   }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
        _appAuth = appAuth ?? const FlutterAppAuth(),
-       _config = config ?? const OidcConfig();
+       _config = config ?? const OidcConfig(),
+       _scraperService = scraperService ?? SsoScraperService();
 
   static const String _sessionMarkerKey = 'portal_session_marker';
   static const String _accessTokenKey = 'portal_access_token';
@@ -25,6 +28,7 @@ class AuthController extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage;
   final FlutterAppAuth _appAuth;
   final OidcConfig _config;
+  final SsoScraperService _scraperService;
 
   AuthStatus _status = AuthStatus.signedOut;
   bool _isBusy = false;
@@ -97,6 +101,25 @@ class AuthController extends ChangeNotifier {
       _lastError = null;
     } catch (error) {
       _lastError = _describeAuthError(error);
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> signInWithCredentials(String username, String password) async {
+    _isBusy = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      final session = await _scraperService.scrapeLogin(username, password, _config);
+      await _persistSession(session);
+      _status = AuthStatus.signedIn;
+    } on SsoScraperException catch (error) {
+      _lastError = error.message;
+    } catch (error) {
+      _lastError = 'Đăng nhập thất bại: $error';
     } finally {
       _isBusy = false;
       notifyListeners();
