@@ -5,10 +5,7 @@ import 'package:dio/dio.dart';
 import '../portal_constants.dart';
 
 class PortalApiClient {
-  PortalApiClient({
-    Dio? dio,
-    this.accessTokenProvider,
-  })
+  PortalApiClient({Dio? dio, this.accessTokenProvider})
     : _dio =
           dio ??
           Dio(

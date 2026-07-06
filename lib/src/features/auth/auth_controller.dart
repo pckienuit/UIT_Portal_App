@@ -62,8 +62,9 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> signIn() async {
-    if (!_config.hasClientId) {
-      _lastError = 'Thiếu UIT_OIDC_CLIENT_ID để đăng nhập native.';
+    final configurationProblem = _config.configurationProblem;
+    if (configurationProblem != null) {
+      _lastError = configurationProblem;
       notifyListeners();
       return;
     }
@@ -95,11 +96,19 @@ class AuthController extends ChangeNotifier {
     } on FlutterAppAuthUserCancelledException {
       _lastError = null;
     } catch (error) {
-      _lastError = 'Đăng nhập native chưa hoàn tất: $error';
+      _lastError = _describeAuthError(error);
     } finally {
       _isBusy = false;
       notifyListeners();
     }
+  }
+
+  String _describeAuthError(Object error) {
+    final text = error.toString();
+    if (text.contains('invalid_parameter') && text.contains('redirect_uri')) {
+      return 'UIT SSO từ chối redirect URI mobile. Cần UIT cấp/whitelist OAuth client cho ${_config.redirectUrl}.';
+    }
+    return 'Đăng nhập native chưa hoàn tất: $error';
   }
 
   Future<void> _persistSession(AuthSession session) async {

@@ -1,13 +1,12 @@
 class OidcConfig {
   const OidcConfig({
-    this.clientId = const String.fromEnvironment(
-      'UIT_OIDC_CLIENT_ID',
-      defaultValue: 'portal-fe-prod',
-    ),
+    this.clientId = const String.fromEnvironment('UIT_OIDC_CLIENT_ID'),
     this.redirectUrl = 'com.personal.uitportal:/oauthredirect',
     this.issuer = 'https://sso.uit.edu.vn/realms/UIT',
     this.scopes = const ['openid', 'profile', 'email', 'offline_access'],
   });
+
+  static const String portalWebClientId = 'portal-fe-prod';
 
   final String clientId;
   final String redirectUrl;
@@ -17,6 +16,20 @@ class OidcConfig {
   String get redirectScheme => Uri.parse(redirectUrl).scheme;
 
   bool get hasClientId => clientId.trim().isNotEmpty;
+
+  bool get usesPortalWebClient => clientId == portalWebClientId;
+
+  bool get canStartNativeAuth => hasClientId && !usesPortalWebClient;
+
+  String? get configurationProblem {
+    if (!hasClientId) {
+      return 'Chưa cấu hình UIT_OIDC_CLIENT_ID cho OAuth mobile client.';
+    }
+    if (usesPortalWebClient) {
+      return 'Client portal-fe-prod là client web của portal và không chấp nhận redirect URI mobile $redirectUrl.';
+    }
+    return null;
+  }
 }
 
 class AuthSession {
