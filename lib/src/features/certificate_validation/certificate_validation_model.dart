@@ -9,15 +9,18 @@ class CertificateValidationResponse {
 
   factory CertificateValidationResponse.fromJson(Map<String, dynamic> json) {
     return CertificateValidationResponse(
-      certs: (json['certs'] as List<dynamic>?)
-              ?.map((e) => CertificateRecord.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      certTypes: (json['certTypes'] as List<dynamic>?)
-              ?.map((e) => CertificateType.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      certs: _parseList(json['certs'], (e) => CertificateRecord.fromJson(e as Map<String, dynamic>)),
+      certTypes: _parseList(json['certTypes'], (e) => CertificateType.fromJson(e as Map<String, dynamic>)),
     );
+  }
+
+  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    } else if (data is Map) {
+      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    }
+    return [];
   }
 }
 

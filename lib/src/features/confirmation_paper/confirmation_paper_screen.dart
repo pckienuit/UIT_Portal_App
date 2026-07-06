@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'confirmation_paper_providers.dart';
+import 'confirmation_paper_model.dart';
 
 class ConfirmationPaperScreen extends ConsumerWidget {
   const ConfirmationPaperScreen({super.key});

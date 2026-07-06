@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'certificate_validation_providers.dart';
+import 'certificate_validation_model.dart';
 
 class CertificateValidationScreen extends ConsumerWidget {
   const CertificateValidationScreen({super.key});
@@ -131,7 +132,7 @@ class CertificateValidationScreen extends ConsumerWidget {
                   children: [
                     const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text('Ngày nộp: \${cert.submitDate ?? '--'}'),
+                    Text('Ngày nộp: ${cert.submitDate ?? "--"}'),
                   ],
                 ),
                 if (cert.note != null && cert.note!.isNotEmpty) ...[
@@ -175,7 +176,7 @@ class CertificateValidationScreen extends ConsumerWidget {
               type.name ?? 'Chứng chỉ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text('Loại: \${type.type ?? '--'} | Mã: \${type.code ?? '--'}'),
+            subtitle: Text('Loại: ${type.type ?? "--"} | Mã: ${type.code ?? "--"}'),
             trailing: FilledButton.tonal(
               onPressed: () {},
               child: const Text('Nộp'),

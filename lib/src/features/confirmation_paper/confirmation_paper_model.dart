@@ -13,17 +13,20 @@ class ConfirmationPaperResponse {
 
   factory ConfirmationPaperResponse.fromJson(Map<String, dynamic> json) {
     return ConfirmationPaperResponse(
-      parameters: (json['parameters'] as List<dynamic>?)
-              ?.map((e) => ConfirmationParameter.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      history: (json['history'] as List<dynamic>?)
-              ?.map((e) => ConfirmationHistory.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      parameters: _parseList(json['parameters'], (e) => ConfirmationParameter.fromJson(e as Map<String, dynamic>)),
+      history: _parseList(json['history'], (e) => ConfirmationHistory.fromJson(e as Map<String, dynamic>)),
       fullName: json['fullName'] as String?,
       studentCode: json['studentCode'] as String?,
     );
+  }
+
+  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    } else if (data is Map) {
+      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    }
+    return [];
   }
 }
 

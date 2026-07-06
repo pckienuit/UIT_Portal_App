@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'parking_registration_providers.dart';
+import 'parking_registration_model.dart';
 
 class ParkingRegistrationScreen extends ConsumerWidget {
   const ParkingRegistrationScreen({super.key});
@@ -102,7 +103,7 @@ class ParkingRegistrationScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Loại xe: \${record.vehicleType == 'motorcycle' ? 'Xe máy' : (record.vehicleType == 'bicycle' ? 'Xe đạp' : record.vehicleType ?? 'Không rõ')}',
+                            "Loại xe: ${record.vehicleType == 'motorcycle' ? 'Xe máy' : (record.vehicleType == 'bicycle' ? 'Xe đạp' : record.vehicleType ?? 'Không rõ')}",
                             style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
                           ),
                         ],
@@ -131,20 +132,23 @@ class ParkingRegistrationScreen extends ConsumerWidget {
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInfoRow(Icons.calendar_month, 'Tháng đăng ký: \${record.numberOfMonths ?? 1} tháng'),
-                        const SizedBox(height: 8),
-                        _buildInfoRow(Icons.event_available, 'Hiệu lực: \${record.effectiveDate ?? '--'}'),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoRow(Icons.calendar_month, 'Tháng đăng ký: ${record.numberOfMonths ?? 1} tháng'),
+                          const SizedBox(height: 8),
+                          _buildInfoRow(Icons.event_available, "Hiệu lực: ${record.effectiveDate ?? '--'}"),
+                        ],
+                      ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '\${record.amountPaid ?? 0} / \${record.amountDue ?? 0} VNĐ',
+                          '${record.amountPaid ?? 0} / ${record.amountDue ?? 0} VNĐ',
                           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                         ),
                         const SizedBox(height: 4),

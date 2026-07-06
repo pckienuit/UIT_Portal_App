@@ -9,12 +9,18 @@ class ParkingRegistrationResponse {
 
   factory ParkingRegistrationResponse.fromJson(Map<String, dynamic> json) {
     return ParkingRegistrationResponse(
-      records: (json['records'] as List<dynamic>?)
-              ?.map((e) => ParkingRecord.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      records: _parseList(json['records'], (e) => ParkingRecord.fromJson(e as Map<String, dynamic>)),
       feeConfig: json['feeConfig'] as Map<String, dynamic>?,
     );
+  }
+
+  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    } else if (data is Map) {
+      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+    }
+    return [];
   }
 }
 

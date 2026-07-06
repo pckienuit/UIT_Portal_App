@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'student_card_providers.dart';
+import 'student_card_model.dart';
 
 class StudentCardScreen extends ConsumerWidget {
   const StudentCardScreen({super.key});
