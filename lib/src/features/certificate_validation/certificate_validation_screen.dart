@@ -43,9 +43,155 @@ class CertificateValidationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, dynamic data, ThemeData theme) {
-    return Center(
-      child: Text('Dữ liệu đã tải thành công. Cần code giao diện chi tiết.'),
+  Widget _buildContent(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(text: 'Hồ sơ đã nộp'),
+              Tab(text: 'Loại chứng chỉ'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildSubmittedCertsTab(context, data, theme),
+                _buildCertTypesTab(context, data, theme),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildSubmittedCertsTab(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+    if (data.certs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open, size: 48, color: theme.dividerColor),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa nộp chứng chỉ nào',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+            ),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: data.certs.length,
+      itemBuilder: (context, index) {
+        final cert = data.certs[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.dividerColor),
+          ),
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cert.name ?? 'Chứng chỉ',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(cert.status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        cert.status ?? 'Đang chờ',
+                        style: TextStyle(
+                          color: _getStatusColor(cert.status),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text('Ngày nộp: \${cert.submitDate ?? '--'}'),
+                  ],
+                ),
+                if (cert.note != null && cert.note!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ghi chú: \${cert.note}',
+                    style: TextStyle(color: Colors.red.shade700, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCertTypesTab(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+    if (data.certTypes.isEmpty) {
+      return const Center(child: Text('Không có dữ liệu loại chứng chỉ.'));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: data.certTypes.length,
+      itemBuilder: (context, index) {
+        final type = data.certTypes[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.dividerColor),
+          ),
+          elevation: 0,
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Icon(Icons.school, color: theme.colorScheme.primary),
+            ),
+            title: Text(
+              type.name ?? 'Chứng chỉ',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('Loại: \${type.type ?? '--'} | Mã: \${type.code ?? '--'}'),
+            trailing: FilledButton.tonal(
+              onPressed: () {},
+              child: const Text('Nộp'),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    if (status == null) return Colors.grey;
+    final s = status.toLowerCase();
+    if (s.contains('hợp lệ') || s.contains('đã xác nhận')) return Colors.green;
+    if (s.contains('chờ') || s.contains('đang')) return Colors.orange;
+    if (s.contains('hủy') || s.contains('không')) return Colors.red;
+    return Colors.blue;
   }
 }

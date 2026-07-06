@@ -43,9 +43,49 @@ class StudentCardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, dynamic data, ThemeData theme) {
-    return Center(
-      child: Text('Dữ liệu đã tải thành công. Cần code giao diện chi tiết.'),
+  Widget _buildContent(BuildContext context, StudentCardResponse data, ThemeData theme) {
+    if (data.records.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.badge, size: 64, color: theme.dividerColor),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa có dữ liệu thẻ sinh viên',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: data.records.length,
+      itemBuilder: (context, index) {
+        final record = data.records[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.badge, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text('Thẻ Sinh Viên', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Divider(),
+                Text(record.toString()),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
