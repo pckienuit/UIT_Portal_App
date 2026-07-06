@@ -5,10 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../portal_module_registry.dart';
 import '../auth/auth_providers.dart';
 import '../../data/portal_api_providers.dart';
-import 'package:dio/dio.dart';
-import 'dart:developer' as developer;
 
-import '../auth/auth_controller.dart';
 import '../../utils/api_scanner.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -67,28 +64,34 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     _SessionStatusPill(isSignedIn: auth.isSignedIn),
-                      const SizedBox(height: 12),
-                      if (auth.isSignedIn) ...[
-                        FilledButton.icon(
-                          onPressed: () {
-                            ApiScanner.scan(ref.read(portalApiClientProvider));
-                          },
-                          icon: const Icon(Icons.radar),
-                          label: const Text('Scan 23 APIs'),
-                        ),
-                        const SizedBox(height: 8),
-                      ] else ...[
-                        FilledButton.icon(
-                          onPressed: () => context.push('/login'),
-                          icon: const Icon(Icons.verified_user_outlined),
-                          label: const Text('Đăng nhập với UIT SSO'),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    if (auth.isSignedIn) ...[
+                      FilledButton.icon(
+                        onPressed: () {
+                          ApiScanner.scan(ref.read(portalApiClientProvider));
+                        },
+                        icon: const Icon(Icons.radar),
+                        label: const Text('Scan 23 APIs'),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        onPressed: () => context.push('/api-debugger'),
+                        icon: const Icon(Icons.bug_report),
+                        label: const Text('API Debugger'),
+                      ),
+                      const SizedBox(height: 8),
+                    ] else ...[
+                      FilledButton.icon(
+                        onPressed: () => context.push('/login'),
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: const Text('Đăng nhập với UIT SSO'),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Module portal',
               style: Theme.of(

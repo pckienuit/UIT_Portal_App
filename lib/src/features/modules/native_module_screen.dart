@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../profile/profile_screen.dart';
 import '../../portal_module_registry.dart';
@@ -71,20 +70,34 @@ class _DashboardNativeBody extends ConsumerWidget {
             onPressed: () => _testRscPayload(context, apiClient, auth),
             child: const Text('Fetch RSC (Next.js)'),
           ),
-        ]
+        ],
       ],
     );
   }
 }
 
-final TextEditingController _urlController = TextEditingController(text: '/sinh-vien/ly-lich');
+final TextEditingController _urlController = TextEditingController(
+  text: '/sinh-vien/ly-lich',
+);
 
 extension on _DashboardNativeBody {
-  Future<void> _testRscPayload(BuildContext context, PortalApiClient client, AuthController auth) async {
+  Future<void> _testRscPayload(
+    BuildContext context,
+    PortalApiClient client,
+    AuthController auth,
+  ) async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (c) => const AlertDialog(content: Row(children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Đang fetch...')])),
+      builder: (c) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Đang fetch...'),
+          ],
+        ),
+      ),
     );
 
     String result = '';
@@ -92,13 +105,9 @@ extension on _DashboardNativeBody {
     try {
       final res = await client.get<dynamic>(
         path,
-        options: Options(
-          headers: {
-            'RSC': '1',
-          }
-        )
+        options: Options(headers: {'RSC': '1'}),
       );
-      
+
       final dataStr = res.data.toString();
       print('=== RSC PAYLOAD START ===');
       final pattern = RegExp('.{1,500}', dotAll: true);
@@ -106,15 +115,17 @@ extension on _DashboardNativeBody {
         print(match.group(0));
       }
       print('=== RSC PAYLOAD END ===');
-      final preview = dataStr.length > 3000 ? dataStr.substring(0, 3000) : dataStr;
+      final preview = dataStr.length > 3000
+          ? dataStr.substring(0, 3000)
+          : dataStr;
       result = '✅ $path (RSC): ${res.statusCode}\n\n$preview';
     } on PortalApiException catch (e) {
       result = '❌ $path: ${e.statusCode}';
     } catch (e) {
       if (e is DioException) {
-         result = '❌ Dio Error: ${e.response?.statusCode}\n${e.message}';
+        result = '❌ Dio Error: ${e.response?.statusCode}\n${e.message}';
       } else {
-         result = '❌ Error: $e';
+        result = '❌ Error: $e';
       }
     }
 
@@ -124,11 +135,12 @@ extension on _DashboardNativeBody {
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Kết quả lấy RSC Payload'),
-          content: SingleChildScrollView(
-            child: Text(result),
-          ),
+          content: SingleChildScrollView(child: Text(result)),
           actions: [
-            TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('Đóng'))
+            TextButton(
+              onPressed: () => Navigator.of(c).pop(),
+              child: const Text('Đóng'),
+            ),
           ],
         ),
       );
@@ -197,17 +209,17 @@ class _NativeInfoPanel extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text('Xem Hồ sơ cá nhân (RSC Parsed)'),
-                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Xem Hồ sơ cá nhân (RSC Parsed)'),
+                  ),
                   const SizedBox(height: 6),
                   Text(message),
                 ],

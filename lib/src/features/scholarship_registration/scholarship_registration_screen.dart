@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'scholarship_registration_providers.dart';
 import 'scholarship_registration_model.dart';
-import 'scholarship_registration_model.dart';
 
 class ScholarshipRegistrationScreen extends ConsumerWidget {
   const ScholarshipRegistrationScreen({super.key});
@@ -14,10 +13,7 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
     final state = ref.watch(scholarship_registrationProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Học bổng'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Học bổng'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -34,10 +30,11 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () => ref.invalidate(scholarship_registrationProvider),
+                onPressed: () =>
+                    ref.invalidate(scholarship_registrationProvider),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
-              )
+              ),
             ],
           ),
         ),
@@ -45,7 +42,11 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, ScholarshipRegistrationResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    ScholarshipRegistrationResponse data,
+    ThemeData theme,
+  ) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -59,7 +60,10 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: theme.colorScheme.onPrimaryContainer),
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -84,7 +88,11 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  Icon(Icons.card_giftcard, size: 64, color: theme.disabledColor),
+                  Icon(
+                    Icons.card_giftcard,
+                    size: 64,
+                    color: theme.disabledColor,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Chưa có dữ liệu học bổng.',
@@ -95,17 +103,19 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
             ),
           )
         else
-          ...data.scholarships.map((e) => Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: theme.dividerColor),
+          ...data.scholarships.map(
+            (e) => Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: theme.dividerColor),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.star, color: Colors.orange),
+                title: Text(e.toString()),
+              ),
             ),
-            child: ListTile(
-              leading: Icon(Icons.star, color: Colors.orange),
-              title: Text(e.toString()),
-            ),
-          )),
+          ),
       ],
     );
   }

@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'graduation_registration_providers.dart';
-import 'graduation_registration_model.dart';
-import 'graduation_registration_model.dart';
+import 'health_insurance_providers.dart';
+import 'health_insurance_model.dart';
 
-class GraduationRegistrationScreen extends ConsumerWidget {
-  const GraduationRegistrationScreen({super.key});
+class HealthInsuranceScreen extends ConsumerWidget {
+  const HealthInsuranceScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final state = ref.watch(graduation_registrationProvider);
+    final state = ref.watch(healthInsuranceProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tốt nghiệp'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Bảo hiểm'),
+        centerTitle: true,
+      ),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -31,11 +33,10 @@ class GraduationRegistrationScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () =>
-                    ref.invalidate(graduation_registrationProvider),
+                onPressed: () => ref.invalidate(healthInsuranceProvider),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
-              ),
+              )
             ],
           ),
         ),
@@ -43,11 +44,7 @@ class GraduationRegistrationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    GraduationRegistrationResponse data,
-    ThemeData theme,
-  ) {
+  Widget _buildContent(BuildContext context, HealthInsuranceResponse data, ThemeData theme) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -61,10 +58,7 @@ class GraduationRegistrationScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
+                Icon(Icons.info_outline, color: theme.colorScheme.onPrimaryContainer),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -78,59 +72,80 @@ class GraduationRegistrationScreen extends ConsumerWidget {
               ],
             ),
           ),
-        if (data.error != null)
+        
+        if (data.profile != null) ...[
+          Text('Hồ sơ Bảo hiểm', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
           Card(
             elevation: 0,
-            color: theme.colorScheme.errorContainer,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: theme.colorScheme.error.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: theme.colorScheme.error,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    data.error!,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onErrorContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          Card(
-            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: theme.dividerColor),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.school, size: 64, color: Colors.green),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Hệ thống đang mở xét tốt nghiệp.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  _buildRow('Mã bảo hiểm', data.profile?.insuranceCode),
+                  const SizedBox(height: 8),
+                  _buildRow('Thời hạn', data.profile?.insurancePeriod),
+                  const SizedBox(height: 8),
+                  _buildRow('Loại bảo hiểm', data.profile?.insuranceType),
                 ],
               ),
             ),
           ),
+        ],
+
+        if (data.config != null) ...[
+          Text('Cấu hình hiện tại', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.dividerColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildRow('Năm', data.config?.year),
+                  const SizedBox(height: 8),
+                  _buildRow('Số tiền', data.config?.amount?.toString()),
+                  const SizedBox(height: 8),
+                  _buildRow('Thời gian', '${data.config?.startDate ?? ''} - ${data.config?.endDate ?? ''}'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRow(String label, String? value) {
+    if (value == null || value.isEmpty) return const SizedBox.shrink();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
       ],
     );
   }

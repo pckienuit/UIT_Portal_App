@@ -126,13 +126,13 @@ class ExamPostponementScreen extends ConsumerWidget {
   }) {
     final color = isOpen ? Colors.green : Colors.orange;
     final icon = isOpen ? Icons.check_circle_outline : Icons.access_time;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,16 +145,13 @@ class ExamPostponementScreen extends ConsumerWidget {
               children: [
                 Text(
                   isOpen ? 'Đang mở đăng ký' : 'Chưa mở đăng ký',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   title,
                   style: TextStyle(
-                    color: color.withOpacity(0.8),
+                    color: color.withValues(alpha: 0.8),
                     fontSize: 13,
                   ),
                 ),
@@ -177,15 +174,15 @@ class ExamPostponementScreen extends ConsumerWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(
-              Icons.inbox,
-              size: 48,
-              color: theme.dividerColor,
-            ),
+            Icon(Icons.inbox, size: 48, color: theme.dividerColor),
             const SizedBox(height: 16),
             Text(
               message,
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
+              ),
               textAlign: TextAlign.center,
             ),
           ],

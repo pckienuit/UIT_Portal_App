@@ -14,10 +14,7 @@ class StudentSupportScreen extends ConsumerWidget {
     final state = ref.watch(student_supportProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hỗ trợ SV'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Hỗ trợ SV'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -37,7 +34,7 @@ class StudentSupportScreen extends ConsumerWidget {
                 onPressed: () => ref.invalidate(student_supportProvider),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
-              )
+              ),
             ],
           ),
         ),
@@ -45,7 +42,11 @@ class StudentSupportScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, StudentSupportResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    StudentSupportResponse data,
+    ThemeData theme,
+  ) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -77,7 +78,10 @@ class StudentSupportScreen extends ConsumerWidget {
           children: [
             Icon(Icons.headset_mic, size: 64, color: theme.disabledColor),
             const SizedBox(height: 16),
-            Text('Chưa có yêu cầu hỗ trợ nào.', style: TextStyle(color: theme.disabledColor)),
+            Text(
+              'Chưa có yêu cầu hỗ trợ nào.',
+              style: TextStyle(color: theme.disabledColor),
+            ),
           ],
         ),
       );
@@ -121,13 +125,19 @@ class StudentSupportScreen extends ConsumerWidget {
                   children: [
                     CircleAvatar(
                       backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(Icons.group, color: theme.colorScheme.primary),
+                      child: Icon(
+                        Icons.group,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
                         team.name ?? 'Phòng ban',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ],
@@ -138,7 +148,11 @@ class StudentSupportScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     team.teamNote!,
-                    style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8)),
+                    style: TextStyle(
+                      color: theme.textTheme.bodyMedium?.color?.withValues(
+                        alpha: 0.8,
+                      ),
+                    ),
                   ),
                 ],
               ],

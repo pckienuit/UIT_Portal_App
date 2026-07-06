@@ -1,24 +1,33 @@
 class CertificateValidationResponse {
-  CertificateValidationResponse({
-    required this.certs,
-    required this.certTypes,
-  });
+  CertificateValidationResponse({required this.certs, required this.certTypes});
 
   final List<CertificateRecord> certs;
   final List<CertificateType> certTypes;
 
   factory CertificateValidationResponse.fromJson(Map<String, dynamic> json) {
     return CertificateValidationResponse(
-      certs: _parseList(json['certs'], (e) => CertificateRecord.fromJson(e as Map<String, dynamic>)),
-      certTypes: _parseList(json['certTypes'], (e) => CertificateType.fromJson(e as Map<String, dynamic>)),
+      certs: _parseList(json['certs'], (e) => CertificateRecord.fromJson(e)),
+      certTypes: _parseList(
+        json['certTypes'],
+        (e) => CertificateType.fromJson(e),
+      ),
     );
   }
 
-  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+  static List<T> _parseList<T>(
+    dynamic data,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     } else if (data is Map) {
-      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data.values
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     }
     return [];
   }
@@ -51,13 +60,7 @@ class CertificateRecord {
 }
 
 class CertificateType {
-  CertificateType({
-    this.id,
-    this.code,
-    this.name,
-    this.type,
-    this.abbrName,
-  });
+  CertificateType({this.id, this.code, this.name, this.type, this.abbrName});
 
   final int? id;
   final String? code;

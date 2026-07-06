@@ -13,30 +13,40 @@ class ConfirmationPaperResponse {
 
   factory ConfirmationPaperResponse.fromJson(Map<String, dynamic> json) {
     return ConfirmationPaperResponse(
-      parameters: _parseList(json['parameters'], (e) => ConfirmationParameter.fromJson(e as Map<String, dynamic>)),
-      history: _parseList(json['history'], (e) => ConfirmationHistory.fromJson(e as Map<String, dynamic>)),
+      parameters: _parseList(
+        json['parameters'],
+        (e) => ConfirmationParameter.fromJson(e),
+      ),
+      history: _parseList(
+        json['history'],
+        (e) => ConfirmationHistory.fromJson(e),
+      ),
       fullName: json['fullName'] as String?,
       studentCode: json['studentCode'] as String?,
     );
   }
 
-  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+  static List<T> _parseList<T>(
+    dynamic data,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     } else if (data is Map) {
-      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data.values
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     }
     return [];
   }
 }
 
 class ConfirmationParameter {
-  ConfirmationParameter({
-    this.id,
-    this.parameter,
-    this.displayName,
-    this.cost,
-  });
+  ConfirmationParameter({this.id, this.parameter, this.displayName, this.cost});
 
   final String? id;
   final String? parameter;

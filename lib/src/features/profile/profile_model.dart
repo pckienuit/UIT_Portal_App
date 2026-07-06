@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 class StudentProfile {
   final String sub;
   final String username;
   final String displayName;
   final String email;
   final String role;
-  
+
   StudentProfile({
     required this.sub,
     required this.username,

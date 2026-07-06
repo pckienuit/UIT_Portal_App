@@ -18,6 +18,11 @@ import 'features/thesis_registration/thesis_registration_screen.dart';
 import 'features/graduation_registration/graduation_registration_screen.dart';
 import 'features/scholarship_registration/scholarship_registration_screen.dart';
 import 'features/student_support/student_support_screen.dart';
+import 'features/extracurricular/extracurricular_screen.dart';
+import 'features/health_insurance/health_insurance_screen.dart';
+import 'features/tuition_extension/tuition_extension_screen.dart';
+import 'features/study_reservation/study_reservation_screen.dart';
+import 'features/debug/api_debugger_screen.dart';
 import 'portal_module_registry.dart';
 
 class UitPortalApp extends StatelessWidget {
@@ -28,6 +33,7 @@ class UitPortalApp extends StatelessWidget {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/api-debugger', builder: (context, state) => const ApiDebuggerScreen()),
       GoRoute(
         path: '/module/:moduleId',
         builder: (context, state) {
@@ -72,6 +78,18 @@ class UitPortalApp extends StatelessWidget {
           }
           if (moduleId == 'revaluation') {
             return const RevaluationScreen();
+          }
+          if (moduleId == 'ngoai-tru') {
+            return const ExtracurricularScreen();
+          }
+          if (moduleId == 'bao-hiem') {
+            return const HealthInsuranceScreen();
+          }
+          if (moduleId == 'gia-han-hoc-phi') {
+            return const TuitionExtensionScreen();
+          }
+          if (moduleId == 'thoi-hoc-bao-luu') {
+            return const StudyReservationScreen();
           }
 
           final module = PortalModuleRegistry.byId(moduleId);

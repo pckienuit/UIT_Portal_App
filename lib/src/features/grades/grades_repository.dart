@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../../data/portal_api_client.dart';
 import 'grades_model.dart';
 
@@ -9,7 +8,7 @@ class GradesRepository {
 
   Future<GradesResponse> fetchGrades() async {
     final response = await apiClient.get('/api/sinh-vien/bang-diem');
-    
+
     if (response.data is Map<String, dynamic>) {
       return GradesResponse.fromJson(response.data as Map<String, dynamic>);
     } else {

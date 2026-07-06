@@ -13,10 +13,7 @@ class TrainingPointScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Điểm rèn luyện'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Điểm rèn luyện'), centerTitle: true),
       body: trainingPointAsync.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -51,19 +48,14 @@ class TrainingPointScreen extends ConsumerWidget {
   ) {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: _buildSummaryCards(context, data, theme),
-        ),
+        SliverToBoxAdapter(child: _buildSummaryCards(context, data, theme)),
         SliverPadding(
           padding: const EdgeInsets.all(16.0),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final history = data.trainingPointHistory[index];
-                return _buildHistoryCard(context, history, theme);
-              },
-              childCount: data.trainingPointHistory.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final history = data.trainingPointHistory[index];
+              return _buildHistoryCard(context, history, theme);
+            }, childCount: data.trainingPointHistory.length),
           ),
         ),
       ],
@@ -114,7 +106,9 @@ class TrainingPointScreen extends ConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isExcellent ? Colors.green.withOpacity(0.5) : theme.dividerColor,
+          color: isExcellent
+              ? Colors.green.withValues(alpha: 0.5)
+              : theme.dividerColor,
           width: isExcellent ? 1.5 : 1,
         ),
       ),
@@ -133,9 +127,12 @@ class TrainingPointScreen extends ConsumerWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: _getRankColor(history.rank).withOpacity(0.1),
+                    color: _getRankColor(history.rank).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -155,7 +152,9 @@ class TrainingPointScreen extends ConsumerWidget {
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -170,7 +169,9 @@ class TrainingPointScreen extends ConsumerWidget {
                 Icon(
                   Icons.people,
                   size: 16,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -246,13 +247,13 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

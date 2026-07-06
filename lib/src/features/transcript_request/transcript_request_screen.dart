@@ -13,10 +13,7 @@ class TranscriptRequestScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Xin bảng điểm'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Xin bảng điểm'), centerTitle: true),
       body: transcriptRequestAsync.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -52,7 +49,8 @@ class TranscriptRequestScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        if (data.feePaymentLocation != null && data.feePaymentLocation!.isNotEmpty)
+        if (data.feePaymentLocation != null &&
+            data.feePaymentLocation!.isNotEmpty)
           _buildInfoAlert(context, data.feePaymentLocation!, theme),
         const SizedBox(height: 24),
         Text(
@@ -87,15 +85,15 @@ class TranscriptRequestScreen extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                Icon(
-                  Icons.history,
-                  size: 48,
-                  color: theme.dividerColor,
-                ),
+                Icon(Icons.history, size: 48, color: theme.dividerColor),
                 const SizedBox(height: 16),
                 Text(
                   'Chưa có yêu cầu xin bảng điểm nào',
-                  style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+                  style: TextStyle(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(
+                      alpha: 0.6,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -107,13 +105,17 @@ class TranscriptRequestScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoAlert(BuildContext context, String message, ThemeData theme) {
+  Widget _buildInfoAlert(
+    BuildContext context,
+    String message,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.blue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +168,9 @@ class TranscriptRequestScreen extends ConsumerWidget {
         trailing: FilledButton.tonal(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tính năng đăng ký đang phát triển')),
+              const SnackBar(
+                content: Text('Tính năng đăng ký đang phát triển'),
+              ),
             );
           },
           child: const Text('Đăng ký'),

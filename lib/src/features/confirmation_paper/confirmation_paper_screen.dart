@@ -13,10 +13,7 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Giấy xác nhận'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Giấy xác nhận'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -44,7 +41,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, ConfirmationPaperResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    ConfirmationPaperResponse data,
+    ThemeData theme,
+  ) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -68,7 +69,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRegistrationTab(BuildContext context, ConfirmationPaperResponse data, ThemeData theme) {
+  Widget _buildRegistrationTab(
+    BuildContext context,
+    ConfirmationPaperResponse data,
+    ThemeData theme,
+  ) {
     if (data.parameters.isEmpty) {
       return const Center(child: Text('Không có loại giấy xác nhận nào.'));
     }
@@ -120,7 +125,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHistoryTab(BuildContext context, ConfirmationPaperResponse data, ThemeData theme) {
+  Widget _buildHistoryTab(
+    BuildContext context,
+    ConfirmationPaperResponse data,
+    ThemeData theme,
+  ) {
     if (data.history.isEmpty) {
       return Center(
         child: Column(
@@ -130,7 +139,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(
               'Chưa có lịch sử đăng ký',
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
+              ),
             ),
           ],
         ),
@@ -159,13 +172,21 @@ class ConfirmationPaperScreen extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         item.paperName ?? 'Giấy xác nhận',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(item.status).withOpacity(0.1),
+                        color: _getStatusColor(
+                          item.status,
+                        ).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -186,7 +207,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
                     const SizedBox(width: 4),
                     Text('Số lượng: \${item.quantity ?? 1}'),
                     const SizedBox(width: 16),
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 4),
                     Text(item.requestDate ?? '--'),
                   ],
@@ -196,7 +221,9 @@ class ConfirmationPaperScreen extends ConsumerWidget {
                   children: [
                     const Icon(Icons.payments, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text('Đã thanh toán: \${item.amountPaid ?? 0} / \${item.amountDue ?? 0} VNĐ'),
+                    Text(
+                      'Đã thanh toán: \${item.amountPaid ?? 0} / \${item.amountDue ?? 0} VNĐ',
+                    ),
                   ],
                 ),
               ],

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'thesis_registration_providers.dart';
-import 'thesis_registration_model.dart';
+import 'tuition_extension_providers.dart';
+import 'tuition_extension_model.dart';
 
-class ThesisRegistrationScreen extends ConsumerWidget {
-  const ThesisRegistrationScreen({super.key});
+class TuitionExtensionScreen extends ConsumerWidget {
+  const TuitionExtensionScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final state = ref.watch(thesis_registrationProvider);
+    final state = ref.watch(tuitionExtensionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Khóa luận'), centerTitle: true),
+      appBar: AppBar(title: const Text('Gia hạn học phí'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -30,7 +30,7 @@ class ThesisRegistrationScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
-                onPressed: () => ref.invalidate(thesis_registrationProvider),
+                onPressed: () => ref.invalidate(tuitionExtensionProvider),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
               ),
@@ -43,7 +43,7 @@ class ThesisRegistrationScreen extends ConsumerWidget {
 
   Widget _buildContent(
     BuildContext context,
-    ThesisRegistrationResponse data,
+    TuitionExtensionResponse data,
     ThemeData theme,
   ) {
     return ListView(
@@ -78,6 +78,7 @@ class ThesisRegistrationScreen extends ConsumerWidget {
           ),
         Card(
           elevation: 0,
+          margin: const EdgeInsets.only(bottom: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: theme.dividerColor),
@@ -87,16 +88,19 @@ class ThesisRegistrationScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Icon(
-                  data.hasThesis == true ? Icons.check_circle : Icons.cancel,
+                  data.periodStatusOpen == true
+                      ? Icons.event_available
+                      : Icons.event_busy,
                   size: 64,
-                  color: data.hasThesis == true ? Colors.green : Colors.grey,
+                  color: data.periodStatusOpen == true
+                      ? Colors.green
+                      : Colors.grey,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  data.message ??
-                      (data.hasThesis == true
-                          ? 'Bạn đủ điều kiện làm khóa luận.'
-                          : 'Bạn chưa đủ điều kiện làm khóa luận.'),
+                  data.periodStatusOpen == true
+                      ? 'Đang trong đợt gia hạn học phí.'
+                      : 'Hiện không trong đợt gia hạn học phí.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleMedium,
                 ),
@@ -104,6 +108,33 @@ class ThesisRegistrationScreen extends ConsumerWidget {
             ),
           ),
         ),
+        Text(
+          'Lịch sử gia hạn',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (data.history == null || data.history!.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: Text('Chưa có lịch sử gia hạn học phí')),
+          )
+        else
+          ...data.history!.map(
+            (record) => Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: theme.dividerColor),
+              ),
+              child: ListTile(
+                title: const Text('Gia hạn học phí'),
+                subtitle: Text(record.toString()),
+              ),
+            ),
+          ),
       ],
     );
   }

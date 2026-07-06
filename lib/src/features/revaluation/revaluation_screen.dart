@@ -67,9 +67,14 @@ class RevaluationScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16.0),
       children: [
         if (data.eligible.isEmpty)
-          _buildEmptyState(theme, 'Hiện tại không có môn nào có thể đăng ký phúc khảo.')
+          _buildEmptyState(
+            theme,
+            'Hiện tại không có môn nào có thể đăng ký phúc khảo.',
+          )
         else
-          ...data.eligible.map((item) => _buildEligibleCard(context, item, theme)),
+          ...data.eligible.map(
+            (item) => _buildEligibleCard(context, item, theme),
+          ),
       ],
     );
   }
@@ -108,16 +113,21 @@ class RevaluationScreen extends ConsumerWidget {
                       Text(
                         'Mã lớp: ${item.sectionClassCode ?? '--'}',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -154,7 +164,9 @@ class RevaluationScreen extends ConsumerWidget {
                 FilledButton.tonal(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Tính năng phúc khảo đang phát triển')),
+                      const SnackBar(
+                        content: Text('Tính năng phúc khảo đang phát triển'),
+                      ),
                     );
                   },
                   child: const Text('Phúc khảo'),
@@ -178,7 +190,9 @@ class RevaluationScreen extends ConsumerWidget {
         if (data.history.isEmpty)
           _buildEmptyState(theme, 'Không có lịch sử phúc khảo.')
         else
-          ...data.history.map((item) => _buildHistoryCard(context, item, theme)),
+          ...data.history.map(
+            (item) => _buildHistoryCard(context, item, theme),
+          ),
       ],
     );
   }
@@ -217,16 +231,21 @@ class RevaluationScreen extends ConsumerWidget {
                       Text(
                         'Lớp: ${item.classCode ?? '--'}',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -271,15 +290,15 @@ class RevaluationScreen extends ConsumerWidget {
       child: Center(
         child: Column(
           children: [
-            Icon(
-              Icons.inbox,
-              size: 48,
-              color: theme.dividerColor,
-            ),
+            Icon(Icons.inbox, size: 48, color: theme.dividerColor),
             const SizedBox(height: 16),
             Text(
               message,
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
+              ),
               textAlign: TextAlign.center,
             ),
           ],

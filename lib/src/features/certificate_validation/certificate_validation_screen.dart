@@ -33,7 +33,8 @@ class CertificateValidationScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: () => ref.refresh(certificate_validationFutureProvider),
+                onPressed: () =>
+                    ref.refresh(certificate_validationFutureProvider),
                 icon: Icon(Icons.refresh),
                 label: const Text('Thử lại'),
               ),
@@ -44,7 +45,11 @@ class CertificateValidationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    CertificateValidationResponse data,
+    ThemeData theme,
+  ) {
     return DefaultTabController(
       length: 2,
       child: Column(
@@ -68,7 +73,11 @@ class CertificateValidationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSubmittedCertsTab(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+  Widget _buildSubmittedCertsTab(
+    BuildContext context,
+    CertificateValidationResponse data,
+    ThemeData theme,
+  ) {
     if (data.certs.isEmpty) {
       return Center(
         child: Column(
@@ -78,7 +87,11 @@ class CertificateValidationScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(
               'Chưa nộp chứng chỉ nào',
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
+              ),
             ),
           ],
         ),
@@ -107,13 +120,21 @@ class CertificateValidationScreen extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         cert.name ?? 'Chứng chỉ',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(cert.status).withOpacity(0.1),
+                        color: _getStatusColor(
+                          cert.status,
+                        ).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -130,7 +151,11 @@ class CertificateValidationScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 4),
                     Text('Ngày nộp: ${cert.submitDate ?? "--"}'),
                   ],
@@ -139,7 +164,10 @@ class CertificateValidationScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Ghi chú: \${cert.note}',
-                    style: TextStyle(color: Colors.red.shade700, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ],
@@ -150,7 +178,11 @@ class CertificateValidationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCertTypesTab(BuildContext context, CertificateValidationResponse data, ThemeData theme) {
+  Widget _buildCertTypesTab(
+    BuildContext context,
+    CertificateValidationResponse data,
+    ThemeData theme,
+  ) {
     if (data.certTypes.isEmpty) {
       return const Center(child: Text('Không có dữ liệu loại chứng chỉ.'));
     }
@@ -176,7 +208,9 @@ class CertificateValidationScreen extends ConsumerWidget {
               type.name ?? 'Chứng chỉ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text('Loại: ${type.type ?? "--"} | Mã: ${type.code ?? "--"}'),
+            subtitle: Text(
+              'Loại: ${type.type ?? "--"} | Mã: ${type.code ?? "--"}',
+            ),
             trailing: FilledButton.tonal(
               onPressed: () {},
               child: const Text('Nộp'),

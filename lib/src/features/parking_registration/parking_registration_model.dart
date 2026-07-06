@@ -1,24 +1,30 @@
 class ParkingRegistrationResponse {
-  ParkingRegistrationResponse({
-    required this.records,
-    this.feeConfig,
-  });
+  ParkingRegistrationResponse({required this.records, this.feeConfig});
 
   final List<ParkingRecord> records;
   final Map<String, dynamic>? feeConfig;
 
   factory ParkingRegistrationResponse.fromJson(Map<String, dynamic> json) {
     return ParkingRegistrationResponse(
-      records: _parseList(json['records'], (e) => ParkingRecord.fromJson(e as Map<String, dynamic>)),
+      records: _parseList(json['records'], (e) => ParkingRecord.fromJson(e)),
       feeConfig: json['feeConfig'] as Map<String, dynamic>?,
     );
   }
 
-  static List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+  static List<T> _parseList<T>(
+    dynamic data,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     } else if (data is Map) {
-      return data.values.whereType<Map<String, dynamic>>().map((e) => fromJson(e)).toList();
+      return data.values
+          .whereType<Map<String, dynamic>>()
+          .map((e) => fromJson(e))
+          .toList();
     }
     return [];
   }

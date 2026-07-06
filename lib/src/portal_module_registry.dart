@@ -144,6 +144,34 @@ class PortalModuleRegistry {
       path: '/sinh-vien/ho-tro',
       status: PortalModuleStatus.nativeImplemented,
     ),
+    PortalModule(
+      id: 'ngoai-tru',
+      title: 'Ngoại trú',
+      description: 'Thông tin hồ sơ ngoại trú.',
+      path: '/sinh-vien/ngoai-tru',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'bao-hiem',
+      title: 'Bảo hiểm',
+      description: 'Thông tin bảo hiểm y tế.',
+      path: '/sinh-vien/bao-hiem',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'gia-han-hoc-phi',
+      title: 'Gia hạn học phí',
+      description: 'Đăng ký gia hạn đóng học phí.',
+      path: '/sinh-vien/gia-han-hoc-phi',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'thoi-hoc-bao-luu',
+      title: 'Bảo lưu',
+      description: 'Đăng ký thôi học hoặc bảo lưu.',
+      path: '/sinh-vien/thoi-hoc-bao-luu',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
   ];
 
   static PortalModule byId(String id) {

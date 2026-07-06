@@ -13,10 +13,7 @@ class StudentCardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Thẻ sinh viên'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Thẻ sinh viên'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -44,7 +41,11 @@ class StudentCardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, StudentCardResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    StudentCardResponse data,
+    ThemeData theme,
+  ) {
     if (data.records.isEmpty) {
       return Center(
         child: Column(
@@ -54,13 +55,17 @@ class StudentCardScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(
               'Chưa có dữ liệu thẻ sinh viên',
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.6,
+                ),
+              ),
             ),
           ],
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: data.records.length,
@@ -77,7 +82,12 @@ class StudentCardScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.badge, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
-                    Text('Thẻ Sinh Viên', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Thẻ Sinh Viên',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 const Divider(),
