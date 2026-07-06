@@ -9,6 +9,7 @@ import 'features/certificate_validation/certificate_validation_screen.dart';
 import 'features/student_card/student_card_screen.dart';
 import 'features/parking_registration/parking_registration_screen.dart';
 
+import 'features/profile/profile_screen.dart';
 import 'features/grades/grades_screen.dart';
 import 'features/schedule/schedule_screen.dart';
 import 'features/training_point/training_point_screen.dart';
@@ -43,6 +44,7 @@ class UitPortalApp extends StatelessWidget {
           final moduleId = state.pathParameters['moduleId'] ?? '';
           print('GoRoute routing to: $moduleId');
           
+          if (moduleId == 'profile') return const ProfileScreen();
           if (moduleId == 'grades') return const GradesScreen();
           if (moduleId == 'tkb') return const ScheduleScreen();
           if (moduleId == 'confirmation_paper') return const ConfirmationPaperScreen();

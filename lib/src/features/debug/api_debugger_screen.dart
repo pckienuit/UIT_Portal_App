@@ -47,19 +47,26 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
           
       String formattedData;
       if (response.data is String && _useRscHeader) {
-        // Thử parse qua RscParser
-        final parsedData = RscParser.extractObjectsWithKey(response.data as String, 'C202');
+        final rawData = response.data as String;
         
-        if (parsedData.isEmpty) {
-          final rawData = response.data as String;
-          final match = RegExp(r'.{0,150}C202.{0,150}').firstMatch(rawData);
-          if (match != null) {
-             formattedData = 'Parser thất bại, nhưng tìm thấy "C202" trong chuỗi thô!\n\nContext:\n${match.group(0)}';
-          } else {
-             formattedData = 'Hoàn toàn không tìm thấy "C202" trong chuỗi RSC dài ${rawData.length} ký tự.\n\nĐoạn đầu:\n${rawData.length > 500 ? rawData.substring(0, 500) : rawData}';
-          }
+        final profile = RscParser.parseFullProfile(rawData);
+        if (profile != null) {
+          formattedData = 'Trích xuất thành công dữ liệu Profile!\n\n'
+              'Tên: ${profile.fullName}\n'
+              'Mã SV: ${profile.studentCode}\n'
+              'Lớp: ${profile.academic?.className} - ${profile.academic?.cohort}\n'
+              'Email: ${profile.personal?.schoolEmail}\n'
+              'Ngày sinh: ${profile.personal?.dateOfBirth}\n'
+              'Dân tộc: ${profile.personal?.ethnicity}\n'
+              'Tôn giáo: ${profile.personal?.religion}\n'
+              'SDT: ${profile.personal?.phone}\n'
+              'Ba: ${profile.family?.father?.fullName}\n'
+              'Mẹ: ${profile.family?.mother?.fullName}\n'
+              'Số thẻ NH: ${profile.bank?.accountNumber} - ${profile.bank?.bankName}\n\n'
+              '---\nRaw RSC Length: ${rawData.length} bytes';
         } else {
-          formattedData = 'RscParser tìm thấy ${parsedData.length} đối tượng!\n\n${const JsonEncoder.withIndent('  ').convert(parsedData)}';
+          // Chỉ in ra đoạn nhỏ để debug tránh treo app
+          formattedData = 'Không tìm thấy Profile trong chuỗi RSC khổng lồ (${rawData.length} bytes).\n\nĐoạn đầu:\n${rawData.length > 2000 ? rawData.substring(0, 2000) : rawData}';
         }
       } else if (response.data is String) {
         formattedData = response.data as String;

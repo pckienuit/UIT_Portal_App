@@ -3,27 +3,58 @@ import '../features/profile/profile_model.dart';
 
 class RscParser {
   static StudentProfile? parseStudentProfile(String rscPayload) {
-    // The payload contains a JSON string like:
-    // "user":{"sub":"...","username":"23520804","displayName":"Kiên Phan Chí","email":"23520804@gm.uit.edu.vn","role":"student"}
-    
-    final RegExp userRegex = RegExp(r'"user":\s*(\{.*?\})');
-    final match = userRegex.firstMatch(rscPayload);
-    
-    if (match != null && match.groupCount >= 1) {
-      try {
-        final String userJsonStr = match.group(1)!;
-        // Fix potential trailing commas or nested objects that the regex might capture too much of
-        // We can just find the first balanced braces.
-        final cleanJsonStr = _extractBalancedJson(rscPayload.substring(match.start + '"user":'.length));
-        if (cleanJsonStr != null) {
-          final Map<String, dynamic> json = jsonDecode(cleanJsonStr);
-          return StudentProfile.fromJson(json);
+    return parseFullProfile(rscPayload);
+  }
+
+  static StudentProfile? parseFullProfile(String rscPayload) {
+    try {
+      // 1. Tìm object "profile" chi tiết (tránh dùng split hay regex quá lớn để không treo máy)
+      final int profileIdx = rscPayload.indexOf('"profile":{');
+      Map<String, dynamic>? profileJson;
+      if (profileIdx != -1) {
+        final String? cleanProfileJson = _extractBalancedJson(rscPayload.substring(profileIdx + '"profile":'.length));
+        if (cleanProfileJson != null) {
+          profileJson = jsonDecode(cleanProfileJson);
         }
-      } catch (e) {
-        print('Error parsing student profile JSON: \$e');
       }
+
+      // 2. Tìm thông tin session user (từ đối tượng user nhỏ)
+      final RegExp userRegex = RegExp(r'"user":\s*(\{.*?\})');
+      final match = userRegex.firstMatch(rscPayload);
+      Map<String, dynamic>? sessionJson;
+      if (match != null && match.groupCount >= 1) {
+        final cleanSessionJson = _extractBalancedJson(rscPayload.substring(match.start + '"user":'.length));
+        if (cleanSessionJson != null) {
+          sessionJson = jsonDecode(cleanSessionJson);
+        }
+      }
+
+      if (profileJson == null && sessionJson == null) return null;
+
+      // 3. Tìm thông tin học thuật (Nằm rải rác trong các span của Next.js VDOM)
+      String? cohort;
+      String? className;
+      String? major;
+
+      // Regex tìm "Khóa 2023"
+      final cohortMatch = RegExp(r'"children":"(Khóa \d+)"').firstMatch(rscPayload);
+      if (cohortMatch != null) cohort = cohortMatch.group(1);
+
+      // Regex tìm tên lớp (vd: KTMT2023.1, HTTT2022.2)
+      final classMatch = RegExp(r'"children":"([A-Z]{2,6}\d{4}\.\d+)"').firstMatch(rscPayload);
+      if (classMatch != null) className = classMatch.group(1);
+
+      // Regex tìm ngành học (vd: D520214 - Kỹ thuật Máy tính)
+      final majorMatch = RegExp(r'"children":"([A-Z0-9]+ - [^"]+)"').firstMatch(rscPayload);
+      if (majorMatch != null) major = majorMatch.group(1);
+
+      final academic = AcademicInfo(cohort: cohort, className: className, major: major);
+
+      return StudentProfile.fromJson(profileJson ?? {}, sessionUser: sessionJson, academic: academic);
+    } catch (e) {
+      print('Error parsing full profile: $e');
+      return null;
     }
-    return null;
   }
 
   static String? _extractBalancedJson(String text) {

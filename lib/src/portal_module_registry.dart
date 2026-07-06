@@ -72,7 +72,7 @@ class PortalModuleRegistry {
       title: 'Thông tin cá nhân',
       description: 'Hồ sơ người học và thông tin tài khoản.',
       path: '/sinh-vien/ho-so',
-      status: PortalModuleStatus.pendingApi,
+      status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
       id: 'grades',
