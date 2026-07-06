@@ -76,8 +76,17 @@ class PortalApiClient {
 
     final headers = <String, dynamic>{
       ...?options?.headers,
-      'Authorization': 'Bearer $token',
     };
+
+    if (token.startsWith('Cookie=')) {
+      final cookie = token.replaceFirst('Cookie=', '');
+      final existingCookie = headers['Cookie']?.toString() ?? '';
+      headers['Cookie'] = existingCookie.isNotEmpty 
+          ? '$existingCookie; $cookie'
+          : cookie;
+    } else {
+      headers['Authorization'] = 'Bearer $token';
+    }
 
     return (options ?? Options()).copyWith(headers: headers);
   }
