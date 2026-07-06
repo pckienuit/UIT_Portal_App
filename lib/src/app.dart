@@ -10,6 +10,7 @@ import 'features/student_card/student_card_screen.dart';
 import 'features/parking_registration/parking_registration_screen.dart';
 
 import 'features/profile/profile_screen.dart';
+import 'features/tuition/tuition_screen.dart';
 import 'features/grades/grades_screen.dart';
 import 'features/schedule/schedule_screen.dart';
 import 'features/training_point/training_point_screen.dart';
@@ -65,6 +66,7 @@ class UitPortalApp extends StatelessWidget {
           if (moduleId == 'thoi-hoc-bao-luu') return const StudyReservationScreen();
           if (moduleId == 'lich-thi') return const ExamScheduleScreen();
           if (moduleId == 'khao-sat-giang-day') return const TeachingSurveyScreen();
+          if (moduleId == 'hoc-phi') return const TuitionScreen();
 
           final module = PortalModuleRegistry.byId(moduleId);
           return NativeModuleScreen(module: module);

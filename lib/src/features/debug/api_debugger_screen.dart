@@ -49,24 +49,30 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
       if (response.data is String && _useRscHeader) {
         final rawData = response.data as String;
         
-        final profile = RscParser.parseFullProfile(rawData);
-        if (profile != null) {
-          formattedData = 'Trích xuất thành công dữ liệu Profile!\n\n'
-              'Tên: ${profile.fullName}\n'
-              'Mã SV: ${profile.studentCode}\n'
-              'Lớp: ${profile.academic?.className} - ${profile.academic?.cohort}\n'
-              'Email: ${profile.personal?.schoolEmail}\n'
-              'Ngày sinh: ${profile.personal?.dateOfBirth}\n'
-              'Dân tộc: ${profile.personal?.ethnicity}\n'
-              'Tôn giáo: ${profile.personal?.religion}\n'
-              'SDT: ${profile.personal?.phone}\n'
-              'Ba: ${profile.family?.father?.fullName}\n'
-              'Mẹ: ${profile.family?.mother?.fullName}\n'
-              'Số thẻ NH: ${profile.bank?.accountNumber} - ${profile.bank?.bankName}\n\n'
-              '---\nRaw RSC Length: ${rawData.length} bytes';
+        if (_pathController.text == '/sinh-vien/ho-so') {
+          final profile = RscParser.parseFullProfile(rawData);
+          if (profile != null && profile.personal != null) {
+            formattedData = 'Trích xuất thành công dữ liệu Profile!\n\n'
+                'Tên: ${profile.fullName}\n'
+                'Mã SV: ${profile.studentCode}\n'
+                'Lớp: ${profile.academic?.className} - ${profile.academic?.cohort}\n'
+                'Email: ${profile.personal?.schoolEmail}\n'
+                'Ngày sinh: ${profile.personal?.dateOfBirth}\n'
+                'Dân tộc: ${profile.personal?.ethnicity}\n'
+                'Tôn giáo: ${profile.personal?.religion}\n'
+                'SDT: ${profile.personal?.phone}\n'
+                'Ba: ${profile.family?.father?.fullName}\n'
+                'Mẹ: ${profile.family?.mother?.fullName}\n'
+                'Số thẻ NH: ${profile.bank?.accountNumber} - ${profile.bank?.bankName}\n\n'
+                '---\nRaw RSC Length: ${rawData.length} bytes';
+          } else {
+            formattedData = 'Không tìm thấy Profile trong chuỗi RSC khổng lồ (${rawData.length} bytes).\n\nĐoạn đầu:\n${rawData.length > 2000 ? rawData.substring(0, 2000) : rawData}';
+          }
         } else {
-          // Chỉ in ra đoạn nhỏ để debug tránh treo app
-          formattedData = 'Không tìm thấy Profile trong chuỗi RSC khổng lồ (${rawData.length} bytes).\n\nĐoạn đầu:\n${rawData.length > 2000 ? rawData.substring(0, 2000) : rawData}';
+          // In raw data cho các API khác, tăng giới hạn lên 50,000 ký tự (8KB là an toàn)
+          formattedData = rawData.length > 50000 
+              ? '${rawData.substring(0, 50000)}\n\n[... ĐÃ CẮT BỚT VÌ QUÁ DÀI (${rawData.length} bytes) ...]' 
+              : rawData;
         }
       } else if (response.data is String) {
         formattedData = response.data as String;

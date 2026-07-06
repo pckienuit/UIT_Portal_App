@@ -166,6 +166,13 @@ class PortalModuleRegistry {
       status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
+      id: 'hoc-phi',
+      title: 'Học phí',
+      description: 'Thông tin học phí và công nợ',
+      path: '/sinh-vien/hoc-phi',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
       id: 'gia-han-hoc-phi',
       title: 'Gia hạn học phí',
       description: 'Đăng ký gia hạn đóng học phí.',
