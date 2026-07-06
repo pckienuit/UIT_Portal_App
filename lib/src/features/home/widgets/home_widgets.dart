@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../schedule/schedule_providers.dart';
 import '../../tuition/tuition_providers.dart';
 import '../../grades/grades_providers.dart';
+import '../../../utils/glass_container.dart';
 
 final currencyFormatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
@@ -15,21 +16,23 @@ class ScheduleWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheduleAsync = ref.watch(scheduleFutureProvider);
 
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
+    return GlassContainer(
+      opacity: 0.4,
+      blur: 16,
+      borderRadius: 24,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.event, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                Icon(Icons.event, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Lịch học',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -61,21 +64,23 @@ class TuitionWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tuitionAsync = ref.watch(tuitionListProvider);
 
-    return Card(
-      color: Theme.of(context).colorScheme.tertiaryContainer,
+    return GlassContainer(
+      opacity: 0.4,
+      blur: 16,
+      borderRadius: 24,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.attach_money, color: Theme.of(context).colorScheme.onTertiaryContainer),
+                Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Học phí',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onTertiaryContainer,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -110,21 +115,23 @@ class GradesWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gradesAsync = ref.watch(gradesFutureProvider);
 
-    return Card(
-      color: Theme.of(context).colorScheme.secondaryContainer,
+    return GlassContainer(
+      opacity: 0.4,
+      blur: 16,
+      borderRadius: 24,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.school, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Kết quả học tập',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
                 ),

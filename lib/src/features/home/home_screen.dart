@@ -1,8 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../portal_module_registry.dart';
+import '../../utils/glass_container.dart';
 import '../auth/auth_providers.dart';
 import '../profile/profile_providers.dart';
 import 'providers/widget_preferences_provider.dart';
@@ -29,133 +32,185 @@ class HomeScreen extends ConsumerWidget {
     final userName = profileAsync.value?.fullName ?? profileAsync.value?.displayName ?? 'Sinh viên';
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120.0,
-            floating: false,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'UIT Portal',
-                style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.primaryContainer],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.dashboard_customize),
-                color: colorScheme.onPrimary,
-                tooltip: 'Tùy chỉnh trang chủ',
-                onPressed: () => _showCustomizationSheet(context),
-              ),
-              if (auth.isSignedIn)
-                IconButton(
-                  tooltip: 'Đăng xuất',
-                  onPressed: () => ref.read(authControllerProvider).signOut(),
-                  icon: const Icon(Icons.logout),
-                  color: colorScheme.onPrimary,
-                )
-              else
-                IconButton(
-                  tooltip: 'Đăng nhập',
-                  onPressed: () => context.push('/login'),
-                  icon: const Icon(Icons.login),
-                  color: colorScheme.onPrimary,
-                ),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colorScheme.primaryContainer,
+              colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+              colorScheme.secondaryContainer.withValues(alpha: 0.5),
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          
-          // User Greeting & Status
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Icon(Icons.person, color: colorScheme.primary),
+        ),
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 120.0,
+              floating: false,
+              pinned: true,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: ClipRRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: FlexibleSpaceBar(
+                    title: Text(
+                      'UIT Portal',
+                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold),
+                    ),
+                    background: Container(
+                      color: colorScheme.surface.withValues(alpha: 0.3),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.dashboard_customize),
+                  color: colorScheme.onSurface,
+                  tooltip: 'Tùy chỉnh trang chủ',
+                  onPressed: () => _showCustomizationSheet(context),
+                ),
+                if (auth.isSignedIn)
+                  IconButton(
+                    tooltip: 'Đăng xuất',
+                    onPressed: () => ref.read(authControllerProvider).signOut(),
+                    icon: const Icon(Icons.logout),
+                    color: colorScheme.onSurface,
+                  )
+                else
+                  IconButton(
+                    tooltip: 'Đăng nhập',
+                    onPressed: () => context.push('/login'),
+                    icon: const Icon(Icons.login),
+                    color: colorScheme.onSurface,
+                  ),
+              ],
+            ),
+            
+            // User Greeting & Status
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: GlassContainer(
+                  borderRadius: 24,
+                  opacity: 0.5,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
                       children: [
-                        Text(
-                          auth.isSignedIn ? 'Xin chào, $userName' : 'Chào khách',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        CircleAvatar(
+                          backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.8),
+                          child: Icon(Icons.person, color: colorScheme.primary),
                         ),
-                        Text(
-                          auth.isSignedIn ? 'Đã kết nối portal' : 'Vui lòng đăng nhập',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                auth.isSignedIn ? 'Xin chào, $userName' : 'Chào khách',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                auth.isSignedIn ? 'Đã kết nối portal' : 'Vui lòng đăng nhập',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // Widgets Section
-          if (activeWidgets.isNotEmpty)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final widgetId = activeWidgets[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: _buildWidgetById(widgetId),
-                    );
-                  },
-                  childCount: activeWidgets.length,
                 ),
               ),
             ),
 
-          // Services Grid Header
+            // Widgets Section
+            if (activeWidgets.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final widgetId = activeWidgets[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: _buildWidgetById(widgetId),
+                      );
+                    },
+                    childCount: activeWidgets.length,
+                  ),
+                ),
+              ),
+
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 12.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
             sliver: SliverToBoxAdapter(
               child: Text(
                 'Dịch vụ & Tiện ích',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
           ),
 
-          // Services Grid
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.8,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final module = PortalModuleRegistry.modules[index];
-                  return _ModuleGridItem(module: module);
-                },
-                childCount: PortalModuleRegistry.modules.length,
-              ),
+          ...[
+            (
+              title: 'Học tập & Thi cử',
+              ids: ['tkb', 'grades', 'training_point', 'transcript_request', 'khao-sat-giang-day', 'lich-thi', 'exam_postponement', 'revaluation', 'khoa-luan', 'tot-nghiep', 'certificate_validation']
             ),
-          ),
-          
-          const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
-        ],
+            (
+              title: 'Tài chính',
+              ids: ['hoc-phi', 'gia-han-hoc-phi', 'hoc-bong']
+            ),
+            (
+              title: 'Hành chính & Hồ sơ',
+              ids: ['profile', 'student_card', 'confirmation_paper', 'thoi-hoc-bao-luu', 'bao-hiem']
+            ),
+            (
+              title: 'Tiện ích & Hỗ trợ',
+              ids: ['parking_registration', 'lich-sinh-hoat', 'social_work', 'ho-tro', 'giao-vu']
+            ),
+          ].expand((group) {
+            return [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 12.0),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    group.title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    childAspectRatio: 0.8,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final module = PortalModuleRegistry.byId(group.ids[index]);
+                      return _ModuleGridItem(module: module);
+                    },
+                    childCount: group.ids.length,
+                  ),
+                ),
+              ),
+            ];
+          }),
+            
+            const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
+          ],
+        ),
       ),
     );
   }
@@ -181,16 +236,47 @@ class _ModuleGridItem extends StatelessWidget {
 
   IconData _getIconForModule(String id) {
     switch (id) {
+      // Học tập & Điểm
       case 'tkb': return Icons.calendar_month;
       case 'grades': return Icons.school;
-      case 'hoc-phi': return Icons.attach_money;
-      case 'profile': return Icons.person;
+      case 'training_point': return Icons.military_tech;
+      case 'transcript_request': return Icons.description;
+      case 'khao-sat-giang-day': return Icons.fact_check;
+      
+      // Thi cử & Phúc khảo
+      case 'lich-thi': return Icons.event_note;
+      case 'exam_postponement': return Icons.edit_calendar;
+      case 'revaluation': return Icons.rate_review;
+      
+      // Tốt nghiệp & Khóa luận
       case 'khoa-luan': return Icons.menu_book;
       case 'tot-nghiep': return Icons.workspace_premium;
-      case 'parking_registration': return Icons.local_parking;
+      case 'certificate_validation': return Icons.verified;
+      
+      // Tài chính
+      case 'hoc-phi': return Icons.attach_money;
+      case 'gia-han-hoc-phi': return Icons.request_quote;
+      case 'hoc-bong': return Icons.card_giftcard;
+      
+      // Hành chính & Sinh viên
+      case 'profile': return Icons.person;
       case 'student_card': return Icons.badge;
+      case 'confirmation_paper': return Icons.file_present;
+      case 'thoi-hoc-bao-luu': return Icons.pause_circle_filled;
+      
+      // Tiện ích khác
+      case 'parking_registration': return Icons.local_parking;
       case 'bao-hiem': return Icons.health_and_safety;
-      case 'lich-thi': return Icons.event_note;
+      case 'lich-sinh-hoat': return Icons.event_available;
+      case 'ho-tro': return Icons.support_agent;
+      case 'social_work': return Icons.volunteer_activism;
+      case 'giao-vu': return Icons.support_agent;
+      
+      // Chung
+      case 'dashboard': return Icons.dashboard;
+      case 'notifications': return Icons.notifications;
+      case 'services': return Icons.grid_view;
+      
       default: return Icons.apps;
     }
   }
@@ -199,20 +285,21 @@ class _ModuleGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => context.push('/module/${module.id}'),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              _getIconForModule(module.id),
-              color: Theme.of(context).colorScheme.primary,
-              size: 28,
+          Expanded(
+            child: GlassContainer(
+              opacity: 0.3,
+              borderRadius: 16,
+              child: Center(
+                child: Icon(
+                  _getIconForModule(module.id),
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 28,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
