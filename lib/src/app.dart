@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/auth/auth_providers.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/modules/native_module_screen.dart';
@@ -28,15 +30,65 @@ import 'features/study_reservation/study_reservation_screen.dart';
 import 'features/debug/api_debugger_screen.dart';
 import 'features/exam_schedule/exam_schedule_screen.dart';
 import 'features/teaching_survey/teaching_survey_screen.dart';
+import 'features/main/main_screen.dart';
+import 'features/notifications/notifications_screen.dart';
 import 'portal_module_registry.dart';
 
-class UitPortalApp extends StatelessWidget {
-  const UitPortalApp({super.key});
-
-  static final GoRouter _router = GoRouter(
+final routerProvider = Provider<GoRouter>((ref) {
+  final authController = ref.watch(authControllerProvider);
+  
+  return GoRouter(
     initialLocation: '/',
+    redirect: (context, state) {
+      final isLoggingIn = state.matchedLocation == '/login';
+      if (!authController.isSignedIn && !isLoggingIn) {
+        return '/login';
+      }
+      if (authController.isSignedIn && isLoggingIn) {
+        return '/';
+      }
+      return null;
+    },
     routes: [
-      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainScreen(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/schedule',
+                builder: (context, state) => const ScheduleScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/notifications',
+                builder: (context, state) => const NotificationsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile-tab',
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/api-debugger', builder: (context, state) => const ApiDebuggerScreen()),
       GoRoute(
@@ -74,9 +126,15 @@ class UitPortalApp extends StatelessWidget {
       ),
     ],
   );
+});
+
+class UitPortalApp extends ConsumerWidget {
+  const UitPortalApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+    
     return MaterialApp.router(
       title: 'UIT Portal Mobile',
       debugShowCheckedModeBanner: false,
@@ -103,7 +161,7 @@ class UitPortalApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      routerConfig: _router,
+      routerConfig: router,
     );
   }
 }

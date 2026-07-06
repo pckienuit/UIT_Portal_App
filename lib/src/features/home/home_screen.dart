@@ -4,168 +4,276 @@ import 'package:go_router/go_router.dart';
 
 import '../../portal_module_registry.dart';
 import '../auth/auth_providers.dart';
-import '../../data/portal_api_providers.dart';
-
-import '../../utils/api_scanner.dart';
+import 'providers/widget_preferences_provider.dart';
+import 'widgets/home_widgets.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
+
+  void _showCustomizationSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => const _WidgetCustomizationSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final auth = ref.watch(authControllerProvider);
+    final activeWidgets = ref.watch(widgetPreferencesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('UIT Portal Mobile'),
-        actions: [
-          if (auth.isSignedIn)
-            IconButton(
-              tooltip: 'Đăng xuất',
-              onPressed: () => ref.read(authControllerProvider).signOut(),
-              icon: const Icon(Icons.logout),
-            ),
-          IconButton(
-            tooltip: 'Đăng nhập',
-            onPressed: () => context.push('/login'),
-            icon: const Icon(Icons.login),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.primary,
-                borderRadius: BorderRadius.circular(8),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 120.0,
+            floating: false,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                'UIT Portal',
+                style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Cổng thông tin UIT',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: colorScheme.onPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Bản Android native-first, chuẩn bị thay thế toàn bộ module portal bằng màn hình Flutter native.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _SessionStatusPill(isSignedIn: auth.isSignedIn),
-                    const SizedBox(height: 12),
-                    if (auth.isSignedIn) ...[
-                      FilledButton.icon(
-                        onPressed: () {
-                          ApiScanner.scan(ref.read(portalApiClientProvider));
-                        },
-                        icon: const Icon(Icons.radar),
-                        label: const Text('Scan 23 APIs'),
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        onPressed: () => context.push('/api-debugger'),
-                        icon: const Icon(Icons.bug_report),
-                        label: const Text('API Debugger'),
-                      ),
-                      const SizedBox(height: 8),
-                    ] else ...[
-                      FilledButton.icon(
-                        onPressed: () => context.push('/login'),
-                        icon: const Icon(Icons.verified_user_outlined),
-                        label: const Text('Đăng nhập với UIT SSO'),
-                      ),
-                    ],
-                  ],
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colorScheme.primary, colorScheme.primaryContainer],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Module portal',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            ...PortalModuleRegistry.modules.map(
-              (module) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _ModuleTile(module: module),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SessionStatusPill extends StatelessWidget {
-  const _SessionStatusPill({required this.isSignedIn});
-
-  final bool isSignedIn;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.onPrimary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSignedIn ? Icons.check_circle_outline : Icons.lock_outline,
-              size: 18,
-              color: colorScheme.onPrimary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isSignedIn ? 'Đã có phiên portal' : 'Chưa đăng nhập',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.dashboard_customize),
                 color: colorScheme.onPrimary,
-                fontWeight: FontWeight.w700,
+                tooltip: 'Tùy chỉnh trang chủ',
+                onPressed: () => _showCustomizationSheet(context),
+              ),
+              if (auth.isSignedIn)
+                IconButton(
+                  tooltip: 'Đăng xuất',
+                  onPressed: () => ref.read(authControllerProvider).signOut(),
+                  icon: const Icon(Icons.logout),
+                  color: colorScheme.onPrimary,
+                )
+              else
+                IconButton(
+                  tooltip: 'Đăng nhập',
+                  onPressed: () => context.push('/login'),
+                  icon: const Icon(Icons.login),
+                  color: colorScheme.onPrimary,
+                ),
+            ],
+          ),
+          
+          // User Greeting & Status
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: colorScheme.primaryContainer,
+                    child: Icon(Icons.person, color: colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.isSignedIn ? 'Xin chào, Sinh viên' : 'Chào khách',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          auth.isSignedIn ? 'Đã kết nối portal' : 'Vui lòng đăng nhập',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Widgets Section
+          if (activeWidgets.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final widgetId = activeWidgets[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: _buildWidgetById(widgetId),
+                    );
+                  },
+                  childCount: activeWidgets.length,
+                ),
+              ),
+            ),
+
+          // Services Grid Header
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 12.0),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                'Dịch vụ & Tiện ích',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+
+          // Services Grid
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                childAspectRatio: 0.8,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final module = PortalModuleRegistry.modules[index];
+                  return _ModuleGridItem(module: module);
+                },
+                childCount: PortalModuleRegistry.modules.length,
+              ),
+            ),
+          ),
+          
+          const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
+        ],
       ),
     );
   }
+
+  Widget _buildWidgetById(String id) {
+    switch (id) {
+      case 'schedule':
+        return const ScheduleWidget();
+      case 'tuition':
+        return const TuitionWidget();
+      case 'grades':
+        return const GradesWidget();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 }
 
-class _ModuleTile extends StatelessWidget {
-  const _ModuleTile({required this.module});
+class _ModuleGridItem extends StatelessWidget {
+  const _ModuleGridItem({required this.module});
 
   final PortalModule module;
 
+  IconData _getIconForModule(String id) {
+    switch (id) {
+      case 'tkb': return Icons.calendar_month;
+      case 'grades': return Icons.school;
+      case 'hoc-phi': return Icons.attach_money;
+      case 'profile': return Icons.person;
+      case 'khoa-luan': return Icons.menu_book;
+      case 'tot-nghiep': return Icons.workspace_premium;
+      case 'parking_registration': return Icons.local_parking;
+      case 'student_card': return Icons.badge;
+      case 'bao-hiem': return Icons.health_and_safety;
+      case 'lich-thi': return Icons.event_note;
+      default: return Icons.apps;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.apps_outlined),
-        title: Text(module.title),
-        subtitle: Text(module.description),
-        isThreeLine: true,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/module/${module.id}'),
+    return InkWell(
+      onTap: () => context.push('/module/${module.id}'),
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _getIconForModule(module.id),
+              color: Theme.of(context).colorScheme.primary,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Text(
+              module.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(height: 1.1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WidgetCustomizationSheet extends ConsumerWidget {
+  const _WidgetCustomizationSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeWidgets = ref.watch(widgetPreferencesProvider);
+    final notifier = ref.read(widgetPreferencesProvider.notifier);
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Tùy chỉnh trang chủ',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              ],
+            ),
+          ),
+          SwitchListTile(
+            title: const Text('Lịch học hôm nay'),
+            subtitle: const Text('Hiển thị lịch học sắp tới'),
+            value: activeWidgets.contains('schedule'),
+            onChanged: (val) => notifier.toggleWidget('schedule', val),
+          ),
+          SwitchListTile(
+            title: const Text('Tình trạng học phí'),
+            subtitle: const Text('Theo dõi công nợ học phí'),
+            value: activeWidgets.contains('tuition'),
+            onChanged: (val) => notifier.toggleWidget('tuition', val),
+          ),
+          SwitchListTile(
+            title: const Text('Kết quả học tập'),
+            subtitle: const Text('Xem điểm thi mới nhất'),
+            value: activeWidgets.contains('grades'),
+            onChanged: (val) => notifier.toggleWidget('grades', val),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
