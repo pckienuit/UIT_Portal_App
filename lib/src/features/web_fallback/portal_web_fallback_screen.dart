@@ -16,6 +16,8 @@ class PortalWebFallbackScreen extends StatefulWidget {
 class _PortalWebFallbackScreenState extends State<PortalWebFallbackScreen> {
   late final WebViewController _controller;
   double _progress = 0;
+  bool _canGoBack = false;
+  bool _canGoForward = false;
 
   @override
   void initState() {
@@ -27,9 +29,22 @@ class _PortalWebFallbackScreenState extends State<PortalWebFallbackScreen> {
           onProgress: (progress) {
             setState(() => _progress = progress / 100);
           },
+          onPageFinished: (_) => _refreshNavigationState(),
         ),
       )
       ..loadRequest(widget.module.webUri);
+  }
+
+  Future<void> _refreshNavigationState() async {
+    final canGoBack = await _controller.canGoBack();
+    final canGoForward = await _controller.canGoForward();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _canGoBack = canGoBack;
+      _canGoForward = canGoForward;
+    });
   }
 
   @override
@@ -38,6 +53,16 @@ class _PortalWebFallbackScreenState extends State<PortalWebFallbackScreen> {
       appBar: AppBar(
         title: Text(widget.module.title),
         actions: [
+          IconButton(
+            tooltip: 'Quay lại',
+            onPressed: _canGoBack ? _controller.goBack : null,
+            icon: const Icon(Icons.arrow_back),
+          ),
+          IconButton(
+            tooltip: 'Đi tới',
+            onPressed: _canGoForward ? _controller.goForward : null,
+            icon: const Icon(Icons.arrow_forward),
+          ),
           IconButton(
             tooltip: 'Tải lại',
             onPressed: () => _controller.reload(),
