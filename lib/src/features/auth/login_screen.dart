@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../portal_constants.dart';
-import 'auth_controller.dart';
 import 'auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -14,41 +11,52 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  late final WebViewController _controller;
-  double _progress = 0;
-
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (progress) {
-            setState(() => _progress = progress / 100);
-          },
-          onPageFinished: (url) {
-            final uri = Uri.tryParse(url);
-            if (uri != null && AuthController.isPortalAuthenticatedUrl(uri)) {
-              ref.read(authControllerProvider).markSignedIn();
-            }
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(PortalConstants.loginUrl));
+    Future.microtask(() => ref.read(authControllerProvider).signIn());
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authControllerProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Đăng nhập UIT SSO')),
       body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_progress < 1)
-              LinearProgressIndicator(value: _progress == 0 ? null : _progress),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Đăng nhập native',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'App sẽ mở UIT SSO bằng trình duyệt hệ thống/Custom Tabs theo chuẩn OAuth, không dùng WebView đăng nhập.',
+              ),
+              const SizedBox(height: 20),
+              if (auth.isBusy) const LinearProgressIndicator(),
+              if (auth.lastError != null) ...[
+                Text(
+                  auth.lastError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 12),
+              ],
+              FilledButton.icon(
+                onPressed: auth.isBusy
+                    ? null
+                    : () => ref.read(authControllerProvider).signIn(),
+                icon: const Icon(Icons.login),
+                label: const Text('Mở UIT SSO'),
+              ),
+            ],
+          ),
         ),
       ),
     );

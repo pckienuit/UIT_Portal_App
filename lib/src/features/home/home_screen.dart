@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../auth/auth_providers.dart';
 import '../../portal_module_registry.dart';
+import '../auth/auth_providers.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -54,7 +54,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Bản Android native-first, giữ WebView fallback cho các module portal chưa có API ổn định.',
+                      'Bản Android native-first, chuẩn bị thay thế toàn bộ module portal bằng màn hình Flutter native.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onPrimary,
                       ),
