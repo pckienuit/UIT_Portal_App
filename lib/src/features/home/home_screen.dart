@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../portal_module_registry.dart';
 import '../auth/auth_providers.dart';
+import '../../data/portal_api_providers.dart';
+import 'package:dio/dio.dart';
+import 'dart:developer' as developer;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -62,16 +65,16 @@ class HomeScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     _SessionStatusPill(isSignedIn: auth.isSignedIn),
                     const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: () => context.push('/login'),
-                      icon: const Icon(Icons.verified_user_outlined),
-                      label: const Text('Đăng nhập với UIT SSO'),
-                    ),
-                  ],
+                      FilledButton.icon(
+                        onPressed: () => context.push('/login'),
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: const Text('Đăng nhập với UIT SSO'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
             Text(
               'Module portal',
               style: Theme.of(

@@ -35,8 +35,15 @@ class PortalModuleRegistry {
       id: 'profile',
       title: 'Thông tin cá nhân',
       description: 'Hồ sơ người học và thông tin tài khoản.',
-      path: '/profile',
+      path: '/sinh-vien/ho-so',
       status: PortalModuleStatus.pendingApi,
+    ),
+    PortalModule(
+      id: 'grades',
+      title: 'Bảng điểm',
+      description: 'Kết quả học tập, điểm quá trình, điểm thi.',
+      path: '/sinh-vien/bang-diem',
+      status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
       id: 'services',

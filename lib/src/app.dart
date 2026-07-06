@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/modules/native_module_screen.dart';
+import 'features/grades/grades_screen.dart';
 import 'portal_module_registry.dart';
 
 class UitPortalApp extends StatelessWidget {
@@ -18,8 +19,11 @@ class UitPortalApp extends StatelessWidget {
         path: '/module/:moduleId',
         builder: (context, state) {
           final moduleId = state.pathParameters['moduleId'] ?? '';
-          final module = PortalModuleRegistry.byId(moduleId);
+          if (moduleId == 'grades') {
+            return const GradesScreen();
+          }
 
+          final module = PortalModuleRegistry.byId(moduleId);
           return NativeModuleScreen(module: module);
         },
       ),
