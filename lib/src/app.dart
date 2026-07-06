@@ -14,6 +14,10 @@ import 'features/training_point/training_point_screen.dart';
 import 'features/transcript_request/transcript_request_screen.dart';
 import 'features/exam_postponement/exam_postponement_screen.dart';
 import 'features/revaluation/revaluation_screen.dart';
+import 'features/thesis_registration/thesis_registration_screen.dart';
+import 'features/graduation_registration/graduation_registration_screen.dart';
+import 'features/scholarship_registration/scholarship_registration_screen.dart';
+import 'features/student_support/student_support_screen.dart';
 import 'portal_module_registry.dart';
 
 class UitPortalApp extends StatelessWidget {
@@ -28,7 +32,7 @@ class UitPortalApp extends StatelessWidget {
         path: '/module/:moduleId',
         builder: (context, state) {
           final moduleId = state.pathParameters['moduleId'] ?? '';
-          print('GoRoute /module/\$moduleId');
+          print('GoRoute routing to: $moduleId');
           if (moduleId == 'grades') {
             return const GradesScreen();
           }
@@ -44,6 +48,18 @@ class UitPortalApp extends StatelessWidget {
           }
           if (moduleId == 'parking_registration') {
             return const ParkingRegistrationScreen();
+          }
+          if (moduleId == 'khoa-luan') {
+            return const ThesisRegistrationScreen();
+          }
+          if (moduleId == 'tot-nghiep') {
+            return const GraduationRegistrationScreen();
+          }
+          if (moduleId == 'hoc-bong') {
+            return const ScholarshipRegistrationScreen();
+          }
+          if (moduleId == 'ho-tro') {
+            return const StudentSupportScreen();
           }
           if (moduleId == 'training_point') {
             return const TrainingPointScreen();

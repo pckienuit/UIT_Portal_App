@@ -116,6 +116,34 @@ class PortalModuleRegistry {
       path: '/notifications',
       status: PortalModuleStatus.pendingApi,
     ),
+    PortalModule(
+      id: 'khoa-luan',
+      title: 'Khóa luận',
+      description: 'Đăng ký đề tài khóa luận.',
+      path: '/sinh-vien/khoa-luan',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'tot-nghiep',
+      title: 'Tốt nghiệp',
+      description: 'Đăng ký xét tốt nghiệp.',
+      path: '/sinh-vien/tot-nghiep',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'hoc-bong',
+      title: 'Học bổng',
+      description: 'Đăng ký xét học bổng.',
+      path: '/sinh-vien/hoc-bong',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
+    PortalModule(
+      id: 'ho-tro',
+      title: 'Hỗ trợ SV',
+      description: 'Hỗ trợ sinh viên.',
+      path: '/sinh-vien/ho-tro',
+      status: PortalModuleStatus.nativeImplemented,
+    ),
   ];
 
   static PortalModule byId(String id) {
