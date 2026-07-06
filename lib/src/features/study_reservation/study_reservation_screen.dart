@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'study_reservation_providers.dart';
 import 'study_reservation_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class StudyReservationScreen extends ConsumerWidget {
   const StudyReservationScreen({super.key});
@@ -12,7 +13,7 @@ class StudyReservationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(studyReservationProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Thôi học/Bảo lưu'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

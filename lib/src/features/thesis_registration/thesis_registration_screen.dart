@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'thesis_registration_providers.dart';
 import 'thesis_registration_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ThesisRegistrationScreen extends ConsumerWidget {
   const ThesisRegistrationScreen({super.key});
@@ -12,7 +13,7 @@ class ThesisRegistrationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(thesis_registrationProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Khóa luận'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

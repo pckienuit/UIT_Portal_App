@@ -8,6 +8,7 @@ import '../auth/auth_providers.dart';
 import '../auth/auth_controller.dart';
 import '../../data/portal_api_client.dart';
 import '../../data/portal_api_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class NativeModuleScreen extends ConsumerWidget {
   const NativeModuleScreen({super.key, required this.module});
@@ -16,7 +17,7 @@ class NativeModuleScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: Text(module.title)),
       body: SafeArea(
         child: switch (module.id) {

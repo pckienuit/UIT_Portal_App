@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'transcript_request_model.dart';
 import 'transcript_request_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class TranscriptRequestScreen extends ConsumerWidget {
   const TranscriptRequestScreen({super.key});
@@ -12,7 +13,7 @@ class TranscriptRequestScreen extends ConsumerWidget {
     final transcriptRequestAsync = ref.watch(transcriptRequestFutureProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Xin bảng điểm'), centerTitle: true),
       body: transcriptRequestAsync.when(
         data: (data) => _buildContent(context, data, theme),

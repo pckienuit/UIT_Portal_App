@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'student_support_providers.dart';
 import 'student_support_model.dart';
 import 'student_support_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class StudentSupportScreen extends ConsumerWidget {
   const StudentSupportScreen({super.key});
@@ -13,7 +14,7 @@ class StudentSupportScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(student_supportProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Hỗ trợ SV'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'scholarship_registration_providers.dart';
 import 'scholarship_registration_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ScholarshipRegistrationScreen extends ConsumerWidget {
   const ScholarshipRegistrationScreen({super.key});
@@ -12,7 +13,7 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(scholarship_registrationProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Học bổng'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

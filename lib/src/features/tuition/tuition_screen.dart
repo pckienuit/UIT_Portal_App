@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'tuition_providers.dart';
 import 'tuition_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class TuitionScreen extends ConsumerWidget {
   const TuitionScreen({super.key});
@@ -11,7 +12,7 @@ class TuitionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tuitionState = ref.watch(tuitionListProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Học phí'),
       ),

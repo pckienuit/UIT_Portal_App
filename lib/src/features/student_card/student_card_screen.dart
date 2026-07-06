@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'student_card_providers.dart';
 import 'student_card_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class StudentCardScreen extends ConsumerWidget {
   const StudentCardScreen({super.key});
@@ -12,7 +13,7 @@ class StudentCardScreen extends ConsumerWidget {
     final asyncData = ref.watch(student_cardFutureProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Thẻ sinh viên'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),

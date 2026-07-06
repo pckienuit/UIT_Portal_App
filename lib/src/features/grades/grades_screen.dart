@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'grades_model.dart';
 import 'grades_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class GradesScreen extends ConsumerWidget {
   const GradesScreen({super.key});
@@ -11,7 +12,7 @@ class GradesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gradesAsync = ref.watch(gradesFutureProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Bảng Điểm'),
         actions: [

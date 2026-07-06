@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'exam_postponement_model.dart';
 import 'exam_postponement_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ExamPostponementScreen extends ConsumerWidget {
   const ExamPostponementScreen({super.key});
@@ -14,7 +15,7 @@ class ExamPostponementScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
+      child: LiquidScaffold(
         appBar: AppBar(
           title: const Text('Hoãn thi & Thi lại'),
           centerTitle: true,

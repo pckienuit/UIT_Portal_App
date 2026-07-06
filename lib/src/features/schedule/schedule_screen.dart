@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'schedule_model.dart';
 import 'schedule_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
@@ -11,7 +12,7 @@ class ScheduleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheduleAsync = ref.watch(scheduleFutureProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Thời Khóa Biểu'),
         actions: [

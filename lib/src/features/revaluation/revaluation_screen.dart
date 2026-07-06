@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'revaluation_model.dart';
 import 'revaluation_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class RevaluationScreen extends ConsumerWidget {
   const RevaluationScreen({super.key});
@@ -14,7 +15,7 @@ class RevaluationScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
+      child: LiquidScaffold(
         appBar: AppBar(
           title: const Text('Phúc khảo điểm'),
           centerTitle: true,

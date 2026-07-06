@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'training_point_model.dart';
 import 'training_point_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class TrainingPointScreen extends ConsumerWidget {
   const TrainingPointScreen({super.key});
@@ -12,7 +13,7 @@ class TrainingPointScreen extends ConsumerWidget {
     final trainingPointAsync = ref.watch(trainingPointFutureProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Điểm rèn luyện'), centerTitle: true),
       body: trainingPointAsync.when(
         data: (data) => _buildContent(context, data, theme),

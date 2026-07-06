@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'teaching_survey_providers.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class TeachingSurveyScreen extends ConsumerWidget {
   const TeachingSurveyScreen({super.key});
@@ -10,7 +11,7 @@ class TeachingSurveyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final surveyAsync = ref.watch(teachingSurveyFutureProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Khảo sát giảng dạy'),
       ),

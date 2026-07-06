@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'certificate_validation_providers.dart';
 import 'certificate_validation_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class CertificateValidationScreen extends ConsumerWidget {
   const CertificateValidationScreen({super.key});
@@ -12,7 +13,7 @@ class CertificateValidationScreen extends ConsumerWidget {
     final asyncData = ref.watch(certificate_validationFutureProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Xác nhận chứng chỉ'),
         centerTitle: true,

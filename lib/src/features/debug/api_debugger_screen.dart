@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import '../../data/portal_api_providers.dart';
 import '../../utils/rsc_parser.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ApiDebuggerScreen extends ConsumerStatefulWidget {
   const ApiDebuggerScreen({super.key});
@@ -96,7 +97,7 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('API Debugger'),
         backgroundColor: Colors.red[900],

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'graduation_registration_providers.dart';
 import 'graduation_registration_model.dart';
 import 'graduation_registration_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class GraduationRegistrationScreen extends ConsumerWidget {
   const GraduationRegistrationScreen({super.key});
@@ -13,7 +14,7 @@ class GraduationRegistrationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(graduation_registrationProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Tốt nghiệp'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

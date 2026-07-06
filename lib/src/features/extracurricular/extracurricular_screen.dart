@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'extracurricular_providers.dart';
 import 'extracurricular_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ExtracurricularScreen extends ConsumerWidget {
   const ExtracurricularScreen({super.key});
@@ -11,7 +12,7 @@ class ExtracurricularScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(extracurricularProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Lịch sinh hoạt'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, Theme.of(context)),

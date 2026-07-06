@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'exam_schedule_providers.dart';
 import 'exam_schedule_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ExamScheduleScreen extends ConsumerWidget {
   const ExamScheduleScreen({super.key});
@@ -11,7 +12,7 @@ class ExamScheduleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final examScheduleAsync = ref.watch(examScheduleFutureProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Lịch thi'),
       ),

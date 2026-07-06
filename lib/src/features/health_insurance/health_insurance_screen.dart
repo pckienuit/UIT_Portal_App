@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'health_insurance_providers.dart';
 import 'health_insurance_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class HealthInsuranceScreen extends ConsumerWidget {
   const HealthInsuranceScreen({super.key});
@@ -12,7 +13,7 @@ class HealthInsuranceScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(healthInsuranceProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(
         title: const Text('Bảo hiểm'),
         centerTitle: true,

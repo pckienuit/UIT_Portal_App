@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'tuition_extension_providers.dart';
 import 'tuition_extension_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class TuitionExtensionScreen extends ConsumerWidget {
   const TuitionExtensionScreen({super.key});
@@ -12,7 +13,7 @@ class TuitionExtensionScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(tuitionExtensionProvider);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Gia hạn học phí'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),

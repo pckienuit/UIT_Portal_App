@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'confirmation_paper_providers.dart';
 import 'confirmation_paper_model.dart';
+import '../../utils/liquid_scaffold.dart';
 
 class ConfirmationPaperScreen extends ConsumerWidget {
   const ConfirmationPaperScreen({super.key});
@@ -12,7 +13,7 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     final asyncData = ref.watch(confirmation_paperFutureProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return LiquidScaffold(
       appBar: AppBar(title: const Text('Giấy xác nhận'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
