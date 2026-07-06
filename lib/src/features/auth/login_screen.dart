@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../portal_constants.dart';
+import 'auth_controller.dart';
+import 'auth_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final WebViewController _controller;
   double _progress = 0;
 
@@ -23,6 +26,12 @@ class _LoginScreenState extends State<LoginScreen> {
         NavigationDelegate(
           onProgress: (progress) {
             setState(() => _progress = progress / 100);
+          },
+          onPageFinished: (url) {
+            final uri = Uri.tryParse(url);
+            if (uri != null && AuthController.isPortalAuthenticatedUrl(uri)) {
+              ref.read(authControllerProvider).markSignedIn();
+            }
           },
         ),
       )

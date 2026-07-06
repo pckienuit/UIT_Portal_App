@@ -9,6 +9,7 @@ void main() {
 
     expect(find.text('UIT Portal Mobile'), findsOneWidget);
     expect(find.text('Đăng nhập với UIT SSO'), findsOneWidget);
+    expect(find.text('Chưa đăng nhập'), findsOneWidget);
     expect(find.text('Module portal'), findsOneWidget);
     expect(find.byIcon(Icons.login), findsOneWidget);
   });

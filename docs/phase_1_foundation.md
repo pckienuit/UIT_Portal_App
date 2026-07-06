@@ -7,6 +7,7 @@
 - Created a Flutter project targeting Android first.
 - Added navigation, app shell, UIT SSO login WebView, and portal module WebView fallback using `webview_flutter`.
 - Added the first widget test for the entry screen.
+- Follow-up phase 2 adds auth state and cookie/storage cleanup around the SSO WebView.
 
 ## Security Notes
 
