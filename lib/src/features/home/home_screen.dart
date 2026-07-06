@@ -8,6 +8,9 @@ import '../../data/portal_api_providers.dart';
 import 'package:dio/dio.dart';
 import 'dart:developer' as developer;
 
+import '../auth/auth_controller.dart';
+import '../../utils/api_scanner.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -64,12 +67,23 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     _SessionStatusPill(isSignedIn: auth.isSignedIn),
-                    const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: () => context.push('/login'),
-                        icon: const Icon(Icons.verified_user_outlined),
-                        label: const Text('Đăng nhập với UIT SSO'),
-                      ),
+                      const SizedBox(height: 12),
+                      if (auth.isSignedIn) ...[
+                        FilledButton.icon(
+                          onPressed: () {
+                            ApiScanner.scan(ref.read(portalApiClientProvider));
+                          },
+                          icon: const Icon(Icons.radar),
+                          label: const Text('Scan 23 APIs'),
+                        ),
+                        const SizedBox(height: 8),
+                      ] else ...[
+                        FilledButton.icon(
+                          onPressed: () => context.push('/login'),
+                          icon: const Icon(Icons.verified_user_outlined),
+                          label: const Text('Đăng nhập với UIT SSO'),
+                        ),
+                      ],
                     ],
                   ),
                 ),

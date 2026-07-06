@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import '../portal_constants.dart';
 
 class PortalApiClient {
-  PortalApiClient({Dio? dio, this.accessTokenProvider})
+  PortalApiClient({Dio? dio, this.accessTokenProvider, this.onSessionExpired})
     : _dio =
           dio ??
           Dio(
@@ -23,6 +23,7 @@ class PortalApiClient {
 
   final Dio _dio;
   final FutureOr<String?> Function()? accessTokenProvider;
+  final void Function()? onSessionExpired;
 
   Dio get dio => _dio;
 
@@ -60,6 +61,18 @@ class PortalApiClient {
 
   void _throwIfPortalError(Response<dynamic> response) {
     final statusCode = response.statusCode ?? 0;
+    
+    // Phát hiện session hết hạn (UIT portal thường trả về trang HTML chứa form login thay vì 401)
+    bool isSessionExpired = statusCode == 401;
+    if (statusCode == 200 && response.data is String && (response.data as String).trimLeft().startsWith('<')) {
+      isSessionExpired = true;
+    }
+    
+    if (isSessionExpired) {
+      onSessionExpired?.call();
+      throw PortalApiException(statusCode: 401, path: response.requestOptions.path);
+    }
+    
     if (statusCode >= 400) {
       throw PortalApiException(
         statusCode: statusCode,
