@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-class ScheduleWidget extends StatelessWidget {
+import '../../schedule/schedule_providers.dart';
+import '../../tuition/tuition_providers.dart';
+import '../../grades/grades_providers.dart';
+
+final currencyFormatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+
+class ScheduleWidget extends ConsumerWidget {
   const ScheduleWidget({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheduleAsync = ref.watch(scheduleFutureProvider);
+
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
       child: Padding(
@@ -17,7 +27,7 @@ class ScheduleWidget extends StatelessWidget {
                 Icon(Icons.event, color: Theme.of(context).colorScheme.onPrimaryContainer),
                 const SizedBox(width: 8),
                 Text(
-                  'Lịch học hôm nay',
+                  'Lịch học',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.bold,
@@ -26,7 +36,17 @@ class ScheduleWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('Chưa có dữ liệu lịch học hoặc bạn được nghỉ hôm nay.'),
+            scheduleAsync.when(
+              data: (schedule) {
+                final tiets = schedule.tiets;
+                if (tiets.isEmpty) {
+                  return const Text('Không có dữ liệu lịch học.');
+                }
+                return Text('Học kỳ ${schedule.hocKy} có ${tiets.length} tiết học sắp tới.');
+              },
+              loading: () => const Text('Đang tải lịch học...'),
+              error: (err, stack) => const Text('Không thể tải lịch học.'),
+            ),
           ],
         ),
       ),
@@ -34,11 +54,13 @@ class ScheduleWidget extends StatelessWidget {
   }
 }
 
-class TuitionWidget extends StatelessWidget {
+class TuitionWidget extends ConsumerWidget {
   const TuitionWidget({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tuitionAsync = ref.watch(tuitionListProvider);
+
     return Card(
       color: Theme.of(context).colorScheme.tertiaryContainer,
       child: Padding(
@@ -60,7 +82,20 @@ class TuitionWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('Đang cập nhật tình trạng công nợ...'),
+            tuitionAsync.when(
+              data: (records) {
+                final totalDebt = records.fold<num>(0, (sum, record) => sum + record.amountDue);
+                if (totalDebt <= 0) {
+                  return const Text('Bạn đã hoàn thành nghĩa vụ học phí.');
+                }
+                return Text(
+                  'Tổng công nợ: ${currencyFormatter.format(totalDebt)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                );
+              },
+              loading: () => const Text('Đang tải công nợ...'),
+              error: (err, stack) => const Text('Không thể tải học phí.'),
+            ),
           ],
         ),
       ),
@@ -68,11 +103,13 @@ class TuitionWidget extends StatelessWidget {
   }
 }
 
-class GradesWidget extends StatelessWidget {
+class GradesWidget extends ConsumerWidget {
   const GradesWidget({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gradesAsync = ref.watch(gradesFutureProvider);
+
     return Card(
       color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
@@ -94,7 +131,18 @@ class GradesWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('Xem điểm thi và điểm rèn luyện mới nhất.'),
+            gradesAsync.when(
+              data: (grades) {
+                final semesters = grades.semesterGroups;
+                if (semesters.isEmpty) {
+                  return const Text('Chưa có dữ liệu điểm.');
+                }
+                final latest = semesters.first;
+                return Text('Học kỳ gần nhất: ${latest.semesterLabel} (${latest.subjects.length} môn)');
+              },
+              loading: () => const Text('Đang tải điểm...'),
+              error: (err, stack) => const Text('Không thể tải điểm.'),
+            ),
           ],
         ),
       ),

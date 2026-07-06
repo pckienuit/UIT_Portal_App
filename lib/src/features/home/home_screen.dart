@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../portal_module_registry.dart';
 import '../auth/auth_providers.dart';
+import '../profile/profile_providers.dart';
 import 'providers/widget_preferences_provider.dart';
 import 'widgets/home_widgets.dart';
 
@@ -22,6 +23,10 @@ class HomeScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final auth = ref.watch(authControllerProvider);
     final activeWidgets = ref.watch(widgetPreferencesProvider);
+    
+    // Fetch profile
+    final profileAsync = ref.watch(detailedProfileProvider);
+    final userName = profileAsync.value?.fullName ?? profileAsync.value?.displayName ?? 'Sinh viên';
 
     return Scaffold(
       body: CustomScrollView(
@@ -85,7 +90,7 @@ class HomeScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          auth.isSignedIn ? 'Xin chào, Sinh viên' : 'Chào khách',
+                          auth.isSignedIn ? 'Xin chào, $userName' : 'Chào khách',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
