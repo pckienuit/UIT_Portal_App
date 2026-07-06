@@ -1,10 +1,11 @@
 # UIT Portal Mobile
 
-Native-first Flutter Android app for `https://portal.uit.edu.vn`.
+Native Flutter Android app for `https://portal.uit.edu.vn`.
 
-The app starts with a Flutter shell, UIT SSO login, and WebView fallback for
-portal modules that do not have a documented native API yet. Native screens can
-replace fallback modules as sanitized API contracts are discovered.
+The app now uses Flutter-native screens for the portal shell/modules and
+AppAuth/Custom Tabs for UIT SSO. No `webview_flutter` dependency remains in the
+runtime app. Dynamic portal data is intentionally pending until each endpoint is
+verified and documented in `docs/portal_api_inventory.md`.
 
 ## Local Setup
 
@@ -39,6 +40,29 @@ The debug APK is written to:
 ```text
 build\app\outputs\flutter-apk\app-debug.apk
 ```
+
+## Native Auth Configuration
+
+The default OIDC issuer is:
+
+```text
+https://sso.uit.edu.vn/realms/UIT
+```
+
+The app uses this redirect URI:
+
+```text
+com.personal.uitportal:/oauthredirect
+```
+
+Use a UIT-approved mobile client id when available:
+
+```powershell
+flutter run --dart-define=UIT_OIDC_CLIENT_ID=<client-id>
+```
+
+The legacy portal web client id may reject the mobile redirect URI until UIT
+allows a mobile OAuth client/redirect.
 
 ## Security
 

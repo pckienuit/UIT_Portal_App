@@ -1,5 +1,8 @@
 # Phase 1: Flutter Android Foundation
 
+Historical note: WebView fallback described below has been superseded by the
+native module/AppAuth migration.
+
 ## Completed
 
 - Installed Flutter stable in `C:\tools\flutter` for this machine.
