@@ -8,6 +8,7 @@ import 'package:uit_portal_app/src/features/auth/auth_controller.dart';
 import 'package:uit_portal_app/src/features/auth/auth_providers.dart';
 import 'package:uit_portal_app/src/features/home/home_screen.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
+import 'package:uit_portal_app/src/features/home/widgets/academic_snapshot_card.dart';
 import 'package:uit_portal_app/src/features/profile/profile_model.dart';
 import 'package:uit_portal_app/src/features/profile/profile_providers.dart';
 import 'package:uit_portal_app/src/features/schedule/schedule_model.dart';
@@ -156,9 +157,115 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('7,60'), findsOneWidget);
-    expect(find.text('8 tín chỉ đã hoàn thành'), findsOneWidget);
+    expect(find.text('7,60 / 10', findRichText: true), findsOneWidget);
+    expect(find.text('Tăng 2,10 so với kỳ trước'), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
+    expect(find.text('Tín chỉ hoàn thành'), findsOneWidget);
     expect(find.text('Chưa có tổng tín chỉ chương trình'), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
+    expect(find.text('Mới nhất'), findsOneWidget);
+    expect(find.text('Cũ hơn'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('grade insight survives narrow width and large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({
+      'widget_preferences': ['grades'],
+    });
+    final sharedPrefs = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPrefs),
+          authControllerProvider.overrideWith((ref) => _MockAuthController()),
+          detailedProfileProvider.overrideWith((ref) async => null),
+          scheduleFutureProvider.overrideWith(
+            (ref) async => ScheduleResponse(hocKy: 2, namHoc: 2026, tiets: []),
+          ),
+          tuitionListProvider.overrideWith((ref) async => []),
+          gradesFutureProvider.overrideWith(
+            (ref) async => GradesResponse(
+              semesterGroups: [
+                _semester('Học kỳ 2, 2025-2026', [
+                  _subject(code: 'CURRENT', credits: 3, score: '8.4'),
+                ]),
+                _semester('Học kỳ 1, 2025-2026', [
+                  _subject(code: 'PREVIOUS', credits: 3, score: '7.2'),
+                ]),
+              ],
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: PortalTheme.light(),
+          home: const MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: GradesSnapshot(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('does not compare non-adjacent semesters and renders dark mode', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'widget_preferences': ['grades'],
+    });
+    final sharedPrefs = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPrefs),
+          gradesFutureProvider.overrideWith(
+            (ref) async => GradesResponse(
+              semesterGroups: [
+                _semester('Học kỳ hiện tại', [
+                  _subject(code: 'CURRENT', credits: 3, score: '8.4'),
+                ]),
+                _semester('Học kỳ liền trước', [
+                  _subject(code: 'PENDING', credits: 3, score: ''),
+                ]),
+                _semester('Học kỳ cũ', [
+                  _subject(code: 'OLD', credits: 3, score: '6.2'),
+                ]),
+              ],
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: PortalTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: GradesSnapshot(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('so với kỳ trước'), findsNothing);
     expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
