@@ -117,11 +117,18 @@ class TuitionSnapshot extends ConsumerWidget {
   }
 }
 
-class GradesSnapshot extends ConsumerWidget {
+class GradesSnapshot extends ConsumerStatefulWidget {
   const GradesSnapshot({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GradesSnapshot> createState() => _GradesSnapshotState();
+}
+
+class _GradesSnapshotState extends ConsumerState<GradesSnapshot> {
+  bool _scoresVisible = true;
+
+  @override
+  Widget build(BuildContext context) {
     final gradesAsync = ref.watch(gradesFutureProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -134,12 +141,27 @@ class GradesSnapshot extends ConsumerWidget {
           Row(
             children: [
               Icon(Icons.school_outlined, color: colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Điểm số',
-                style: textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: PortalSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Điểm số',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('grade-visibility-button'),
+                tooltip: _scoresVisible ? 'Ẩn điểm số' : 'Hiện điểm số',
+                visualDensity: VisualDensity.compact,
+                onPressed: () =>
+                    setState(() => _scoresVisible = !_scoresVisible),
+                icon: Icon(
+                  _scoresVisible
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 20,
                 ),
               ),
             ],
@@ -157,28 +179,18 @@ class GradesSnapshot extends ConsumerWidget {
                 );
               }
               final latest = semesters.first;
-              final currentAverage = _weightedAverage(latest.subjects);
-              final previousAverage = semesters.length >= 2
-                  ? _weightedAverage(semesters[1].subjects)
-                  : null;
-              final completedCredits = _completedCredits(semesters);
-              final trend = semesters
-                  .map((semester) => _weightedAverage(semester.subjects))
-                  .whereType<double>()
-                  .toList();
               return _GradeInsight(
                 semesterLabel: latest.semesterLabel,
-                currentAverage: currentAverage,
-                previousAverage: previousAverage,
-                completedCredits: completedCredits,
-                trend: trend,
+                currentAverage: _weightedAverage(latest.subjects),
+                previousAverage: semesters.length >= 2
+                    ? _weightedAverage(semesters[1].subjects)
+                    : null,
+                completedCredits: _completedCredits(semesters),
+                totalProgramCredits: grades.totalProgramCredits,
+                scoresVisible: _scoresVisible,
               );
             },
-            loading: () => const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [PortalSkeleton(width: 100, height: 16)],
-            ),
+            loading: () => const PortalSkeleton(width: 100, height: 16),
             error: (err, stack) => Text(
               'Lỗi tải điểm',
               style: textTheme.bodySmall?.copyWith(color: colorScheme.error),
@@ -196,14 +208,16 @@ class _GradeInsight extends StatelessWidget {
     required this.currentAverage,
     required this.previousAverage,
     required this.completedCredits,
-    required this.trend,
+    required this.totalProgramCredits,
+    required this.scoresVisible,
   });
 
   final String semesterLabel;
   final double? currentAverage;
   final double? previousAverage;
   final int completedCredits;
-  final List<double> trend;
+  final int? totalProgramCredits;
+  final bool scoresVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -226,77 +240,43 @@ class _GradeInsight extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: PortalSpacing.sm),
-        Wrap(
-          spacing: PortalSpacing.md,
-          runSpacing: PortalSpacing.sm,
-          crossAxisAlignment: WrapCrossAlignment.end,
-          children: [
-            Semantics(
-              label: currentAverage == null
-                  ? 'Chưa có điểm trung bình kỳ hiện tại'
-                  : 'Điểm trung bình kỳ hiện tại ${_formatScore(currentAverage!)} trên 10',
-              child: ExcludeSemantics(
-                child: Text.rich(
-                  TextSpan(
-                    text: currentAverage == null
-                        ? 'Chưa có'
-                        : _formatScore(currentAverage!),
-                    children: currentAverage == null
-                        ? const []
-                        : [
-                            TextSpan(
-                              text: ' / 10',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0,
-                              ),
-                            ),
-                          ],
-                  ),
-                  style: textTheme.displaySmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                    height: 0.95,
-                    letterSpacing: -1.5,
-                  ),
-                ),
+        Semantics(
+          label: !scoresVisible
+              ? 'Điểm trung bình đang được ẩn'
+              : currentAverage == null
+              ? 'Chưa có điểm trung bình kỳ hiện tại'
+              : 'Điểm trung bình kỳ hiện tại ${_formatScore(currentAverage!)} trên 10',
+          child: ExcludeSemantics(
+            child: Text.rich(
+              TextSpan(
+                text: !scoresVisible
+                    ? '••••'
+                    : currentAverage == null
+                    ? 'Chưa có'
+                    : _formatScore(currentAverage!),
+                children: currentAverage == null && scoresVisible
+                    ? const []
+                    : [
+                        TextSpan(
+                          text: ' / 10',
+                          style: textTheme.labelLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+              ),
+              style: textTheme.displaySmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w700,
+                height: 0.95,
+                letterSpacing: -1.5,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: PortalSpacing.xs,
-                vertical: PortalSpacing.xs,
-              ),
-              decoration: BoxDecoration(
-                color: colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Wrap(
-                spacing: PortalSpacing.xxs,
-                runSpacing: PortalSpacing.xxs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    '$completedCredits',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onTertiaryContainer,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Tín chỉ hoàn thành',
-                    style: textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onTertiaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-        if (delta != null) ...[
+        if (scoresVisible && delta != null) ...[
           const SizedBox(height: PortalSpacing.xs),
           Text(
             _deltaLabel(delta),
@@ -306,76 +286,89 @@ class _GradeInsight extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: PortalSpacing.xxs),
-        Text(
-          'Chưa có tổng tín chỉ chương trình',
-          style: textTheme.labelSmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+        const SizedBox(height: PortalSpacing.md),
+        _CreditProgress(
+          completedCredits: completedCredits,
+          totalProgramCredits: totalProgramCredits,
         ),
-        if (trend.length >= 2) ...[
-          const SizedBox(height: PortalSpacing.lg),
-          Wrap(
-            spacing: PortalSpacing.sm,
-            runSpacing: PortalSpacing.xxs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                'Xu hướng học tập',
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                '${trend.length} học kỳ',
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: PortalSpacing.xs),
-          SizedBox(
-            key: const ValueKey('grade-trend-chart'),
-            height: 104,
-            width: double.infinity,
-            child: Semantics(
-              label:
-                  'Xu hướng điểm trung bình qua ${trend.length} học kỳ: '
-                  '${trend.map(_formatScore).join(', ')}',
-              image: true,
-              child: CustomPaint(
-                painter: _GradeTrendPainter(
-                  values: trend,
-                  color: colorScheme.tertiary,
-                  guideColor: colorScheme.outlineVariant,
-                  fillColor: colorScheme.tertiaryContainer,
-                  pointBackgroundColor: colorScheme.surfaceContainerLow,
-                ),
-              ),
-            ),
-          ),
-          Wrap(
-            spacing: PortalSpacing.md,
-            runSpacing: PortalSpacing.xxs,
-            children: [
-              Text(
-                'Mới nhất',
-                style: textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                'Cũ hơn',
-                style: textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
+    );
+  }
+}
+
+class _CreditProgress extends StatelessWidget {
+  const _CreditProgress({
+    required this.completedCredits,
+    required this.totalProgramCredits,
+  });
+
+  final int completedCredits;
+  final int? totalProgramCredits;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = totalProgramCredits;
+    final value = total == null
+        ? null
+        : (completedCredits / total).clamp(0.0, 1.0);
+    final valueLabel = total == null
+        ? '$completedCredits tín chỉ'
+        : '$completedCredits / $total tín chỉ';
+
+    return Semantics(
+      label: total == null
+          ? 'Đã hoàn thành $completedCredits tín chỉ, chưa có tổng tín chỉ chương trình'
+          : 'Đã hoàn thành $completedCredits trên $total tín chỉ',
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tín chỉ hoàn thành',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  valueLabel,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.tertiary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (value != null) ...[
+              const SizedBox(height: PortalSpacing.xs),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  key: const ValueKey('grade-credit-progress'),
+                  value: value,
+                  minHeight: 8,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ),
+            ],
+            if (total == null) ...[
+              const SizedBox(height: PortalSpacing.xs),
+              Text(
+                'Chưa có tổng tín chỉ chương trình',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -426,85 +419,4 @@ int _completedCredits(List<SemesterGroup> semesters) {
     credits += subject.numberOfCredit;
   }
   return credits;
-}
-
-class _GradeTrendPainter extends CustomPainter {
-  const _GradeTrendPainter({
-    required this.values,
-    required this.color,
-    required this.guideColor,
-    required this.fillColor,
-    required this.pointBackgroundColor,
-  });
-
-  final List<double> values;
-  final Color color;
-  final Color guideColor;
-  final Color fillColor;
-  final Color pointBackgroundColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final guidePaint = Paint()
-      ..color = guideColor
-      ..strokeWidth = 1;
-    for (final fraction in [0.25, 0.5, 0.75]) {
-      final y = size.height * fraction;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), guidePaint);
-    }
-    final minimum = values.reduce((a, b) => a < b ? a : b);
-    final maximum = values.reduce((a, b) => a > b ? a : b);
-    final range = maximum - minimum;
-    final points = <Offset>[];
-    final path = Path();
-    for (var index = 0; index < values.length; index++) {
-      const horizontalInset = 5.0;
-      final x =
-          horizontalInset +
-          (size.width - horizontalInset * 2) * index / (values.length - 1);
-      final normalized = range == 0 ? 0.5 : (values[index] - minimum) / range;
-      final y = 4 + (size.height - 8) * (1 - normalized);
-      final point = Offset(x, y);
-      points.add(point);
-      if (index == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    final linePaint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    final areaPath = Path.from(path)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(
-      areaPath,
-      Paint()..color = fillColor.withValues(alpha: 0.48),
-    );
-    canvas.drawPath(path, linePaint);
-    final pointPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final pointBorderPaint = Paint()
-      ..color = pointBackgroundColor
-      ..style = PaintingStyle.fill;
-    for (final point in points) {
-      canvas.drawCircle(point, 5, pointBorderPaint);
-      canvas.drawCircle(point, 3, pointPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _GradeTrendPainter oldDelegate) {
-    return oldDelegate.values != values ||
-        oldDelegate.color != color ||
-        oldDelegate.guideColor != guideColor ||
-        oldDelegate.fillColor != fillColor ||
-        oldDelegate.pointBackgroundColor != pointBackgroundColor;
-  }
 }

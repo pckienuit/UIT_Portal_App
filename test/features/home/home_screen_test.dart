@@ -95,7 +95,7 @@ void main() {
     expect(find.text('Lịch học hôm nay'), findsNothing);
   });
 
-  testWidgets('shows current average, completed credits, and grade trend', (
+  testWidgets('shows current average and credit progress without graph', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1000);
@@ -108,6 +108,7 @@ void main() {
     });
     final sharedPrefs = await SharedPreferences.getInstance();
     final grades = GradesResponse(
+      totalProgramCredits: 120,
       semesterGroups: [
         _semester('Học kỳ 2, 2025-2026', [
           _subject(code: 'CURRENT-1', credits: 3, score: '8.0'),
@@ -159,12 +160,22 @@ void main() {
 
     expect(find.text('7,60 / 10', findRichText: true), findsOneWidget);
     expect(find.text('Tăng 2,10 so với kỳ trước'), findsOneWidget);
-    expect(find.text('8'), findsOneWidget);
     expect(find.text('Tín chỉ hoàn thành'), findsOneWidget);
-    expect(find.text('Chưa có tổng tín chỉ chương trình'), findsOneWidget);
-    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
-    expect(find.text('Mới nhất'), findsOneWidget);
-    expect(find.text('Cũ hơn'), findsOneWidget);
+    expect(find.text('8 / 120 tín chỉ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-credit-progress')), findsOneWidget);
+    final progress = tester.widget<LinearProgressIndicator>(
+      find.byKey(const ValueKey('grade-credit-progress')),
+    );
+    expect(progress.value, closeTo(8 / 120, 0.0001));
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('grade-visibility-button')));
+    await tester.pump();
+
+    expect(find.text('7,60 / 10', findRichText: true), findsNothing);
+    expect(find.text('•••• / 10', findRichText: true), findsOneWidget);
+    expect(find.textContaining('so với kỳ trước'), findsNothing);
+    expect(find.text('8 / 120 tín chỉ'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -220,7 +231,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-credit-progress')), findsNothing);
+    expect(find.text('Chưa có tổng tín chỉ chương trình'), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -266,7 +279,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('so với kỳ trước'), findsNothing);
-    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-credit-progress')), findsNothing);
+    expect(find.text('Chưa có tổng tín chỉ chương trình'), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

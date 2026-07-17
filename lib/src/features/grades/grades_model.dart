@@ -1,17 +1,25 @@
 class GradesResponse {
-  GradesResponse({required this.semesterGroups});
+  GradesResponse({required this.semesterGroups, this.totalProgramCredits});
 
   final List<SemesterGroup> semesterGroups;
+  final int? totalProgramCredits;
 
   factory GradesResponse.fromJson(Map<String, dynamic> json) {
     final bySemester = json['bySemester'] as Map<String, dynamic>?;
     final groupsJson = bySemester?['semester_groups'] as List<dynamic>? ?? [];
     return GradesResponse(
-      semesterGroups:
-          groupsJson
-              .map((e) => SemesterGroup.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      totalProgramCredits: _positiveInt(
+        bySemester?['total_program_credits'] ?? json['total_program_credits'],
+      ),
+      semesterGroups: groupsJson
+          .map((e) => SemesterGroup.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
+  }
+
+  static int? _positiveInt(dynamic value) {
+    final parsed = int.tryParse(value?.toString() ?? '');
+    return parsed != null && parsed > 0 ? parsed : null;
   }
 }
 
@@ -34,10 +42,9 @@ class SemesterGroup {
       semesterKey: json['semester_key']?.toString() ?? '',
       semesterLabel: json['semester_label']?.toString() ?? '',
       yearName: json['year_name']?.toString() ?? '',
-      subjects:
-          subjectsJson
-              .map((e) => GradeSubject.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      subjects: subjectsJson
+          .map((e) => GradeSubject.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -91,10 +98,9 @@ class GradeSubject {
       statusPoint: json['status_point']?.toString() ?? '',
       subjectRequired: json['subject_required'] == true,
       note: json['note']?.toString() ?? '',
-      weights:
-          json['weights'] != null
-              ? GradeWeights.fromJson(json['weights'] as Map<String, dynamic>)
-              : null,
+      weights: json['weights'] != null
+          ? GradeWeights.fromJson(json['weights'] as Map<String, dynamic>)
+          : null,
     );
   }
 }
