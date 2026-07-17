@@ -33,10 +33,11 @@ import 'features/teaching_survey/teaching_survey_screen.dart';
 import 'features/main/main_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'portal_module_registry.dart';
+import 'design_system/theme/portal_theme.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authController = ref.watch(authControllerProvider);
-  
+
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
@@ -90,38 +91,42 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/api-debugger', builder: (context, state) => const ApiDebuggerScreen()),
+      GoRoute(
+        path: '/api-debugger',
+        builder: (context, state) => const ApiDebuggerScreen(),
+      ),
       GoRoute(
         path: '/module/:moduleId',
         builder: (context, state) {
           final moduleId = state.pathParameters['moduleId'] ?? '';
-          print('GoRoute routing to: $moduleId');
-          
-          if (moduleId == 'profile') return const ProfileScreen();
-          if (moduleId == 'grades') return const GradesScreen();
-          if (moduleId == 'tkb') return const ScheduleScreen();
-          if (moduleId == 'confirmation_paper') return const ConfirmationPaperScreen();
-          if (moduleId == 'certificate_validation') return const CertificateValidationScreen();
-          if (moduleId == 'student_card') return const StudentCardScreen();
-          if (moduleId == 'parking_registration') return const ParkingRegistrationScreen();
-          if (moduleId == 'khoa-luan') return const ThesisRegistrationScreen();
-          if (moduleId == 'tot-nghiep') return const GraduationRegistrationScreen();
-          if (moduleId == 'hoc-bong') return const ScholarshipRegistrationScreen();
-          if (moduleId == 'ho-tro') return const StudentSupportScreen();
-          if (moduleId == 'training_point') return const TrainingPointScreen();
-          if (moduleId == 'transcript_request') return const TranscriptRequestScreen();
-          if (moduleId == 'exam_postponement') return const ExamPostponementScreen();
-          if (moduleId == 'revaluation') return const RevaluationScreen();
-          if (moduleId == 'ngoai-tru' || moduleId == 'lich-sinh-hoat') return const ExtracurricularScreen();
-          if (moduleId == 'bao-hiem') return const HealthInsuranceScreen();
-          if (moduleId == 'gia-han-hoc-phi') return const TuitionExtensionScreen();
-          if (moduleId == 'thoi-hoc-bao-luu') return const StudyReservationScreen();
-          if (moduleId == 'lich-thi') return const ExamScheduleScreen();
-          if (moduleId == 'khao-sat-giang-day') return const TeachingSurveyScreen();
-          if (moduleId == 'hoc-phi') return const TuitionScreen();
 
-          final module = PortalModuleRegistry.byId(moduleId);
-          return NativeModuleScreen(module: module);
+          return switch (moduleId) {
+            'profile' => const ProfileScreen(),
+            'grades' => const GradesScreen(),
+            'tkb' => const ScheduleScreen(),
+            'confirmation_paper' => const ConfirmationPaperScreen(),
+            'certificate_validation' => const CertificateValidationScreen(),
+            'student_card' => const StudentCardScreen(),
+            'parking_registration' => const ParkingRegistrationScreen(),
+            'khoa-luan' => const ThesisRegistrationScreen(),
+            'tot-nghiep' => const GraduationRegistrationScreen(),
+            'hoc-bong' => const ScholarshipRegistrationScreen(),
+            'ho-tro' => const StudentSupportScreen(),
+            'training_point' => const TrainingPointScreen(),
+            'transcript_request' => const TranscriptRequestScreen(),
+            'exam_postponement' => const ExamPostponementScreen(),
+            'revaluation' => const RevaluationScreen(),
+            'ngoai-tru' || 'lich-sinh-hoat' => const ExtracurricularScreen(),
+            'bao-hiem' => const HealthInsuranceScreen(),
+            'gia-han-hoc-phi' => const TuitionExtensionScreen(),
+            'thoi-hoc-bao-luu' => const StudyReservationScreen(),
+            'lich-thi' => const ExamScheduleScreen(),
+            'khao-sat-giang-day' => const TeachingSurveyScreen(),
+            'hoc-phi' => const TuitionScreen(),
+            _ => NativeModuleScreen(
+              module: PortalModuleRegistry.byId(moduleId),
+            ),
+          };
         },
       ),
     ],
@@ -134,33 +139,13 @@ class UitPortalApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    
+
     return MaterialApp.router(
       title: 'UIT Portal Mobile',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0954C2),
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF6F8FC),
-        appBarTheme: const AppBarTheme(centerTitle: false),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6EA8FF),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: PortalTheme.light(),
+      darkTheme: PortalTheme.dark(),
+      themeMode: ThemeMode.system,
       routerConfig: router,
     );
   }
