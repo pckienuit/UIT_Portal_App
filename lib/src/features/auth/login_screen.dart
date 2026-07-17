@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../utils/glass_container.dart';
+import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_surface.dart';
+import '../../design_system/foundations/portal_spacing.dart';
 import 'auth_controller.dart';
 import 'auth_providers.dart';
 
@@ -14,8 +16,10 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -38,141 +42,170 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final auth = ref.watch(authControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text(''),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.primaryContainer,
-              colorScheme.tertiaryContainer,
-              colorScheme.secondaryContainer,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo UIT
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 120,
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Glass Form
-                  GlassContainer(
-                    opacity: 0.4,
-                    blur: 24.0,
-                    borderRadius: 32.0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'UIT Portal',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: colorScheme.primary,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Đăng nhập nội bộ hệ thống',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 32),
-                          TextField(
-                            controller: _usernameController,
-                            decoration: InputDecoration(
-                              labelText: 'Mã sinh viên / Username',
-                              prefixIcon: const Icon(Icons.person_outline),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
-                            ),
-                            textInputAction: TextInputAction.next,
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _passwordController,
-                            decoration: InputDecoration(
-                              labelText: 'Mật khẩu',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
-                            ),
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _submit(),
-                          ),
-                          if (auth.isBusy) ...[
-                            const SizedBox(height: 24),
-                            const Center(child: CircularProgressIndicator()),
-                          ],
-                          if (auth.lastError != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                auth.lastError!,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 32),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: auth.isBusy ? null : _submit,
-                            child: const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
+    return PortalScaffold(
+      maxContentWidth: 560,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: PortalSpacing.lg,
+              vertical: PortalSpacing.lg,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight > PortalSpacing.xxl
+                    ? constraints.maxHeight - PortalSpacing.xxl
+                    : 0,
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 88),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: PortalSpacing.lg),
+                    PortalSurface(
+                      padding: const EdgeInsets.all(PortalSpacing.lg),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'UIT Portal',
+                              style: textTheme.headlineMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: PortalSpacing.xs),
+                            Text(
+                              'Đăng nhập nội bộ hệ thống',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: PortalSpacing.lg),
+                            TextFormField(
+                              key: const Key('usernameField'),
+                              controller: _usernameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Mã sinh viên / Username',
+                              ),
+                              autocorrect: false,
+                              textInputAction: TextInputAction.next,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Vui lòng nhập mã sinh viên hoặc username';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: PortalSpacing.md),
+                            TextFormField(
+                              key: const Key('passwordField'),
+                              controller: _passwordController,
+                              decoration: InputDecoration(
+                                labelText: 'Mật khẩu',
+                                suffixIcon: IconButton(
+                                  key: const Key('passwordVisibilityButton'),
+                                  tooltip: _obscurePassword
+                                      ? 'Hiện mật khẩu'
+                                      : 'Ẩn mật khẩu',
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                              obscureText: _obscurePassword,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => _submit(),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Vui lòng nhập mật khẩu';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (auth.lastError != null) ...[
+                              const SizedBox(height: PortalSpacing.md),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(
+                                    PortalSpacing.sm,
+                                  ),
+                                  child: Text(
+                                    auth.lastError!,
+                                    style: TextStyle(
+                                      color: colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: PortalSpacing.lg),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: FilledButton(
+                                onPressed: auth.isBusy ? null : _submit,
+                                child: auth.isBusy
+                                    ? const SizedBox.square(
+                                        dimension: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : const Text('Đăng nhập'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
   void _submit() {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-    if (username.isEmpty || password.isEmpty) return;
-    ref.read(authControllerProvider).signInWithCredentials(username, password);
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    ref
+        .read(authControllerProvider)
+        .signInWithCredentials(
+          _usernameController.text.trim(),
+          _passwordController.text,
+        );
   }
 }
