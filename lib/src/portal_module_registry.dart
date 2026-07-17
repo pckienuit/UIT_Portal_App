@@ -205,7 +205,7 @@ class PortalModuleRegistry {
   static PortalModule byId(String id) {
     return modules.firstWhere(
       (module) => module.id == id,
-      orElse: () => modules.first,
+      orElse: () => modules.firstWhere((module) => module.id == 'dashboard'),
     );
   }
 }

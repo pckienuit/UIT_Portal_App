@@ -25,7 +25,7 @@ void main() {
     );
     expect(
       PortalModuleRegistry.byId('profile').status,
-      PortalModuleStatus.pendingApi,
+      PortalModuleStatus.nativeImplemented,
     );
   });
 }
