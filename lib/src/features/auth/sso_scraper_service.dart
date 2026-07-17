@@ -1,22 +1,7 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
+import '../../data/uit_trusted_dio.dart';
 import 'oidc_config.dart';
-
-String _generateCodeVerifier() {
-  final random = Random.secure();
-  final values = List<int>.generate(32, (i) => random.nextInt(256));
-  return base64UrlEncode(values).replaceAll('=', '');
-}
-
-String _generateCodeChallenge(String verifier) {
-  final bytes = utf8.encode(verifier);
-  final digest = sha256.convert(bytes);
-  return base64UrlEncode(digest.bytes).replaceAll('=', '');
-}
 
 class SsoScraperException implements Exception {
   const SsoScraperException(this.message);
@@ -28,14 +13,14 @@ class SsoScraperException implements Exception {
 
 class SsoScraperService {
   SsoScraperService({Dio? dio})
-      : _dio =
-            dio ??
-            Dio(
-              BaseOptions(
-                followRedirects: false,
-                validateStatus: (status) => status != null && status < 500,
-              ),
-            );
+    : _dio =
+          dio ??
+          createUitTrustedDio(
+            BaseOptions(
+              followRedirects: false,
+              validateStatus: (status) => status != null && status < 500,
+            ),
+          );
 
   final Dio _dio;
 
@@ -45,26 +30,42 @@ class SsoScraperService {
     OidcConfig config,
   ) async {
     // 1. GET /api/auth/login to initialize Portal OIDC flow
-    final loginRes = await _dio.get<dynamic>('https://portal.uit.edu.vn/api/auth/login');
-    
-    final oidcCookies = loginRes.headers['set-cookie']?.map((c) => c.split(';').first).join('; ') ?? '';
+    final loginRes = await _dio.get<dynamic>(
+      'https://portal.uit.edu.vn/api/auth/login',
+    );
+
+    final oidcCookies =
+        loginRes.headers['set-cookie']
+            ?.map((c) => c.split(';').first)
+            .join('; ') ??
+        '';
     final kcAuthUrl = loginRes.headers.value('location') ?? '';
 
     if (kcAuthUrl.isEmpty) {
-      throw const SsoScraperException('Không thể lấy được URL xác thực từ Portal.');
+      throw const SsoScraperException(
+        'Không thể lấy được URL xác thực từ Portal.',
+      );
     }
 
     // 2. Fetch Keycloak login page to get initial cookies and action URL
     final kcRes = await _dio.get<dynamic>(kcAuthUrl);
-    final kcCookies = kcRes.headers['set-cookie']?.map((c) => c.split(';').first).join('; ') ?? '';
-    
+    final kcCookies =
+        kcRes.headers['set-cookie']
+            ?.map((c) => c.split(';').first)
+            .join('; ') ??
+        '';
+
     final html = kcRes.data.toString();
-    final actionMatch = RegExp(r'id="kc-form-login"[^>]*action="([^"]+)"').firstMatch(html) ?? RegExp(r'action="([^"]+)"').firstMatch(html);
-    
+    final actionMatch =
+        RegExp(r'id="kc-form-login"[^>]*action="([^"]+)"').firstMatch(html) ??
+        RegExp(r'action="([^"]+)"').firstMatch(html);
+
     if (actionMatch == null) {
-      throw const SsoScraperException('Không tìm thấy form đăng nhập của UIT SSO.');
+      throw const SsoScraperException(
+        'Không tìm thấy form đăng nhập của UIT SSO.',
+      );
     }
-    
+
     final actionUrl = actionMatch.group(1)!.replaceAll('&amp;', '&');
 
     // 3. POST credentials to Keycloak
@@ -80,26 +81,28 @@ class SsoScraperService {
     );
 
     if (authPostRes.statusCode == 200) {
-      throw const SsoScraperException('Tài khoản hoặc mật khẩu không chính xác.');
+      throw const SsoScraperException(
+        'Tài khoản hoặc mật khẩu không chính xác.',
+      );
     }
 
     if (authPostRes.statusCode != 302) {
-      throw SsoScraperException('Lỗi hệ thống SSO (Mã lỗi: ${authPostRes.statusCode}).');
+      throw SsoScraperException(
+        'Lỗi hệ thống SSO (Mã lỗi: ${authPostRes.statusCode}).',
+      );
     }
 
     final callbackUrl = authPostRes.headers.value('location');
     if (callbackUrl == null || !callbackUrl.contains('code=')) {
-      throw const SsoScraperException('Không lấy được mã xác thực (Authorization Code).');
+      throw const SsoScraperException(
+        'Không lấy được mã xác thực (Authorization Code).',
+      );
     }
 
     // 4. Follow redirect back to Portal to complete the flow and get portal_session
     final callbackRes = await _dio.get<dynamic>(
       callbackUrl,
-      options: Options(
-        headers: {
-          'Cookie': oidcCookies,
-        }
-      )
+      options: Options(headers: {'Cookie': oidcCookies}),
     );
 
     final portalCookies = callbackRes.headers['set-cookie'] ?? <String>[];
@@ -110,11 +113,13 @@ class SsoScraperService {
         validCookies.add(part);
       }
     }
-    
+
     final sessionCookieStr = validCookies.join('; ');
 
     if (sessionCookieStr.isEmpty) {
-      throw const SsoScraperException('Không lấy được phiên đăng nhập từ Portal.');
+      throw const SsoScraperException(
+        'Không lấy được phiên đăng nhập từ Portal.',
+      );
     }
 
     // Return AuthSession storing the portal cookie in the accessToken field with 'Cookie=' prefix
@@ -122,7 +127,7 @@ class SsoScraperService {
       accessToken: 'Cookie=$sessionCookieStr',
       refreshToken: null,
       idToken: null,
-      expiresAt: DateTime.now().add(const Duration(days: 30)), 
+      expiresAt: DateTime.now().add(const Duration(days: 30)),
     );
   }
 }

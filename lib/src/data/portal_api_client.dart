@@ -4,12 +4,13 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../portal_constants.dart';
+import 'uit_trusted_dio.dart';
 
 class PortalApiClient {
   PortalApiClient({Dio? dio, this.accessTokenProvider, this.onSessionExpired})
     : _dio =
           dio ??
-          Dio(
+          createUitTrustedDio(
             BaseOptions(
               baseUrl: PortalConstants.portalOrigin,
               connectTimeout: const Duration(seconds: 15),
@@ -56,22 +57,31 @@ class PortalApiClient {
       searchParamsString = '?$jsonParams';
       searchParamsObj = jsonParams;
     }
-    
+
     // Tách path thành các segments
     final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-    
+
     // Xây dựng cây Router State từ dưới lên
     // Bắt đầu với __PAGE__
-    dynamic currentTree = ["__PAGE__$searchParamsString", jsonDecode(searchParamsObj)];
-    
+    dynamic currentTree = [
+      "__PAGE__$searchParamsString",
+      jsonDecode(searchParamsObj),
+    ];
+
     // Cuộn ngược các segments để bọc vào children
     for (int i = segments.length - 1; i >= 0; i--) {
-      currentTree = [segments[i], {"children": currentTree}];
+      currentTree = [
+        segments[i],
+        {"children": currentTree},
+      ];
     }
-    
+
     // Root Node
-    final rootTree = ["", {"children": currentTree}];
-    
+    final rootTree = [
+      "",
+      {"children": currentTree},
+    ];
+
     final options = Options(
       headers: {
         'RSC': '1',
@@ -108,18 +118,23 @@ class PortalApiClient {
 
   void _throwIfPortalError(Response<dynamic> response) {
     final statusCode = response.statusCode ?? 0;
-    
+
     // Phát hiện session hết hạn (UIT portal thường trả về trang HTML chứa form login thay vì 401)
     bool isSessionExpired = statusCode == 401;
-    if (statusCode == 200 && response.data is String && (response.data as String).trimLeft().startsWith('<')) {
+    if (statusCode == 200 &&
+        response.data is String &&
+        (response.data as String).trimLeft().startsWith('<')) {
       isSessionExpired = true;
     }
-    
+
     if (isSessionExpired) {
       onSessionExpired?.call();
-      throw PortalApiException(statusCode: 401, path: response.requestOptions.path);
+      throw PortalApiException(
+        statusCode: 401,
+        path: response.requestOptions.path,
+      );
     }
-    
+
     if (statusCode >= 400) {
       throw PortalApiException(
         statusCode: statusCode,
@@ -135,14 +150,12 @@ class PortalApiClient {
       return options;
     }
 
-    final headers = <String, dynamic>{
-      ...?options?.headers,
-    };
+    final headers = <String, dynamic>{...?options?.headers};
 
     if (token.startsWith('Cookie=')) {
       final cookie = token.replaceFirst('Cookie=', '');
       final existingCookie = headers['Cookie']?.toString() ?? '';
-      headers['Cookie'] = existingCookie.isNotEmpty 
+      headers['Cookie'] = existingCookie.isNotEmpty
           ? '$existingCookie; $cookie'
           : cookie;
     } else {
@@ -154,7 +167,11 @@ class PortalApiClient {
 }
 
 class PortalApiException implements Exception {
-  const PortalApiException({required this.statusCode, required this.path, this.responseData});
+  const PortalApiException({
+    required this.statusCode,
+    required this.path,
+    this.responseData,
+  });
 
   final int statusCode;
   final String path;

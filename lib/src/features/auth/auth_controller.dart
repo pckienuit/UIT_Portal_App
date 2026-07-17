@@ -113,13 +113,18 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final session = await _scraperService.scrapeLogin(username, password, _config);
+      final session = await _scraperService.scrapeLogin(
+        username,
+        password,
+        _config,
+      );
       await _persistSession(session);
       _status = AuthStatus.signedIn;
     } on SsoScraperException catch (error) {
       _lastError = error.message;
-    } catch (error) {
-      _lastError = 'Đăng nhập thất bại: $error';
+    } catch (_) {
+      _lastError =
+          'Không thể kết nối hệ thống UIT. Vui lòng kiểm tra mạng và thử lại.';
     } finally {
       _isBusy = false;
       notifyListeners();
