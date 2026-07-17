@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
-import '../profile/profile_screen.dart';
 import '../../portal_module_registry.dart';
 import '../auth/auth_providers.dart';
 import '../auth/auth_controller.dart';
@@ -46,8 +45,7 @@ class _DashboardNativeBody extends ConsumerWidget {
         _NativeInfoPanel(
           icon: Icons.dashboard_outlined,
           title: 'Dashboard native',
-          message:
-              'Màn hình này đã được render bằng Flutter. Các dữ liệu động sẽ được nối sau khi API portal được inventory.',
+          message: 'Một số dữ liệu của trang này hiện chưa khả dụng.',
         ),
         const SizedBox(height: 12),
         _NativeInfoPanel(
@@ -163,14 +161,14 @@ class _PendingApiBody extends StatelessWidget {
           icon: Icons.construction_outlined,
           title: 'Đang chờ API portal',
           message:
-              '${module.title} đã được chuyển sang màn Flutter native. Dữ liệu thật sẽ được nối sau khi endpoint được xác minh và ghi vào API inventory.',
+              '${module.title} hiện chưa có nguồn dữ liệu đã được xác minh.',
         ),
         const SizedBox(height: 12),
         _NativeInfoPanel(
           icon: Icons.security_outlined,
-          title: 'Không dùng WebView',
+          title: 'Dữ liệu được bảo toàn',
           message:
-              'Màn hình này không mở portal web. Nếu endpoint chưa rõ, app giữ trạng thái native pending thay vì quay lại WebView.',
+              'Ứng dụng sẽ chỉ hiển thị thông tin khi có dữ liệu chính thức.',
         ),
       ],
     );
@@ -209,17 +207,6 @@ class _NativeInfoPanel extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Xem Hồ sơ cá nhân (RSC Parsed)'),
                   ),
                   const SizedBox(height: 6),
                   Text(message),

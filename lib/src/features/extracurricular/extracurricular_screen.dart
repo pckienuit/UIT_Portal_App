@@ -5,6 +5,7 @@ import 'extracurricular_providers.dart';
 import 'extracurricular_model.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_info_row.dart';
 
 class ExtracurricularScreen extends ConsumerWidget {
   const ExtracurricularScreen({super.key});
@@ -18,25 +19,10 @@ class ExtracurricularScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, Theme.of(context)),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(extracurricularProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải lịch sinh hoạt',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(extracurricularProvider),
         ),
       ),
     );
@@ -48,19 +34,9 @@ class ExtracurricularScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     if (data.items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.event_busy,
-              size: 64,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            const Text('Hiện không có lịch sinh hoạt nào'),
-          ],
-        ),
+      return const PortalAsyncState.empty(
+        title: 'Hiện không có lịch sinh hoạt',
+        message: 'Các hoạt động sinh viên sẽ xuất hiện tại đây.',
       );
     }
 
@@ -85,20 +61,14 @@ class ExtracurricularScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 16),
-                    const SizedBox(width: 8),
-                    Text(item.ngayBatDau ?? 'Chưa rõ ngày'),
-                  ],
+                PortalInfoRow(
+                  label: 'Ngày bắt đầu',
+                  value: Text(item.ngayBatDau ?? 'Chưa cập nhật'),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 16),
-                    const SizedBox(width: 8),
-                    Text(item.diaDiem ?? 'Chưa rõ địa điểm'),
-                  ],
+                PortalInfoRow(
+                  label: 'Địa điểm',
+                  value: Text(item.diaDiem ?? 'Chưa cập nhật'),
                 ),
               ],
             ),

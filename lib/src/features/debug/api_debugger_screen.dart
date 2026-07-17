@@ -110,115 +110,114 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return PortalScaffold(
       appBar: AppBar(
         title: const Text('API Debugger'),
-        backgroundColor: Colors.red[900],
-        foregroundColor: Colors.white,
+        backgroundColor: scheme.errorContainer,
+        foregroundColor: scheme.onErrorContainer,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                Wrap(
-                  spacing: 4,
-                  children: [
-                    _buildTestButton(
-                      '/api/sinh-vien/tkb',
-                      queryParameters: {
-                        'hocKy': '2',
-                        'namHoc': '2025',
-                        'yearId': '17',
-                        'startDate': '2026-03-01',
-                      },
-                    ),
-                    _buildTestButton('/api/sinh-vien/ho-so'),
-                    _buildTestButton(
-                      '/api/sinh-vien/lich-sinh-hoat',
-                      queryParameters: {
-                        'hocKy': '2',
-                        'namHoc': '2025',
-                        'yearId': '17',
-                      },
-                    ),
-                    _buildTestButton(
-                      '/api/sinh-vien/lich-thi',
-                      isPost: true,
-                      queryParameters: {
-                        'hocKy': '2',
-                        'namHoc': '2025',
-                        'yearId': '17',
-                      },
-                    ),
-                    _buildTestButton(
-                      '/api/sinh-vien/khao-sat-giang-day',
-                      isPost: true,
-                    ),
-                    _buildTestButton('/sinh-vien/hoc-phi', isRsc: true),
-                    _buildTestButton('/sinh-vien/dang-vien', isRsc: true),
-                  ],
-                ),
-                const Divider(),
-                TextField(
-                  controller: _pathController,
-                  decoration: const InputDecoration(
-                    labelText: 'API Path',
-                    border: OutlineInputBorder(),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      _buildTestButton(
+                        '/api/sinh-vien/tkb',
+                        queryParameters: {
+                          'hocKy': '2',
+                          'namHoc': '2025',
+                          'yearId': '17',
+                          'startDate': '2026-03-01',
+                        },
+                      ),
+                      _buildTestButton('/api/sinh-vien/ho-so'),
+                      _buildTestButton(
+                        '/api/sinh-vien/lich-sinh-hoat',
+                        queryParameters: {
+                          'hocKy': '2',
+                          'namHoc': '2025',
+                          'yearId': '17',
+                        },
+                      ),
+                      _buildTestButton(
+                        '/api/sinh-vien/lich-thi',
+                        isPost: true,
+                        queryParameters: {
+                          'hocKy': '2',
+                          'namHoc': '2025',
+                          'yearId': '17',
+                        },
+                      ),
+                      _buildTestButton(
+                        '/api/sinh-vien/khao-sat-giang-day',
+                        isPost: true,
+                      ),
+                      _buildTestButton('/sinh-vien/hoc-phi', isRsc: true),
+                      _buildTestButton('/sinh-vien/dang-vien', isRsc: true),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _paramsController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'JSON Query Parameters / Body',
-                    border: OutlineInputBorder(),
-                    hintText: '{"key": "value"}',
+                  const Divider(),
+                  TextField(
+                    controller: _pathController,
+                    decoration: const InputDecoration(
+                      labelText: 'API Path',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                CheckboxListTile(
-                  title: const Text('Gửi kèm header RSC: 1 (Next.js)'),
-                  value: _useRscHeader,
-                  onChanged: (val) {
-                    setState(() {
-                      _useRscHeader = val ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                        ),
-                        onPressed: () => _testApi(false),
-                        child: const Text(
-                          'GET',
-                          style: TextStyle(color: Colors.white),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _paramsController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'JSON Query Parameters / Body',
+                      border: OutlineInputBorder(),
+                      hintText: '{"key": "value"}',
+                    ),
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Gửi kèm header RSC: 1 (Next.js)'),
+                    value: _useRscHeader,
+                    onChanged: (val) {
+                      setState(() {
+                        _useRscHeader = val ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: scheme.primaryContainer,
+                            foregroundColor: scheme.onPrimaryContainer,
+                          ),
+                          onPressed: () => _testApi(false),
+                          child: const Text('GET'),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                        ),
-                        onPressed: () => _testApi(true),
-                        child: const Text(
-                          'POST',
-                          style: TextStyle(color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: scheme.tertiaryContainer,
+                            foregroundColor: scheme.onTertiaryContainer,
+                          ),
+                          onPressed: () => _testApi(true),
+                          child: const Text('POST'),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           const Divider(thickness: 2),
@@ -226,18 +225,20 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.black87,
+              color: scheme.inverseSurface,
               child: Stack(
                 children: [
                   _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                      ? Center(
+                          child: CircularProgressIndicator(
+                            color: scheme.onInverseSurface,
+                          ),
                         )
                       : SingleChildScrollView(
                           child: Text(
                             _result,
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
+                            style: TextStyle(
+                              color: scheme.onInverseSurface,
                               fontFamily: 'monospace',
                             ),
                           ),
@@ -246,7 +247,7 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
                     top: 0,
                     right: 0,
                     child: IconButton(
-                      icon: const Icon(Icons.copy, color: Colors.white70),
+                      icon: Icon(Icons.copy, color: scheme.onInverseSurface),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: _result));
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -272,10 +273,11 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
     bool isRsc = false,
     Map<String, dynamic>? queryParameters,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey[200],
-        foregroundColor: Colors.black87,
+        backgroundColor: scheme.surfaceContainerHighest,
+        foregroundColor: scheme.onSurfaceVariant,
         textStyle: const TextStyle(fontSize: 12),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),

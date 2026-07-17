@@ -5,6 +5,7 @@ import 'study_reservation_providers.dart';
 import 'study_reservation_model.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class StudyReservationScreen extends ConsumerWidget {
   const StudyReservationScreen({super.key});
@@ -19,25 +20,10 @@ class StudyReservationScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(studyReservationProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin bảo lưu',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(studyReservationProvider),
         ),
       ),
     );
@@ -52,31 +38,9 @@ class StudyReservationScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (data.presentStatusName != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Trạng thái: ${data.presentStatusName}',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          PortalStatusChip(
+            label: data.presentStatusName!,
+            tone: PortalStatusTone.neutral,
           ),
         Text(
           'Lịch sử bảo lưu/thôi học',
@@ -91,19 +55,9 @@ class StudyReservationScreen extends ConsumerWidget {
             child: Center(child: Text('Chưa có dữ liệu')),
           )
         else
-          ...data.history!.map(
-            (record) => Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: theme.dividerColor),
-              ),
-              child: ListTile(
-                title: const Text('Bản ghi thôi học/bảo lưu'),
-                subtitle: Text(record.toString()),
-              ),
-            ),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị lịch sử bảo lưu',
+            message: 'Dữ liệu lịch sử chưa có cấu trúc hiển thị ổn định.',
           ),
       ],
     );

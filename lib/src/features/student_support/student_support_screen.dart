@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'student_support_providers.dart';
 import 'student_support_model.dart';
-import 'student_support_model.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
 
@@ -20,25 +19,10 @@ class StudentSupportScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(student_supportProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin hỗ trợ',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(student_supportProvider),
         ),
       ),
     );
@@ -88,20 +72,9 @@ class StudentSupportScreen extends ConsumerWidget {
         ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: tickets.length,
-      itemBuilder: (context, index) => Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.dividerColor),
-        ),
-        child: ListTile(
-          leading: const Icon(Icons.support_agent),
-          title: Text(tickets[index].toString()),
-        ),
-      ),
+    return const PortalAsyncState.unavailable(
+      title: 'Chưa thể hiển thị yêu cầu hỗ trợ',
+      message: 'Dữ liệu yêu cầu chưa có cấu trúc hiển thị ổn định.',
     );
   }
 
