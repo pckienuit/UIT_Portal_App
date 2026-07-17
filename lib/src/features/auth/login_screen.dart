@@ -117,20 +117,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               controller: _passwordController,
                               decoration: InputDecoration(
                                 labelText: 'Mật khẩu',
-                                suffixIcon: IconButton(
-                                  key: const Key('passwordVisibilityButton'),
-                                  tooltip: _obscurePassword
+                                suffixIcon: Semantics(
+                                  button: true,
+                                  label: _obscurePassword
                                       ? 'Hiện mật khẩu'
                                       : 'Ẩn mật khẩu',
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
+                                  onTap: _togglePassword,
+                                  excludeSemantics: true,
+                                  child: IconButton(
+                                    key: const Key('passwordVisibilityButton'),
+                                    tooltip: _obscurePassword
+                                        ? 'Hiện mật khẩu'
+                                        : 'Ẩn mật khẩu',
+                                    onPressed: _togglePassword,
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -194,6 +198,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         },
       ),
     );
+  }
+
+  void _togglePassword() {
+    setState(() {
+      _obscurePassword = !_obscurePassword;
+    });
   }
 
   void _submit() {
