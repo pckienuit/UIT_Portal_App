@@ -5,6 +5,7 @@ import 'transcript_request_model.dart';
 import 'transcript_request_providers.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/foundations/portal_spacing.dart';
 
 class TranscriptRequestScreen extends ConsumerWidget {
   const TranscriptRequestScreen({super.key});
@@ -19,25 +20,10 @@ class TranscriptRequestScreen extends ConsumerWidget {
       body: transcriptRequestAsync.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref.refresh(transcriptRequestFutureProvider),
-                icon: Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải yêu cầu bảng điểm',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(transcriptRequestFutureProvider),
         ),
       ),
     );
@@ -101,8 +87,10 @@ class TranscriptRequestScreen extends ConsumerWidget {
             ),
           )
         else
-          // If we had a robust history model we'd map it here, but since it's dynamic we just show a placeholder
-          const Text('Có yêu cầu trong lịch sử (đang phát triển UI)'),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị lịch sử bảng điểm',
+            message: 'Dữ liệu lịch sử chưa có cấu trúc hiển thị ổn định.',
+          ),
       ],
     );
   }
@@ -115,19 +103,25 @@ class TranscriptRequestScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.1),
+        color: theme.colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: Colors.blue),
+          Icon(
+            Icons.info_outline,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Colors.blue, height: 1.5),
+              style: TextStyle(
+                color: theme.colorScheme.onSecondaryContainer,
+                height: 1.5,
+              ),
             ),
           ),
         ],
@@ -147,35 +141,33 @@ class TranscriptRequestScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: theme.dividerColor),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        title: Text(
-          param.displayName ?? param.parameter ?? 'Bảng điểm',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            param.cost != null && param.cost! > 0
-                ? 'Lệ phí: ${param.cost} VNĐ / bản'
-                : 'Miễn phí',
-            style: TextStyle(
-              color: param.cost != null && param.cost! > 0
-                  ? Colors.orange
-                  : Colors.green,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        trailing: FilledButton.tonal(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tính năng đăng ký đang phát triển'),
+      child: Padding(
+        padding: const EdgeInsets.all(PortalSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              param.displayName ?? param.parameter ?? 'Bảng điểm',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-            );
-          },
-          child: const Text('Đăng ký'),
+            ),
+            const SizedBox(height: PortalSpacing.xs),
+            Text(
+              param.cost == null
+                  ? 'Lệ phí: Chưa cập nhật'
+                  : param.cost! > 0
+                  ? 'Lệ phí: ${param.cost} VNĐ / bản'
+                  : 'Miễn phí',
+            ),
+            const SizedBox(height: PortalSpacing.md),
+            const Text(
+              'Chưa thể đăng ký trên ứng dụng',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: PortalSpacing.xs),
+            const FilledButton.tonal(onPressed: null, child: Text('Đăng ký')),
+          ],
         ),
       ),
     );

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'health_insurance_providers.dart';
 import 'health_insurance_model.dart';
 import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_info_row.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class HealthInsuranceScreen extends ConsumerWidget {
   const HealthInsuranceScreen({super.key});
@@ -19,25 +21,10 @@ class HealthInsuranceScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(healthInsuranceProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin bảo hiểm',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(healthInsuranceProvider),
         ),
       ),
     );
@@ -52,31 +39,10 @@ class HealthInsuranceScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (data.presentStatusName != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Trạng thái: ${data.presentStatusName}',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          PortalStatusChip(
+            label: data.presentStatusName!,
+            tone: PortalStatusTone.neutral,
+            icon: Icons.info_outline,
           ),
 
         if (data.profile != null) ...[
@@ -134,10 +100,9 @@ class HealthInsuranceScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _buildRow('Số tiền', data.config?.amount?.toString()),
                   const SizedBox(height: 8),
-                  _buildRow(
-                    'Thời gian',
-                    '${data.config?.startDate ?? ''} - ${data.config?.endDate ?? ''}',
-                  ),
+                  _buildRow('Bắt đầu', data.config?.startDate),
+                  const SizedBox(height: 8),
+                  _buildRow('Kết thúc', data.config?.endDate),
                 ],
               ),
             ),
@@ -148,27 +113,9 @@ class HealthInsuranceScreen extends ConsumerWidget {
   }
 
   Widget _buildRow(String label, String? value) {
-    if (value == null || value.isEmpty) return const SizedBox.shrink();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-        ),
-      ],
+    return PortalInfoRow(
+      label: label,
+      value: Text(value == null || value.isEmpty ? 'Chưa cập nhật' : value),
     );
   }
 }

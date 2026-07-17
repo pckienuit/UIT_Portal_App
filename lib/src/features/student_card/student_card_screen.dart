@@ -12,93 +12,30 @@ class StudentCardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(student_cardFutureProvider);
-    final theme = Theme.of(context);
-
     return PortalScaffold(
       appBar: AppBar(title: const Text('Thẻ sinh viên'), centerTitle: true),
       body: asyncData.when(
-        data: (data) => _buildContent(context, data, theme),
+        data: _buildContent,
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref.refresh(student_cardFutureProvider),
-                icon: Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải dữ liệu thẻ sinh viên',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(student_cardFutureProvider),
         ),
       ),
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    StudentCardResponse data,
-    ThemeData theme,
-  ) {
+  Widget _buildContent(StudentCardResponse data) {
     if (data.records.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.badge, size: 64, color: theme.dividerColor),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có dữ liệu thẻ sinh viên',
-              style: TextStyle(
-                color: theme.textTheme.bodyMedium?.color?.withValues(
-                  alpha: 0.6,
-                ),
-              ),
-            ),
-          ],
-        ),
+      return const PortalAsyncState.empty(
+        title: 'Chưa có dữ liệu thẻ sinh viên',
+        message: 'Thông tin thẻ sinh viên sẽ xuất hiện tại đây.',
       );
     }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: data.records.length,
-      itemBuilder: (context, index) {
-        final record = data.records[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.badge, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Thẻ Sinh Viên',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                Text(record.toString()),
-              ],
-            ),
-          ),
-        );
-      },
+    return const PortalAsyncState.unavailable(
+      title: 'Chưa thể hiển thị dữ liệu thẻ sinh viên',
+      message: 'Dữ liệu thẻ chưa có cấu trúc hiển thị ổn định.',
     );
   }
 }
