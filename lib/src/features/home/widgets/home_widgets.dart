@@ -5,9 +5,65 @@ import 'package:intl/intl.dart';
 import '../../schedule/schedule_providers.dart';
 import '../../tuition/tuition_providers.dart';
 import '../../grades/grades_providers.dart';
-import '../../../utils/glass_container.dart';
+import '../../../design_system/components/portal_surface.dart';
 
 final currencyFormatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+
+class HomeBento extends StatelessWidget {
+  const HomeBento({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600 || children.length == 1) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index != children.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          );
+        }
+
+        return SizedBox(
+          height: 320,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(flex: 3, child: children.first),
+              if (children.length > 1) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    children: [
+                      for (var index = 1; index < children.length; index++)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              bottom: index == children.length - 1 ? 0 : 12,
+                            ),
+                            child: children[index],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
 
 class ScheduleWidget extends ConsumerWidget {
   const ScheduleWidget({super.key});
@@ -16,10 +72,7 @@ class ScheduleWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheduleAsync = ref.watch(scheduleFutureProvider);
 
-    return GlassContainer(
-      opacity: 0.4,
-      blur: 16,
-      borderRadius: 24,
+    return PortalSurface(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -32,9 +85,9 @@ class ScheduleWidget extends ConsumerWidget {
                 Text(
                   'Lịch học',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -45,7 +98,9 @@ class ScheduleWidget extends ConsumerWidget {
                 if (tiets.isEmpty) {
                   return const Text('Không có dữ liệu lịch học.');
                 }
-                return Text('Học kỳ ${schedule.hocKy} có ${tiets.length} tiết học sắp tới.');
+                return Text(
+                  'Học kỳ ${schedule.hocKy} có ${tiets.length} tiết học sắp tới.',
+                );
               },
               loading: () => const Text('Đang tải lịch học...'),
               error: (err, stack) => const Text('Không thể tải lịch học.'),
@@ -64,10 +119,7 @@ class TuitionWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tuitionAsync = ref.watch(tuitionListProvider);
 
-    return GlassContainer(
-      opacity: 0.4,
-      blur: 16,
-      borderRadius: 24,
+    return PortalSurface(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -75,21 +127,27 @@ class TuitionWidget extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.attach_money,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Học phí',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             tuitionAsync.when(
               data: (records) {
-                final totalDebt = records.fold<num>(0, (sum, record) => sum + record.amountDue);
+                final totalDebt = records.fold<num>(
+                  0,
+                  (sum, record) => sum + record.amountDue,
+                );
                 if (totalDebt <= 0) {
                   return const Text('Bạn đã hoàn thành nghĩa vụ học phí.');
                 }
@@ -115,10 +173,7 @@ class GradesWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gradesAsync = ref.watch(gradesFutureProvider);
 
-    return GlassContainer(
-      opacity: 0.4,
-      blur: 16,
-      borderRadius: 24,
+    return PortalSurface(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -126,14 +181,17 @@ class GradesWidget extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.school,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Kết quả học tập',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -145,7 +203,9 @@ class GradesWidget extends ConsumerWidget {
                   return const Text('Chưa có dữ liệu điểm.');
                 }
                 final latest = semesters.first;
-                return Text('Học kỳ gần nhất: ${latest.semesterLabel} (${latest.subjects.length} môn)');
+                return Text(
+                  'Học kỳ gần nhất: ${latest.semesterLabel} (${latest.subjects.length} môn)',
+                );
               },
               loading: () => const Text('Đang tải điểm...'),
               error: (err, stack) => const Text('Không thể tải điểm.'),

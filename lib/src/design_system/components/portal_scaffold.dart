@@ -25,7 +25,7 @@ class PortalScaffold extends StatelessWidget {
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-      body: ColoredBox(
+      body: Material(
         color: Theme.of(context).colorScheme.surface,
         child: SafeArea(
           top: appBar == null,

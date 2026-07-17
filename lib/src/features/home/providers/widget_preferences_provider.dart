@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('sharedPreferencesProvider must be overridden in ProviderScope');
+  throw UnimplementedError(
+    'sharedPreferencesProvider must be overridden in ProviderScope',
+  );
 });
 
 const _kWidgetPreferencesKey = 'widget_preferences';
@@ -20,7 +22,7 @@ class WidgetPreferencesNotifier extends Notifier<List<String>> {
   void toggleWidget(String widgetId, bool isEnabled) {
     final currentState = state;
     final List<String> newState = List.from(currentState);
-    
+
     if (isEnabled && !newState.contains(widgetId)) {
       newState.add(widgetId);
     } else if (!isEnabled && newState.contains(widgetId)) {
@@ -34,7 +36,7 @@ class WidgetPreferencesNotifier extends Notifier<List<String>> {
   void reorderWidgets(int oldIndex, int newIndex) {
     final currentState = state;
     final List<String> newState = List.from(currentState);
-    
+
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
@@ -51,6 +53,7 @@ class WidgetPreferencesNotifier extends Notifier<List<String>> {
   }
 }
 
-final widgetPreferencesProvider = NotifierProvider<WidgetPreferencesNotifier, List<String>>(() {
-  return WidgetPreferencesNotifier();
-});
+final widgetPreferencesProvider =
+    NotifierProvider<WidgetPreferencesNotifier, List<String>>(() {
+      return WidgetPreferencesNotifier();
+    });
