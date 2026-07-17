@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'profile_providers.dart';
-import 'profile_model.dart';
+
 import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_info_row.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/foundations/portal_spacing.dart';
+import '../auth/auth_providers.dart';
+import 'profile_model.dart';
+import 'profile_providers.dart';
+import 'widgets/profile_identity_header.dart';
+import 'widgets/profile_info_section.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -15,352 +21,287 @@ class ProfileScreen extends ConsumerWidget {
     return PortalScaffold(
       appBar: AppBar(
         title: const Text('Hồ sơ cá nhân'),
-        backgroundColor: Colors.blue[800],
-        foregroundColor: Colors.white,
-        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Làm mới hồ sơ',
+            onPressed: () => ref.invalidate(detailedProfileProvider),
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
-            return const Center(
-              child: Text('Không thể lấy thông tin sinh viên.'),
+            return const _ProfileFallback(
+              child: PortalAsyncState.empty(
+                title: 'Chưa có thông tin sinh viên',
+                message:
+                    'Hồ sơ sẽ xuất hiện khi hệ thống UIT cung cấp dữ liệu.',
+              ),
             );
           }
-
-          return CustomScrollView(
-            slivers: [
-              _buildHeader(context, profile),
-              SliverPadding(
-                padding: const EdgeInsets.all(16.0),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildSectionTitle('Thông tin cá nhân'),
-                    _buildPersonalInfoCard(profile.personal),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle('Học vấn & Học vụ'),
-                    _buildAcademicInfoCard(profile),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle('Thông tin gia đình'),
-                    _buildFamilyInfoCard(profile.family),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle('Đoàn - Đảng & Khác'),
-                    _buildMembershipCard(profile.membership, profile.bank),
-                    const SizedBox(height: 40),
-                  ]),
-                ),
-              ),
-            ],
-          );
+          return _ProfileContent(profile: profile);
         },
-        loading: () => const PortalAsyncState.loading(),
-        error: (err, stack) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  'Lỗi khi tải hồ sơ:\n$err',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(detailedProfileProvider);
-                },
-                child: const Text('Thử lại'),
-              ),
-            ],
+        loading: () =>
+            const _ProfileFallback(child: PortalAsyncState.loading()),
+        error: (error, stack) => _ProfileFallback(
+          child: PortalAsyncState.error(
+            title: 'Không thể tải hồ sơ',
+            message: 'Vui lòng kiểm tra kết nối và thử lại.',
+            onRetry: () => ref.invalidate(detailedProfileProvider),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context, StudentProfile profile) {
-    return SliverToBoxAdapter(
-      child: Container(
-        padding: const EdgeInsets.only(bottom: 24),
-        decoration: BoxDecoration(
-          color: Colors.blue[800],
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(32),
-            bottomRight: Radius.circular(32),
-          ),
-        ),
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.person, size: 60, color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              profile.fullName ?? profile.displayName ?? 'Chưa cập nhật',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                profile.studentCode ?? profile.username ?? 'MSSV',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            if (profile.academic?.className != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.class_, color: Colors.white70, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${profile.academic!.className} • ${profile.academic?.cohort ?? ''}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+class _ProfileContent extends ConsumerWidget {
+  const _ProfileContent({required this.profile});
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-    );
-  }
+  final StudentProfile profile;
 
-  Widget _buildPersonalInfoCard(PersonalInfo? info) {
-    if (info == null)
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Không có dữ liệu'),
-        ),
-      );
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildInfoRow(Icons.cake, 'Ngày sinh', info.dateOfBirth),
-            const Divider(height: 24),
-            _buildInfoRow(
-              Icons.transgender,
-              'Giới tính',
-              info.gender == 'male'
-                  ? 'Nam'
-                  : (info.gender == 'female' ? 'Nữ' : info.gender),
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              Icons.badge,
-              'CMND/CCCD',
-              '${info.idCardNumber} (${info.idCardIssueDate})',
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(Icons.email, 'Email trường', info.schoolEmail),
-            const Divider(height: 24),
-            _buildInfoRow(Icons.phone, 'Số điện thoại', info.phone),
-            const Divider(height: 24),
-            _buildInfoRow(Icons.home, 'Hộ khẩu', info.permanentAddress),
-            const Divider(height: 24),
-            _buildInfoRow(
-              Icons.public,
-              'Dân tộc / Tôn giáo',
-              '${info.ethnicity ?? ''} / ${info.religion ?? ''}',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAcademicInfoCard(StudentProfile profile) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildInfoRow(Icons.school, 'Ngành học', profile.academic?.major),
-            const Divider(height: 24),
-            _buildInfoRow(
-              Icons.class_,
-              'Lớp sinh hoạt',
-              profile.academic?.className,
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(Icons.timeline, 'Khóa', profile.academic?.cohort),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFamilyInfoCard(FamilyInfo? family) {
-    if (family == null)
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Không có dữ liệu'),
-        ),
-      );
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (family.father != null) ...[
-              const Text(
-                'Thông tin Ba',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.person, 'Họ và tên', family.father!.fullName),
-              const SizedBox(height: 8),
-              _buildInfoRow(
-                Icons.work,
-                'Nghề nghiệp',
-                family.father!.occupation,
-              ),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.phone, 'Số điện thoại', family.father!.phone),
-              const Divider(height: 24),
-            ],
-            if (family.mother != null) ...[
-              const Text(
-                'Thông tin Mẹ',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.pink,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.person, 'Họ và tên', family.mother!.fullName),
-              const SizedBox(height: 8),
-              _buildInfoRow(
-                Icons.work,
-                'Nghề nghiệp',
-                family.mother!.occupation,
-              ),
-              const SizedBox(height: 8),
-              _buildInfoRow(Icons.phone, 'Số điện thoại', family.mother!.phone),
-            ] else if (family.father == null) ...[
-              const Text('Chưa cập nhật thông tin gia đình'),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMembershipCard(MembershipInfo? member, BankInfo? bank) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (member != null) ...[
-              _buildInfoRow(
-                Icons.group,
-                'Đoàn viên',
-                (member.memberStatus == true)
-                    ? 'Đã kết nạp (${member.memberDate ?? ''})'
-                    : 'Chưa kết nạp',
-              ),
-              const Divider(height: 24),
-              _buildInfoRow(
-                Icons.star,
-                'Đảng viên',
-                (member.partyMemberStatus == true)
-                    ? 'Đã kết nạp'
-                    : 'Chưa kết nạp',
-              ),
-              const Divider(height: 24),
-            ],
-            if (bank != null) ...[
-              _buildInfoRow(Icons.account_balance, 'Ngân hàng', bank.bankName),
-              const SizedBox(height: 8),
-              _buildInfoRow(
-                Icons.credit_card,
-                'Số tài khoản',
-                bank.accountNumber,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String? value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView(
+      padding: const EdgeInsets.all(PortalSpacing.md),
       children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 2,
+        ProfileIdentityHeader(profile: profile),
+        const SizedBox(height: PortalSpacing.md),
+        ProfileInfoSection(
+          title: 'Thông tin cá nhân',
+          icon: Icons.person_outline,
+          children: _personalRows(profile.personal),
+        ),
+        const SizedBox(height: PortalSpacing.sm),
+        ProfileInfoSection(
+          title: 'Học tập',
+          icon: Icons.school_outlined,
+          initiallyExpanded: true,
+          children: [
+            _row('Ngành học', profile.academic?.major),
+            _row('Lớp sinh hoạt', profile.academic?.className),
+            _row('Khóa', profile.academic?.cohort),
+          ],
+        ),
+        const SizedBox(height: PortalSpacing.sm),
+        ProfileInfoSection(
+          title: 'Thông tin gia đình',
+          icon: Icons.family_restroom_outlined,
+          children: _familyRows(profile.family),
+        ),
+        const SizedBox(height: PortalSpacing.sm),
+        ProfileInfoSection(
+          title: 'Đoàn, Đảng và thành tích',
+          icon: Icons.groups_outlined,
+          children: _membershipRows(profile.membership),
+        ),
+        const SizedBox(height: PortalSpacing.sm),
+        ProfileInfoSection(
+          title: 'Thông tin ngân hàng',
+          icon: Icons.account_balance_outlined,
+          children: _bankRows(profile.bank),
+        ),
+        const SizedBox(height: PortalSpacing.lg),
+        const _SignOutButton(),
+        const SizedBox(height: PortalSpacing.lg),
+      ],
+    );
+  }
+
+  List<Widget> _personalRows(PersonalInfo? info) {
+    return [
+      _row('Ngày sinh', info?.dateOfBirth),
+      _row('Giới tính', _gender(info?.gender)),
+      _row('Email trường', info?.schoolEmail),
+      _row('Email cá nhân', info?.personalEmail),
+      _row('Số điện thoại', info?.phone),
+      _row('Hộ khẩu', info?.permanentAddress),
+      _row('Nơi ở hiện tại', info?.currentAddress),
+      PortalInfoRow(
+        label: 'CMND/CCCD',
+        value: _SensitiveValue(value: _value(info?.idCardNumber)),
+      ),
+    ];
+  }
+
+  List<Widget> _familyRows(FamilyInfo? family) {
+    return [
+      _row('Họ tên cha', family?.father?.fullName),
+      _row('Nghề nghiệp của cha', family?.father?.occupation),
+      _row('Số điện thoại của cha', family?.father?.phone),
+      _row('Họ tên mẹ', family?.mother?.fullName),
+      _row('Nghề nghiệp của mẹ', family?.mother?.occupation),
+      _row('Số điện thoại của mẹ', family?.mother?.phone),
+    ];
+  }
+
+  List<Widget> _membershipRows(MembershipInfo? membership) {
+    return [
+      _row(
+        'Đoàn viên',
+        membership?.memberStatus == null
+            ? null
+            : membership!.memberStatus!
+            ? 'Đã kết nạp'
+            : 'Chưa kết nạp',
+      ),
+      _row('Ngày kết nạp Đoàn', membership?.memberDate),
+      _row(
+        'Đảng viên',
+        membership?.partyMemberStatus == null
+            ? null
+            : membership!.partyMemberStatus!
+            ? 'Đã kết nạp'
+            : 'Chưa kết nạp',
+      ),
+      _row('Chức vụ cao nhất', membership?.highestPosition),
+      _row('Thành tích và khen thưởng', membership?.achievementsAndAwards),
+    ];
+  }
+
+  List<Widget> _bankRows(BankInfo? bank) {
+    return [
+      _row('Ngân hàng', bank?.bankName),
+      PortalInfoRow(
+        label: 'Số tài khoản',
+        value: _SensitiveValue(value: _value(bank?.accountNumber)),
+      ),
+      _row('Chi nhánh', bank?.branch),
+    ];
+  }
+
+  PortalInfoRow _row(String label, String? value) {
+    return PortalInfoRow(label: label, value: Text(_value(value)));
+  }
+
+  String _value(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty
+        ? 'Chưa cập nhật'
+        : normalized;
+  }
+
+  String? _gender(String? value) {
+    return switch (value?.trim().toLowerCase()) {
+      'male' => 'Nam',
+      'female' => 'Nữ',
+      final value? when value.isNotEmpty => value,
+      _ => null,
+    };
+  }
+}
+
+class _ProfileFallback extends StatelessWidget {
+  const _ProfileFallback({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: child),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            PortalSpacing.md,
+            PortalSpacing.xs,
+            PortalSpacing.md,
+            PortalSpacing.md,
+          ),
+          child: SizedBox(width: double.infinity, child: _SignOutButton()),
+        ),
+      ],
+    );
+  }
+}
+
+class _SignOutButton extends ConsumerWidget {
+  const _SignOutButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      onPressed: () => _confirmSignOut(context, ref),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: scheme.error,
+        side: BorderSide(color: scheme.error),
+      ),
+      icon: const Icon(Icons.logout),
+      label: const Text('Đăng xuất'),
+    );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: const Text('Xác nhận đăng xuất'),
+          content: const Text(
+            'Bạn sẽ cần đăng nhập lại để sử dụng dữ liệu từ UIT Portal.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.error,
+                foregroundColor: scheme.onError,
+              ),
+              child: const Text('Đăng xuất'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true) {
+      await ref.read(authControllerProvider).signOut();
+    }
+  }
+}
+
+class _SensitiveValue extends StatefulWidget {
+  const _SensitiveValue({required this.value});
+
+  final String value;
+
+  @override
+  State<_SensitiveValue> createState() => _SensitiveValueState();
+}
+
+class _SensitiveValueState extends State<_SensitiveValue> {
+  bool _visible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final unavailable = widget.value == 'Chưa cập nhật';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
           child: Text(
-            label,
-            style: TextStyle(color: Colors.grey[700], fontSize: 14),
+            unavailable || _visible ? widget.value : '••••••••',
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value ?? 'Chưa cập nhật',
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        if (!unavailable)
+          IconButton(
+            tooltip: _visible ? 'Ẩn thông tin' : 'Hiện thông tin',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => setState(() => _visible = !_visible),
+            icon: Icon(
+              _visible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 20,
+            ),
           ),
-        ),
       ],
     );
   }
