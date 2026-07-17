@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'certificate_validation_providers.dart';
 import 'certificate_validation_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class CertificateValidationScreen extends ConsumerWidget {
   const CertificateValidationScreen({super.key});
@@ -13,14 +14,14 @@ class CertificateValidationScreen extends ConsumerWidget {
     final asyncData = ref.watch(certificate_validationFutureProvider);
     final theme = Theme.of(context);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(
         title: const Text('Xác nhận chứng chỉ'),
         centerTitle: true,
       ),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -164,7 +165,7 @@ class CertificateValidationScreen extends ConsumerWidget {
                 if (cert.note != null && cert.note!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Ghi chú: \${cert.note}',
+                    'Ghi chú: ${cert.note}',
                     style: TextStyle(
                       color: Colors.red.shade700,
                       fontStyle: FontStyle.italic,

@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'study_reservation_providers.dart';
 import 'study_reservation_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class StudyReservationScreen extends ConsumerWidget {
   const StudyReservationScreen({super.key});
@@ -13,11 +14,11 @@ class StudyReservationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(studyReservationProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Thôi học/Bảo lưu'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'schedule_model.dart';
 import 'schedule_providers.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
@@ -12,7 +13,7 @@ class ScheduleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheduleAsync = ref.watch(scheduleFutureProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(
         title: const Text('Thời Khóa Biểu'),
         actions: [
@@ -24,7 +25,7 @@ class ScheduleScreen extends ConsumerWidget {
       ),
       body: scheduleAsync.when(
         data: (data) => _ScheduleView(response: data),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -114,7 +115,7 @@ class _ScheduleItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Container(
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
@@ -158,17 +159,24 @@ class _ScheduleItemTile extends StatelessWidget {
                 Text(
                   item.tenMonHoc,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.meeting_room, size: 16, color: colorScheme.secondary),
+                    Icon(
+                      Icons.meeting_room,
+                      size: 16,
+                      color: colorScheme.secondary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       item.phong.isNotEmpty ? item.phong : 'Chưa có phòng',
-                      style: TextStyle(color: colorScheme.secondary, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: colorScheme.secondary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -187,7 +195,10 @@ class _ScheduleItemTile extends StatelessWidget {
                 if (item.loaiLich.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.tertiaryContainer,
                       borderRadius: BorderRadius.circular(4),

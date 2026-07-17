@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'confirmation_paper_providers.dart';
 import 'confirmation_paper_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ConfirmationPaperScreen extends ConsumerWidget {
   const ConfirmationPaperScreen({super.key});
@@ -13,11 +14,11 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     final asyncData = ref.watch(confirmation_paperFutureProvider);
     final theme = Theme.of(context);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Giấy xác nhận'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -104,7 +105,7 @@ class ConfirmationPaperScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 param.cost != null && param.cost! > 0
-                    ? 'Lệ phí: \${param.cost} VNĐ'
+                    ? 'Lệ phí: ${param.cost} VNĐ'
                     : 'Miễn phí',
                 style: TextStyle(
                   color: param.cost != null && param.cost! > 0
@@ -206,7 +207,7 @@ class ConfirmationPaperScreen extends ConsumerWidget {
                   children: [
                     const Icon(Icons.numbers, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text('Số lượng: \${item.quantity ?? 1}'),
+                    Text('Số lượng: ${item.quantity ?? 1}'),
                     const SizedBox(width: 16),
                     const Icon(
                       Icons.calendar_today,
@@ -223,7 +224,7 @@ class ConfirmationPaperScreen extends ConsumerWidget {
                     const Icon(Icons.payments, size: 16, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      'Đã thanh toán: \${item.amountPaid ?? 0} / \${item.amountDue ?? 0} VNĐ',
+                      'Đã thanh toán: ${item.amountPaid ?? 0} / ${item.amountDue ?? 0} VNĐ',
                     ),
                   ],
                 ),

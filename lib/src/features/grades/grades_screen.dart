@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'grades_model.dart';
 import 'grades_providers.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class GradesScreen extends ConsumerWidget {
   const GradesScreen({super.key});
@@ -12,7 +13,7 @@ class GradesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gradesAsync = ref.watch(gradesFutureProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(
         title: const Text('Bảng Điểm'),
         actions: [
@@ -26,7 +27,7 @@ class GradesScreen extends ConsumerWidget {
       ),
       body: gradesAsync.when(
         data: (data) => _GradesView(response: data),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -163,23 +164,27 @@ class _SubjectTile extends StatelessWidget {
                     Text(
                       subject.subjectName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${subject.subjectCode} • ${subject.numberOfCredit} tín chỉ',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
               if (subject.coursePoint.isNotEmpty)
                 scoreBadge(subject.coursePoint)
-              else if (subject.statusPoint.isNotEmpty && subject.statusPoint != 'normal')
-                Text(subject.statusPoint, style: const TextStyle(color: Colors.orange)),
+              else if (subject.statusPoint.isNotEmpty &&
+                  subject.statusPoint != 'normal')
+                Text(
+                  subject.statusPoint,
+                  style: const TextStyle(color: Colors.orange),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -211,14 +216,14 @@ class _ScoreItem extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         Text(
           score.isEmpty ? '-' : score,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     );

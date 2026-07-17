@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'training_point_model.dart';
 import 'training_point_providers.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class TrainingPointScreen extends ConsumerWidget {
   const TrainingPointScreen({super.key});
@@ -13,11 +14,11 @@ class TrainingPointScreen extends ConsumerWidget {
     final trainingPointAsync = ref.watch(trainingPointFutureProvider);
     final theme = Theme.of(context);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Điểm rèn luyện'), centerTitle: true),
       body: trainingPointAsync.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

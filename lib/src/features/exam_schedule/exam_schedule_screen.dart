@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'exam_schedule_providers.dart';
 import 'exam_schedule_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ExamScheduleScreen extends ConsumerWidget {
   const ExamScheduleScreen({super.key});
@@ -12,16 +13,12 @@ class ExamScheduleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final examScheduleAsync = ref.watch(examScheduleFutureProvider);
 
-    return LiquidScaffold(
-      appBar: AppBar(
-        title: const Text('Lịch thi'),
-      ),
+    return PortalScaffold(
+      appBar: AppBar(title: const Text('Lịch thi')),
       body: examScheduleAsync.when(
         data: (response) {
           if (response.items.isEmpty) {
-            return const Center(
-              child: Text('Chưa có lịch thi'),
-            );
+            return const Center(child: Text('Chưa có lịch thi'));
           }
 
           // Sort from newest to oldest based on ngayThi
@@ -38,16 +35,16 @@ class ExamScheduleScreen extends ConsumerWidget {
           String? currentGroup;
 
           for (final item in sortedItems) {
-            final term = item.kyThi == 'midterm' 
-                ? 'Thi Giữa Kỳ' 
+            final term = item.kyThi == 'midterm'
+                ? 'Thi Giữa Kỳ'
                 : (item.kyThi == 'final_term' ? 'Thi Cuối Kỳ' : 'Thi Khác');
-            
+
             String groupStr;
             if (item.namHoc != null && item.hocKy != null) {
               groupStr = '$term (HK ${item.hocKy}, Năm học ${item.namHoc})';
             } else {
-              final year = item.ngayThi != null && item.ngayThi!.length >= 4 
-                  ? item.ngayThi!.substring(0, 4) 
+              final year = item.ngayThi != null && item.ngayThi!.length >= 4
+                  ? item.ngayThi!.substring(0, 4)
                   : 'Chưa rõ';
               groupStr = '$term - Năm $year';
             }
@@ -56,8 +53,13 @@ class ExamScheduleScreen extends ConsumerWidget {
               if (currentGroup != null) {
                 children.add(const SizedBox(height: 16));
               }
-              children.add(_buildSectionHeader(
-                  context, groupStr, term.contains('Giữa') ? Icons.assignment : Icons.school));
+              children.add(
+                _buildSectionHeader(
+                  context,
+                  groupStr,
+                  term.contains('Giữa') ? Icons.assignment : Icons.school,
+                ),
+              );
               children.add(const SizedBox(height: 12));
               currentGroup = groupStr;
             }
@@ -70,7 +72,7 @@ class ExamScheduleScreen extends ConsumerWidget {
             children: children,
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -90,7 +92,11 @@ class ExamScheduleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+  ) {
     return Row(
       children: [
         Icon(icon, color: Theme.of(context).colorScheme.primary),
@@ -98,9 +104,9 @@ class ExamScheduleScreen extends ConsumerWidget {
         Expanded(
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
       ],
@@ -118,16 +124,19 @@ class ExamScheduleScreen extends ConsumerWidget {
             Text(
               item.tenMonHoc,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Mã lớp: ${item.maLop}'),
-                Text('Ngày thi: ${item.ngayThi ?? "Chưa rõ"}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  'Ngày thi: ${item.ngayThi ?? "Chưa rõ"}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             const SizedBox(height: 4),
@@ -142,8 +151,17 @@ class ExamScheduleScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Hình thức: ${item.hinhThuc ?? "Chưa rõ"}', style: TextStyle(color: Colors.grey.shade700)),
-                Text('Phòng: ${item.phong ?? "Chưa có phòng"}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                Text(
+                  'Hình thức: ${item.hinhThuc ?? "Chưa rõ"}',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+                Text(
+                  'Phòng: ${item.phong ?? "Chưa có phòng"}',
+                  style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ],

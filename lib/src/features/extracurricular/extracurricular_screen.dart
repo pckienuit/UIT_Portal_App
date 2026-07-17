@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'extracurricular_providers.dart';
 import 'extracurricular_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ExtracurricularScreen extends ConsumerWidget {
   const ExtracurricularScreen({super.key});
@@ -12,11 +13,11 @@ class ExtracurricularScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(extracurricularProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Lịch sinh hoạt'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, Theme.of(context)),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -51,7 +52,11 @@ class ExtracurricularScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy, size: 64, color: theme.colorScheme.onSurface.withOpacity(0.5)),
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
             const SizedBox(height: 16),
             const Text('Hiện không có lịch sinh hoạt nào'),
           ],

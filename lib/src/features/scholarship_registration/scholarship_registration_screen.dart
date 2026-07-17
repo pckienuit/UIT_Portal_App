@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'scholarship_registration_providers.dart';
 import 'scholarship_registration_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ScholarshipRegistrationScreen extends ConsumerWidget {
   const ScholarshipRegistrationScreen({super.key});
@@ -13,11 +14,11 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(scholarship_registrationProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Học bổng'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

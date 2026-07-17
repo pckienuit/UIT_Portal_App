@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'health_insurance_providers.dart';
 import 'health_insurance_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class HealthInsuranceScreen extends ConsumerWidget {
   const HealthInsuranceScreen({super.key});
@@ -13,14 +14,11 @@ class HealthInsuranceScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(healthInsuranceProvider);
 
-    return LiquidScaffold(
-      appBar: AppBar(
-        title: const Text('Bảo hiểm'),
-        centerTitle: true,
-      ),
+    return PortalScaffold(
+      appBar: AppBar(title: const Text('Bảo hiểm'), centerTitle: true),
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -37,7 +35,7 @@ class HealthInsuranceScreen extends ConsumerWidget {
                 onPressed: () => ref.invalidate(healthInsuranceProvider),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
-              )
+              ),
             ],
           ),
         ),
@@ -45,7 +43,11 @@ class HealthInsuranceScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, HealthInsuranceResponse data, ThemeData theme) {
+  Widget _buildContent(
+    BuildContext context,
+    HealthInsuranceResponse data,
+    ThemeData theme,
+  ) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -59,7 +61,10 @@ class HealthInsuranceScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: theme.colorScheme.onPrimaryContainer),
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -73,9 +78,14 @@ class HealthInsuranceScreen extends ConsumerWidget {
               ],
             ),
           ),
-        
+
         if (data.profile != null) ...[
-          Text('Hồ sơ Bảo hiểm', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Hồ sơ Bảo hiểm',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
           Card(
             elevation: 0,
@@ -101,7 +111,12 @@ class HealthInsuranceScreen extends ConsumerWidget {
         ],
 
         if (data.config != null) ...[
-          Text('Cấu hình hiện tại', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Cấu hình hiện tại',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
           Card(
             elevation: 0,
@@ -119,7 +134,10 @@ class HealthInsuranceScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _buildRow('Số tiền', data.config?.amount?.toString()),
                   const SizedBox(height: 8),
-                  _buildRow('Thời gian', '${data.config?.startDate ?? ''} - ${data.config?.endDate ?? ''}'),
+                  _buildRow(
+                    'Thời gian',
+                    '${data.config?.startDate ?? ''} - ${data.config?.endDate ?? ''}',
+                  ),
                 ],
               ),
             ),
@@ -138,7 +156,10 @@ class HealthInsuranceScreen extends ConsumerWidget {
           width: 120,
           child: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey),
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
           ),
         ),
         Expanded(

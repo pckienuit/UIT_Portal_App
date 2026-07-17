@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'profile_providers.dart';
 import 'profile_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -11,7 +12,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(detailedProfileProvider);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(
         title: const Text('Hồ sơ cá nhân'),
         backgroundColor: Colors.blue[800],
@@ -51,7 +52,7 @@ class ProfileScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (err, stack) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -134,7 +135,10 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(width: 6),
                     Text(
                       '${profile.academic!.className} • ${profile.academic?.cohort ?? ''}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -160,7 +164,13 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildPersonalInfoCard(PersonalInfo? info) {
-    if (info == null) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Không có dữ liệu')));
+    if (info == null)
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Không có dữ liệu'),
+        ),
+      );
 
     return Card(
       elevation: 2,
@@ -171,9 +181,19 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _buildInfoRow(Icons.cake, 'Ngày sinh', info.dateOfBirth),
             const Divider(height: 24),
-            _buildInfoRow(Icons.transgender, 'Giới tính', info.gender == 'male' ? 'Nam' : (info.gender == 'female' ? 'Nữ' : info.gender)),
+            _buildInfoRow(
+              Icons.transgender,
+              'Giới tính',
+              info.gender == 'male'
+                  ? 'Nam'
+                  : (info.gender == 'female' ? 'Nữ' : info.gender),
+            ),
             const Divider(height: 24),
-            _buildInfoRow(Icons.badge, 'CMND/CCCD', '${info.idCardNumber} (${info.idCardIssueDate})'),
+            _buildInfoRow(
+              Icons.badge,
+              'CMND/CCCD',
+              '${info.idCardNumber} (${info.idCardIssueDate})',
+            ),
             const Divider(height: 24),
             _buildInfoRow(Icons.email, 'Email trường', info.schoolEmail),
             const Divider(height: 24),
@@ -181,7 +201,11 @@ class ProfileScreen extends ConsumerWidget {
             const Divider(height: 24),
             _buildInfoRow(Icons.home, 'Hộ khẩu', info.permanentAddress),
             const Divider(height: 24),
-            _buildInfoRow(Icons.public, 'Dân tộc / Tôn giáo', '${info.ethnicity ?? ''} / ${info.religion ?? ''}'),
+            _buildInfoRow(
+              Icons.public,
+              'Dân tộc / Tôn giáo',
+              '${info.ethnicity ?? ''} / ${info.religion ?? ''}',
+            ),
           ],
         ),
       ),
@@ -198,7 +222,11 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _buildInfoRow(Icons.school, 'Ngành học', profile.academic?.major),
             const Divider(height: 24),
-            _buildInfoRow(Icons.class_, 'Lớp sinh hoạt', profile.academic?.className),
+            _buildInfoRow(
+              Icons.class_,
+              'Lớp sinh hoạt',
+              profile.academic?.className,
+            ),
             const Divider(height: 24),
             _buildInfoRow(Icons.timeline, 'Khóa', profile.academic?.cohort),
           ],
@@ -208,7 +236,13 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildFamilyInfoCard(FamilyInfo? family) {
-    if (family == null) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Không có dữ liệu')));
+    if (family == null)
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Không có dữ liệu'),
+        ),
+      );
 
     return Card(
       elevation: 2,
@@ -219,26 +253,46 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (family.father != null) ...[
-              const Text('Thông tin Ba', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              const Text(
+                'Thông tin Ba',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.person, 'Họ và tên', family.father!.fullName),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.work, 'Nghề nghiệp', family.father!.occupation),
+              _buildInfoRow(
+                Icons.work,
+                'Nghề nghiệp',
+                family.father!.occupation,
+              ),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.phone, 'Số điện thoại', family.father!.phone),
               const Divider(height: 24),
             ],
             if (family.mother != null) ...[
-              const Text('Thông tin Mẹ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink)),
+              const Text(
+                'Thông tin Mẹ',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.pink,
+                ),
+              ),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.person, 'Họ và tên', family.mother!.fullName),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.work, 'Nghề nghiệp', family.mother!.occupation),
+              _buildInfoRow(
+                Icons.work,
+                'Nghề nghiệp',
+                family.mother!.occupation,
+              ),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.phone, 'Số điện thoại', family.mother!.phone),
             ] else if (family.father == null) ...[
-              const Text('Chưa cập nhật thông tin gia đình')
-            ]
+              const Text('Chưa cập nhật thông tin gia đình'),
+            ],
           ],
         ),
       ),
@@ -255,16 +309,32 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (member != null) ...[
-              _buildInfoRow(Icons.group, 'Đoàn viên', (member.memberStatus == true) ? 'Đã kết nạp (${member.memberDate ?? ''})' : 'Chưa kết nạp'),
+              _buildInfoRow(
+                Icons.group,
+                'Đoàn viên',
+                (member.memberStatus == true)
+                    ? 'Đã kết nạp (${member.memberDate ?? ''})'
+                    : 'Chưa kết nạp',
+              ),
               const Divider(height: 24),
-              _buildInfoRow(Icons.star, 'Đảng viên', (member.partyMemberStatus == true) ? 'Đã kết nạp' : 'Chưa kết nạp'),
+              _buildInfoRow(
+                Icons.star,
+                'Đảng viên',
+                (member.partyMemberStatus == true)
+                    ? 'Đã kết nạp'
+                    : 'Chưa kết nạp',
+              ),
               const Divider(height: 24),
             ],
             if (bank != null) ...[
               _buildInfoRow(Icons.account_balance, 'Ngân hàng', bank.bankName),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.credit_card, 'Số tài khoản', bank.accountNumber),
-            ]
+              _buildInfoRow(
+                Icons.credit_card,
+                'Số tài khoản',
+                bank.accountNumber,
+              ),
+            ],
           ],
         ),
       ),
@@ -281,20 +351,14 @@ class ProfileScreen extends ConsumerWidget {
           flex: 2,
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.grey[700], fontSize: 14),
           ),
         ),
         Expanded(
           flex: 3,
           child: Text(
             value ?? 'Chưa cập nhật',
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
           ),
         ),
       ],

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'teaching_survey_providers.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class TeachingSurveyScreen extends ConsumerWidget {
   const TeachingSurveyScreen({super.key});
@@ -11,10 +12,8 @@ class TeachingSurveyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final surveyAsync = ref.watch(teachingSurveyFutureProvider);
 
-    return LiquidScaffold(
-      appBar: AppBar(
-        title: const Text('Khảo sát giảng dạy'),
-      ),
+    return PortalScaffold(
+      appBar: AppBar(title: const Text('Khảo sát giảng dạy')),
       body: surveyAsync.when(
         data: (response) {
           return Column(
@@ -24,15 +23,27 @@ class TeachingSurveyScreen extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatCard(context, 'Cần khảo sát', response.pendingCount, Colors.orange),
-                    _buildStatCard(context, 'Đã hoàn thành', response.doneCount, Colors.green),
+                    _buildStatCard(
+                      context,
+                      'Cần khảo sát',
+                      response.pendingCount,
+                      Colors.orange,
+                    ),
+                    _buildStatCard(
+                      context,
+                      'Đã hoàn thành',
+                      response.doneCount,
+                      Colors.green,
+                    ),
                   ],
                 ),
               ),
               const Divider(),
               Expanded(
                 child: response.items.isEmpty
-                    ? const Center(child: Text('Không có môn học nào cần khảo sát'))
+                    ? const Center(
+                        child: Text('Không có môn học nào cần khảo sát'),
+                      )
                     : ListView.builder(
                         itemCount: response.items.length,
                         itemBuilder: (context, index) {
@@ -40,12 +51,18 @@ class TeachingSurveyScreen extends ConsumerWidget {
                           final isDone = item.isDone ?? false;
                           return ListTile(
                             leading: Icon(
-                              isDone ? Icons.check_circle : Icons.pending_actions,
+                              isDone
+                                  ? Icons.check_circle
+                                  : Icons.pending_actions,
                               color: isDone ? Colors.green : Colors.orange,
                             ),
                             title: Text(item.tenMonHoc ?? 'Không rõ môn học'),
-                            subtitle: Text('Lớp: ${item.maLop ?? ""}\nGiảng viên: ${item.giangVien ?? ""}'),
-                            trailing: isDone ? const Text('Đã xong') : const Text('Chưa làm'),
+                            subtitle: Text(
+                              'Lớp: ${item.maLop ?? ""}\nGiảng viên: ${item.giangVien ?? ""}',
+                            ),
+                            trailing: isDone
+                                ? const Text('Đã xong')
+                                : const Text('Chưa làm'),
                             isThreeLine: true,
                           );
                         },
@@ -54,7 +71,7 @@ class TeachingSurveyScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -72,13 +89,24 @@ class TeachingSurveyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, int count, Color color) {
+  Widget _buildStatCard(
+    BuildContext context,
+    String title,
+    int count,
+    Color color,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
           children: [
-            Text(count.toString(), style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: color, fontWeight: FontWeight.bold)),
+            Text(
+              count.toString(),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
             Text(title),
           ],

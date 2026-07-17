@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'tuition_providers.dart';
 import 'tuition_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class TuitionScreen extends ConsumerWidget {
   const TuitionScreen({super.key});
@@ -12,10 +13,8 @@ class TuitionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tuitionState = ref.watch(tuitionListProvider);
 
-    return LiquidScaffold(
-      appBar: AppBar(
-        title: const Text('Học phí'),
-      ),
+    return PortalScaffold(
+      appBar: AppBar(title: const Text('Học phí')),
       body: tuitionState.when(
         data: (records) {
           if (records.isEmpty) {
@@ -29,7 +28,7 @@ class TuitionScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (err, stack) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -67,7 +66,7 @@ class _TuitionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPaid = record.amountDue <= 0;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -86,28 +85,41 @@ class _TuitionCard extends StatelessWidget {
                     children: [
                       Text(
                         record.semesterLabel,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Text(
                         record.yearName,
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isPaid ? Colors.green.shade50 : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isPaid ? Colors.green.shade200 : Colors.red.shade200,
+                      color: isPaid
+                          ? Colors.green.shade200
+                          : Colors.red.shade200,
                     ),
                   ),
                   child: Text(
                     isPaid ? 'Đã hoàn tất' : 'Chưa hoàn tất',
                     style: TextStyle(
-                      color: isPaid ? Colors.green.shade700 : Colors.red.shade700,
+                      color: isPaid
+                          ? Colors.green.shade700
+                          : Colors.red.shade700,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -120,13 +132,19 @@ class _TuitionCard extends StatelessWidget {
             const SizedBox(height: 8),
             _buildRow('Số tiền phải đóng:', _formatCurrency(record.mustBePaid)),
             const SizedBox(height: 8),
-            _buildRow('Số tiền đã đóng:', _formatCurrency(record.amountPaid), valueColor: Colors.green.shade700),
+            _buildRow(
+              'Số tiền đã đóng:',
+              _formatCurrency(record.amountPaid),
+              valueColor: Colors.green.shade700,
+            ),
             const SizedBox(height: 8),
-            _buildRow('Còn nợ:', _formatCurrency(record.amountDue), 
+            _buildRow(
+              'Còn nợ:',
+              _formatCurrency(record.amountDue),
               valueColor: isPaid ? Colors.grey.shade600 : Colors.red.shade700,
               isBold: !isPaid,
             ),
-            
+
             if (!isPaid && record.qrCode != null) ...[
               const SizedBox(height: 16),
               Container(
@@ -141,7 +159,10 @@ class _TuitionCard extends StatelessWidget {
                   children: [
                     const Text(
                       'QR Thanh toán học phí',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Image.memory(
@@ -149,7 +170,11 @@ class _TuitionCard extends StatelessWidget {
                       height: 150,
                       width: 150,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code, size: 50, color: Colors.grey),
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.qr_code,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -168,7 +193,9 @@ class _TuitionCard extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: () => _showDetails(context),
                 style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text('Xem chi tiết môn học & thanh toán'),
               ),
@@ -179,11 +206,19 @@ class _TuitionCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(String label, String value, {Color? valueColor, bool isBold = false}) {
+  Widget _buildRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isBold = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: Colors.black87, fontSize: 13)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.black87, fontSize: 13),
+        ),
         Text(
           value,
           style: TextStyle(
@@ -211,7 +246,10 @@ class _TuitionCard extends StatelessWidget {
           maxChildSize: 0.9,
           expand: false,
           builder: (context, scrollController) {
-            return _TuitionDetailsSheet(record: record, scrollController: scrollController);
+            return _TuitionDetailsSheet(
+              record: record,
+              scrollController: scrollController,
+            );
           },
         );
       },
@@ -223,7 +261,10 @@ class _TuitionDetailsSheet extends StatelessWidget {
   final TuitionRecord record;
   final ScrollController scrollController;
 
-  const _TuitionDetailsSheet({required this.record, required this.scrollController});
+  const _TuitionDetailsSheet({
+    required this.record,
+    required this.scrollController,
+  });
 
   String _formatCurrency(num value) {
     final str = value.toInt().toString();
@@ -249,7 +290,9 @@ class _TuitionDetailsSheet extends StatelessWidget {
             children: [
               Text(
                 'Chi tiết Học phí',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
@@ -258,61 +301,114 @@ class _TuitionDetailsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('${record.semesterLabel} - ${record.yearName}', style: TextStyle(color: Colors.grey.shade600)),
+          Text(
+            '${record.semesterLabel} - ${record.yearName}',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
           const Divider(height: 32),
 
-          const Text('Danh sách môn học', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Danh sách môn học',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
           if (record.details.isEmpty)
-            const Text('Không có môn học nào', style: TextStyle(fontStyle: FontStyle.italic)),
-          ...record.details.map((d) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(d.subjectName ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.w500)),
-                      Text('${d.computedSubjectCode} • ${d.tuitionCreditNumber} TC', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ),
-                Text(_formatCurrency(d.amount), style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'monospace')),
-              ],
+            const Text(
+              'Không có môn học nào',
+              style: TextStyle(fontStyle: FontStyle.italic),
             ),
-          )),
-          
-          if (record.payments.isNotEmpty) ...[
-            const Divider(height: 32),
-            const Text('Lịch sử thanh toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            ...record.payments.map((p) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
+          ...record.details.map(
+            (d) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(p.bankName ?? 'Khác', style: const TextStyle(fontWeight: FontWeight.w500)),
-                      Text(_formatCurrency(p.amount), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          d.subjectName ?? 'N/A',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          '${d.computedSubjectCode} • ${d.tuitionCreditNumber} TC',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  if (p.paymentTime != null) Text('Thời gian: ${p.paymentTime}', style: const TextStyle(fontSize: 12)),
-                  if (p.transId != null) Text('Mã GD: ${p.transId}', style: const TextStyle(fontSize: 12)),
-                  if (p.invoiceCode != null) Text('Mã HĐ: ${p.invoiceCode}', style: const TextStyle(fontSize: 12)),
+                  Text(
+                    _formatCurrency(d.amount),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
                 ],
               ),
-            )),
+            ),
+          ),
+
+          if (record.payments.isNotEmpty) ...[
+            const Divider(height: 32),
+            const Text(
+              'Lịch sử thanh toán',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            ...record.payments.map(
+              (p) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          p.bankName ?? 'Khác',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          _formatCurrency(p.amount),
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (p.paymentTime != null)
+                      Text(
+                        'Thời gian: ${p.paymentTime}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    if (p.transId != null)
+                      Text(
+                        'Mã GD: ${p.transId}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    if (p.invoiceCode != null)
+                      Text(
+                        'Mã HĐ: ${p.invoiceCode}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
       ),

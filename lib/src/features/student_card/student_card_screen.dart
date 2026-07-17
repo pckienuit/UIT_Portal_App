@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'student_card_providers.dart';
 import 'student_card_model.dart';
-import '../../utils/liquid_scaffold.dart';
+import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_scaffold.dart';
 
 class StudentCardScreen extends ConsumerWidget {
   const StudentCardScreen({super.key});
@@ -13,11 +14,11 @@ class StudentCardScreen extends ConsumerWidget {
     final asyncData = ref.watch(student_cardFutureProvider);
     final theme = Theme.of(context);
 
-    return LiquidScaffold(
+    return PortalScaffold(
       appBar: AppBar(title: const Text('Thẻ sinh viên'), centerTitle: true),
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const PortalAsyncState.loading(),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
