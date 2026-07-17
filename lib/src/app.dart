@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -91,10 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-        path: '/api-debugger',
-        builder: (context, state) => const ApiDebuggerScreen(),
-      ),
+      ...debugRoutes(),
       GoRoute(
         path: '/module/:moduleId',
         builder: (context, state) {
@@ -124,7 +122,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             'khao-sat-giang-day' => const TeachingSurveyScreen(),
             'hoc-phi' => const TuitionScreen(),
             _ => NativeModuleScreen(
-              module: PortalModuleRegistry.byId(moduleId),
+              module: PortalModule(
+                id: moduleId,
+                title: 'Tính năng chưa khả dụng',
+                description: 'Module này chưa có nguồn dữ liệu được xác minh.',
+                path: '',
+                status: PortalModuleStatus.pendingApi,
+              ),
             ),
           };
         },
@@ -132,6 +136,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+List<RouteBase> debugRoutes({bool enabled = kDebugMode}) => enabled
+    ? [
+        GoRoute(
+          path: '/api-debugger',
+          builder: (context, state) => const ApiDebuggerScreen(),
+        ),
+      ]
+    : const [];
 
 class UitPortalApp extends ConsumerWidget {
   const UitPortalApp({super.key});

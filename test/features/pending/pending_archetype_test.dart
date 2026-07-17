@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uit_portal_app/src/app.dart';
 import 'package:uit_portal_app/src/design_system/theme/portal_theme.dart';
 import 'package:uit_portal_app/src/features/extracurricular/extracurricular_model.dart';
 import 'package:uit_portal_app/src/features/extracurricular/extracurricular_providers.dart';
@@ -14,6 +15,8 @@ import 'package:uit_portal_app/src/features/study_reservation/study_reservation_
 import 'package:uit_portal_app/src/features/teaching_survey/teaching_survey_model.dart';
 import 'package:uit_portal_app/src/features/teaching_survey/teaching_survey_providers.dart';
 import 'package:uit_portal_app/src/features/teaching_survey/teaching_survey_screen.dart';
+import 'package:uit_portal_app/src/features/modules/native_module_screen.dart';
+import 'package:uit_portal_app/src/portal_module_registry.dart';
 
 void main() {
   testWidgets('renders typed extracurricular values without fake fallbacks', (
@@ -108,6 +111,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Không thể tải lịch sinh hoạt'), findsOneWidget);
     expect(find.textContaining('Exception'), findsNothing);
+  });
+
+  testWidgets('dashboard fallback does not expose API debug controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: PortalTheme.light(),
+          home: const NativeModuleScreen(
+            module: PortalModule(
+              id: 'unknown-module',
+              title: 'Tính năng chưa khả dụng',
+              description: 'Module này chưa có nguồn dữ liệu được xác minh.',
+              path: '',
+              status: PortalModuleStatus.pendingApi,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Fetch RSC (Next.js)'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Tính năng chưa khả dụng'), findsOneWidget);
+    expect(find.text('Dữ liệu được bảo toàn'), findsOneWidget);
+  });
+
+  test('release routes exclude API debugger', () {
+    expect(debugRoutes(enabled: false), isEmpty);
+    expect(debugRoutes(enabled: true), hasLength(1));
   });
 }
 
