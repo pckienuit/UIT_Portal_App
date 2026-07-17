@@ -5,6 +5,7 @@ import 'revaluation_model.dart';
 import 'revaluation_providers.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class RevaluationScreen extends ConsumerWidget {
   const RevaluationScreen({super.key});
@@ -35,25 +36,10 @@ class RevaluationScreen extends ConsumerWidget {
             ],
           ),
           loading: () => const PortalAsyncState.loading(),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 16),
-                Text(
-                  'Lỗi khi tải dữ liệu:\\n$error',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => ref.refresh(revaluationFutureProvider),
-                  icon: Icon(Icons.refresh),
-                  label: const Text('Thử lại'),
-                ),
-              ],
-            ),
+          error: (error, stack) => PortalAsyncState.error(
+            title: 'Không thể tải thông tin phúc khảo',
+            message: 'Vui lòng kiểm tra kết nối và thử lại.',
+            onRetry: () => ref.invalidate(revaluationFutureProvider),
           ),
         ),
       ),
@@ -98,53 +84,36 @@ class RevaluationScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.subjectName ?? 'Tên môn học',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Mã lớp: ${item.sectionClassCode ?? '--'}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withValues(
-                            alpha: 0.7,
-                          ),
-                        ),
-                      ),
-                    ],
+                Text(
+                  item.subjectName ?? 'Tên môn học',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${item.currentPoint ?? '--'} đ',
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
+                const SizedBox(height: 4),
+                Text(
+                  'Mã lớp: ${item.sectionClassCode ?? 'Chưa cập nhật'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(
+                      alpha: 0.7,
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                PortalStatusChip(
+                  label: item.currentPoint == null
+                      ? 'Chưa cập nhật'
+                      : '${item.currentPoint} điểm',
+                  tone: PortalStatusTone.info,
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,21 +126,21 @@ class RevaluationScreen extends ConsumerWidget {
                     Text(
                       'Hạn chót: ${item.revaluationDeadline ?? '--'}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.red,
+                        color: theme.colorScheme.error,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                FilledButton.tonal(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Tính năng phúc khảo đang phát triển'),
-                      ),
-                    );
-                  },
-                  child: const Text('Phúc khảo'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Chưa thể đăng ký trên ứng dụng',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const FilledButton.tonal(
+                  onPressed: null,
+                  child: Text('Phúc khảo'),
                 ),
               ],
             ),
@@ -216,59 +185,41 @@ class RevaluationScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.subjectName ?? 'Tên môn học',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Lớp: ${item.classCode ?? '--'}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withValues(
-                            alpha: 0.7,
-                          ),
-                        ),
-                      ),
-                    ],
+                Text(
+                  item.subjectName ?? 'Tên môn học',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    item.status ?? 'Đang xử lý',
-                    style: const TextStyle(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                const SizedBox(height: 4),
+                Text(
+                  'Lớp: ${item.classCode ?? 'Chưa cập nhật'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.textTheme.bodyMedium?.color?.withValues(
+                      alpha: 0.7,
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                PortalStatusChip(
+                  label: item.status ?? 'Chưa cập nhật',
+                  tone: PortalStatusTone.warning,
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
               children: [
                 Text(
                   'Điểm cũ: ${item.currentPoint ?? '--'}',
                   style: theme.textTheme.bodySmall,
                 ),
-                const SizedBox(width: 16),
+
                 Text(
                   'Ngày tạo: ${item.createDate ?? '--'}',
                   style: theme.textTheme.bodySmall,

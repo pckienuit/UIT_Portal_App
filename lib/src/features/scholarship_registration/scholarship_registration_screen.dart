@@ -19,26 +19,10 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    ref.invalidate(scholarship_registrationProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin học bổng',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(scholarship_registrationProvider),
         ),
       ),
     );
@@ -105,18 +89,9 @@ class ScholarshipRegistrationScreen extends ConsumerWidget {
             ),
           )
         else
-          ...data.scholarships.map(
-            (e) => Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: theme.dividerColor),
-              ),
-              child: ListTile(
-                leading: Icon(Icons.star, color: Colors.orange),
-                title: Text(e.toString()),
-              ),
-            ),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị danh sách học bổng',
+            message: 'Dữ liệu học bổng chưa có cấu trúc hiển thị ổn định.',
           ),
       ],
     );

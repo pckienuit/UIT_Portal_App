@@ -5,6 +5,7 @@ import 'thesis_registration_providers.dart';
 import 'thesis_registration_model.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class ThesisRegistrationScreen extends ConsumerWidget {
   const ThesisRegistrationScreen({super.key});
@@ -19,25 +20,10 @@ class ThesisRegistrationScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(thesis_registrationProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin khóa luận',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(thesis_registrationProvider),
         ),
       ),
     );
@@ -78,34 +64,47 @@ class ThesisRegistrationScreen extends ConsumerWidget {
               ],
             ),
           ),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Icon(
-                  data.hasThesis == true ? Icons.check_circle : Icons.cancel,
-                  size: 64,
-                  color: data.hasThesis == true ? Colors.green : Colors.grey,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  data.message ??
-                      (data.hasThesis == true
-                          ? 'Bạn đủ điều kiện làm khóa luận.'
-                          : 'Bạn chưa đủ điều kiện làm khóa luận.'),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ],
+        if (data.hasThesis == null && data.message == null)
+          const PortalAsyncState.unavailable(
+            title: 'Chưa có thông tin điều kiện khóa luận',
+            message: 'Hệ thống chưa trả về kết quả xét điều kiện khóa luận.',
+          )
+        else
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.dividerColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  PortalStatusChip(
+                    label: data.hasThesis == true
+                        ? 'Đủ điều kiện'
+                        : data.hasThesis == false
+                        ? 'Chưa đủ điều kiện'
+                        : 'Chưa cập nhật',
+                    tone: data.hasThesis == true
+                        ? PortalStatusTone.success
+                        : data.hasThesis == false
+                        ? PortalStatusTone.warning
+                        : PortalStatusTone.neutral,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    data.message ??
+                        (data.hasThesis == true
+                            ? 'Bạn đủ điều kiện làm khóa luận.'
+                            : 'Bạn chưa đủ điều kiện làm khóa luận.'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }

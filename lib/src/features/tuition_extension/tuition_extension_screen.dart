@@ -19,25 +19,10 @@ class TuitionExtensionScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(tuitionExtensionProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải thông tin gia hạn',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(tuitionExtensionProvider),
         ),
       ),
     );
@@ -78,38 +63,44 @@ class TuitionExtensionScreen extends ConsumerWidget {
               ],
             ),
           ),
-        Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Icon(
-                  data.periodStatusOpen == true
-                      ? Icons.event_available
-                      : Icons.event_busy,
-                  size: 64,
-                  color: data.periodStatusOpen == true
-                      ? Colors.green
-                      : Colors.grey,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  data.periodStatusOpen == true
-                      ? 'Đang trong đợt gia hạn học phí.'
-                      : 'Hiện không trong đợt gia hạn học phí.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ],
+        if (data.periodStatusOpen == null)
+          const PortalAsyncState.unavailable(
+            title: 'Chưa cập nhật trạng thái đợt gia hạn',
+            message: 'Hệ thống chưa trả về trạng thái mở đăng ký.',
+          )
+        else
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.dividerColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Icon(
+                    data.periodStatusOpen == true
+                        ? Icons.event_available
+                        : Icons.event_busy,
+                    size: 64,
+                    color: data.periodStatusOpen == true
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    data.periodStatusOpen == true
+                        ? 'Đang trong đợt gia hạn học phí.'
+                        : 'Hiện không trong đợt gia hạn học phí.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         Text(
           'Lịch sử gia hạn',
           style: theme.textTheme.titleMedium?.copyWith(
@@ -123,19 +114,9 @@ class TuitionExtensionScreen extends ConsumerWidget {
             child: Center(child: Text('Chưa có lịch sử gia hạn học phí')),
           )
         else
-          ...data.history!.map(
-            (record) => Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: theme.dividerColor),
-              ),
-              child: ListTile(
-                title: const Text('Gia hạn học phí'),
-                subtitle: Text(record.toString()),
-              ),
-            ),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị lịch sử gia hạn',
+            message: 'Dữ liệu lịch sử chưa có cấu trúc hiển thị ổn định.',
           ),
       ],
     );

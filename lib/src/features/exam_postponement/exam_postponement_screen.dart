@@ -35,25 +35,10 @@ class ExamPostponementScreen extends ConsumerWidget {
             ],
           ),
           loading: () => const PortalAsyncState.loading(),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 16),
-                Text(
-                  'Lỗi khi tải dữ liệu:\\n$error',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => ref.refresh(examPostponementFutureProvider),
-                  icon: Icon(Icons.refresh),
-                  label: const Text('Thử lại'),
-                ),
-              ],
-            ),
+          error: (error, stack) => PortalAsyncState.error(
+            title: 'Không thể tải thông tin hoãn thi',
+            message: 'Vui lòng kiểm tra kết nối và thử lại.',
+            onRetry: () => ref.invalidate(examPostponementFutureProvider),
           ),
         ),
       ),
@@ -68,11 +53,17 @@ class ExamPostponementScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildStatusBanner(
-          theme: theme,
-          isOpen: data.eligible?.isOpen ?? false,
-          title: data.eligible?.titleRegister ?? 'Đăng ký hoãn thi',
-        ),
+        if (data.eligible?.isOpen == null)
+          const PortalAsyncState.unavailable(
+            title: 'Chưa cập nhật trạng thái đăng ký',
+            message: 'Hệ thống chưa trả về trạng thái đợt hoãn thi.',
+          )
+        else
+          _buildStatusBanner(
+            theme: theme,
+            isOpen: data.eligible!.isOpen!,
+            title: data.eligible?.titleRegister ?? 'Đăng ký hoãn thi',
+          ),
         const SizedBox(height: 24),
         Text(
           'Lịch sử hoãn thi',
@@ -84,7 +75,10 @@ class ExamPostponementScreen extends ConsumerWidget {
         if (data.history.isEmpty)
           _buildEmptyState(theme, 'Không có lịch sử hoãn thi.')
         else
-          const Text('Có lịch sử hoãn thi (đang phát triển UI)'),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị lịch sử hoãn thi',
+            message: 'Dữ liệu lịch sử chưa có cấu trúc hiển thị ổn định.',
+          ),
       ],
     );
   }
@@ -104,7 +98,10 @@ class ExamPostponementScreen extends ConsumerWidget {
             title: 'Hiện tại chưa có môn học nào đủ điều kiện đăng ký thi lại.',
           )
         else
-          const Text('Danh sách môn đủ điều kiện thi lại (đang phát triển UI)'),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị môn thi lại',
+            message: 'Dữ liệu môn thi lại chưa có cấu trúc hiển thị ổn định.',
+          ),
         const SizedBox(height: 24),
         Text(
           'Lịch sử thi lại',
@@ -116,7 +113,10 @@ class ExamPostponementScreen extends ConsumerWidget {
         if (data.reexamHistory.isEmpty)
           _buildEmptyState(theme, 'Không có lịch sử thi lại.')
         else
-          const Text('Có lịch sử thi lại (đang phát triển UI)'),
+          const PortalAsyncState.unavailable(
+            title: 'Chưa thể hiển thị lịch sử thi lại',
+            message: 'Dữ liệu lịch sử chưa có cấu trúc hiển thị ổn định.',
+          ),
       ],
     );
   }
@@ -126,7 +126,8 @@ class ExamPostponementScreen extends ConsumerWidget {
     required bool isOpen,
     required String title,
   }) {
-    final color = isOpen ? Colors.green : Colors.orange;
+    final semantic = theme.colorScheme;
+    final color = isOpen ? semantic.primary : semantic.tertiary;
     final icon = isOpen ? Icons.check_circle_outline : Icons.access_time;
 
     return Container(

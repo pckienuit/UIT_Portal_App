@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'parking_registration_providers.dart';
 import 'parking_registration_model.dart';
 import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_info_row.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class ParkingRegistrationScreen extends ConsumerWidget {
   const ParkingRegistrationScreen({super.key});
@@ -19,26 +21,10 @@ class ParkingRegistrationScreen extends ConsumerWidget {
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () =>
-                    ref.refresh(parking_registrationFutureProvider),
-                icon: Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải đăng ký gửi xe',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(parking_registrationFutureProvider),
         ),
       ),
     );
@@ -86,65 +72,24 @@ class ParkingRegistrationScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        record.vehicleType?.toLowerCase() == 'bicycle'
-                            ? Icons.pedal_bike
-                            : Icons.two_wheeler,
-                        color: theme.colorScheme.primary,
+                    Text(
+                      record.licensePlateNumber ?? 'Chưa cập nhật biển số',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            record.licensePlateNumber ??
-                                'Chưa cập nhật biển số',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Loại xe: ${record.vehicleType == 'motorcycle' ? 'Xe máy' : (record.vehicleType == 'bicycle' ? 'Xe đạp' : record.vehicleType ?? 'Không rõ')}",
-                            style: TextStyle(
-                              color: theme.textTheme.bodyMedium?.color
-                                  ?.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Loại xe: ${record.vehicleType == 'motorcycle' ? 'Xe máy' : (record.vehicleType == 'bicycle' ? 'Xe đạp' : record.vehicleType ?? 'Chưa cập nhật')}",
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(
-                          record.status,
-                        ).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        record.status ?? 'Đang xử lý',
-                        style: TextStyle(
-                          color: _getStatusColor(record.status),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    const SizedBox(height: 8),
+                    PortalStatusChip(
+                      label: record.status ?? 'Chưa cập nhật',
+                      tone: _statusTone(record.status),
                     ),
                   ],
                 ),
@@ -152,48 +97,27 @@ class ParkingRegistrationScreen extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Divider(height: 1),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildInfoRow(
-                            Icons.calendar_month,
-                            'Tháng đăng ký: ${record.numberOfMonths ?? 1} tháng',
-                          ),
-                          const SizedBox(height: 8),
-                          _buildInfoRow(
-                            Icons.event_available,
-                            "Hiệu lực: ${record.effectiveDate ?? '--'}",
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${record.amountPaid ?? 0} / ${record.amountDue ?? 0} VNĐ',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Đã thanh toán',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: theme.textTheme.bodyMedium?.color
-                                ?.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                PortalInfoRow(
+                  label: 'Thời hạn đăng ký',
+                  value: Text(
+                    record.numberOfMonths == null
+                        ? 'Chưa cập nhật'
+                        : '${record.numberOfMonths} tháng',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                PortalInfoRow(
+                  label: 'Hiệu lực',
+                  value: Text(record.effectiveDate ?? 'Chưa cập nhật'),
+                ),
+                const SizedBox(height: 8),
+                PortalInfoRow(
+                  label: 'Thanh toán',
+                  value: Text(
+                    record.amountPaid == null || record.amountDue == null
+                        ? 'Chưa cập nhật'
+                        : '${record.amountPaid} / ${record.amountDue} VNĐ',
+                  ),
                 ),
               ],
             ),
@@ -203,22 +127,16 @@ class ParkingRegistrationScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey),
-        const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 13)),
-      ],
-    );
-  }
-
-  Color _getStatusColor(String? status) {
-    if (status == null) return Colors.grey;
+  PortalStatusTone _statusTone(String? status) {
+    if (status == null) return PortalStatusTone.neutral;
     final s = status.toLowerCase();
-    if (s.contains('đã duyệt') || s.contains('hoàn thành')) return Colors.green;
-    if (s.contains('chờ') || s.contains('đang')) return Colors.orange;
-    if (s.contains('hủy')) return Colors.red;
-    return Colors.blue;
+    if (s.contains('đã duyệt') || s.contains('hoàn thành')) {
+      return PortalStatusTone.success;
+    }
+    if (s.contains('chờ') || s.contains('đang')) {
+      return PortalStatusTone.warning;
+    }
+    if (s.contains('hủy')) return PortalStatusTone.error;
+    return PortalStatusTone.info;
   }
 }

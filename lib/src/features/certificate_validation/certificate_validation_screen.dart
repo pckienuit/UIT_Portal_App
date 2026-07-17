@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'certificate_validation_providers.dart';
 import 'certificate_validation_model.dart';
 import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_info_row.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
+import '../../design_system/foundations/portal_spacing.dart';
 
 class CertificateValidationScreen extends ConsumerWidget {
   const CertificateValidationScreen({super.key});
@@ -22,26 +25,10 @@ class CertificateValidationScreen extends ConsumerWidget {
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () =>
-                    ref.refresh(certificate_validationFutureProvider),
-                icon: Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải chứng chỉ',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(certificate_validationFutureProvider),
         ),
       ),
     );
@@ -81,22 +68,9 @@ class CertificateValidationScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     if (data.certs.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open, size: 48, color: theme.dividerColor),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa nộp chứng chỉ nào',
-              style: TextStyle(
-                color: theme.textTheme.bodyMedium?.color?.withValues(
-                  alpha: 0.6,
-                ),
-              ),
-            ),
-          ],
-        ),
+      return const PortalAsyncState.empty(
+        title: 'Chưa nộp chứng chỉ nào',
+        message: 'Hồ sơ chứng chỉ đã nộp sẽ xuất hiện tại đây.',
       );
     }
     return ListView.builder(
@@ -116,58 +90,34 @@ class CertificateValidationScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: Text(
-                        cert.name ?? 'Chứng chỉ',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                    Text(
+                      cert.name ?? 'Chứng chỉ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(
-                          cert.status,
-                        ).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        cert.status ?? 'Đang chờ',
-                        style: TextStyle(
-                          color: _getStatusColor(cert.status),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    const SizedBox(height: 8),
+                    PortalStatusChip(
+                      label: cert.status ?? 'Chưa cập nhật',
+                      tone: _statusTone(cert.status),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Text('Ngày nộp: ${cert.submitDate ?? "--"}'),
-                  ],
+                PortalInfoRow(
+                  label: 'Ngày nộp',
+                  value: Text(cert.submitDate ?? 'Chưa cập nhật'),
                 ),
                 if (cert.note != null && cert.note!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     'Ghi chú: ${cert.note}',
                     style: TextStyle(
-                      color: Colors.red.shade700,
+                      color: theme.colorScheme.error,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -186,7 +136,10 @@ class CertificateValidationScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     if (data.certTypes.isEmpty) {
-      return const Center(child: Text('Không có dữ liệu loại chứng chỉ.'));
+      return const PortalAsyncState.empty(
+        title: 'Chưa có loại chứng chỉ',
+        message: 'Hệ thống chưa cung cấp danh mục chứng chỉ.',
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -194,28 +147,32 @@ class CertificateValidationScreen extends ConsumerWidget {
       itemBuilder: (context, index) {
         final type = data.certTypes[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
-          ),
-          elevation: 0,
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(Icons.school, color: theme.colorScheme.primary),
-            ),
-            title: Text(
-              type.name ?? 'Chứng chỉ',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              'Loại: ${type.type ?? "--"} | Mã: ${type.code ?? "--"}',
-            ),
-            trailing: FilledButton.tonal(
-              onPressed: () {},
-              child: const Text('Nộp'),
+          margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
+          child: Padding(
+            padding: const EdgeInsets.all(PortalSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  type.name ?? 'Chứng chỉ',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: PortalSpacing.xs),
+                Text('Loại: ${type.type ?? "Chưa cập nhật"}'),
+                Text('Mã: ${type.code ?? "Chưa cập nhật"}'),
+                const SizedBox(height: PortalSpacing.md),
+                const Text(
+                  'Chưa thể nộp trên ứng dụng',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: PortalSpacing.xs),
+                const FilledButton.tonal(
+                  onPressed: null,
+                  child: Text('Nộp chứng chỉ'),
+                ),
+              ],
             ),
           ),
         );
@@ -223,12 +180,18 @@ class CertificateValidationScreen extends ConsumerWidget {
     );
   }
 
-  Color _getStatusColor(String? status) {
-    if (status == null) return Colors.grey;
+  PortalStatusTone _statusTone(String? status) {
+    if (status == null) return PortalStatusTone.neutral;
     final s = status.toLowerCase();
-    if (s.contains('hợp lệ') || s.contains('đã xác nhận')) return Colors.green;
-    if (s.contains('chờ') || s.contains('đang')) return Colors.orange;
-    if (s.contains('hủy') || s.contains('không')) return Colors.red;
-    return Colors.blue;
+    if (s.contains('hợp lệ') || s.contains('đã xác nhận')) {
+      return PortalStatusTone.success;
+    }
+    if (s.contains('chờ') || s.contains('đang')) {
+      return PortalStatusTone.warning;
+    }
+    if (s.contains('hủy') || s.contains('không')) {
+      return PortalStatusTone.error;
+    }
+    return PortalStatusTone.info;
   }
 }

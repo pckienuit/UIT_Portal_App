@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'graduation_registration_providers.dart';
 import 'graduation_registration_model.dart';
-import 'graduation_registration_model.dart';
 import '../../design_system/components/portal_async_state.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
 
 class GraduationRegistrationScreen extends ConsumerWidget {
   const GraduationRegistrationScreen({super.key});
@@ -20,26 +20,10 @@ class GraduationRegistrationScreen extends ConsumerWidget {
       body: state.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    ref.invalidate(graduation_registrationProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải trạng thái tốt nghiệp',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(graduation_registrationProvider),
         ),
       ),
     );
@@ -54,30 +38,12 @@ class GraduationRegistrationScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (data.presentStatusName != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Trạng thái: ${data.presentStatusName}',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PortalStatusChip(
+              label: data.presentStatusName!,
+              tone: PortalStatusTone.info,
+              icon: Icons.info_outline,
             ),
           ),
         if (data.error != null)
@@ -101,7 +67,7 @@ class GraduationRegistrationScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    data.error!,
+                    'Chưa thể xác định điều kiện tốt nghiệp',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: theme.colorScheme.onErrorContainer,
@@ -111,27 +77,10 @@ class GraduationRegistrationScreen extends ConsumerWidget {
               ),
             ),
           )
-        else
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: theme.dividerColor),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const Icon(Icons.school, size: 64, color: Colors.green),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Hệ thống đang mở xét tốt nghiệp.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ],
-              ),
-            ),
+        else if (data.presentStatusName == null)
+          const PortalAsyncState.unavailable(
+            title: 'Chưa có trạng thái xét tốt nghiệp',
+            message: 'Hệ thống chưa trả về thông tin đợt xét tốt nghiệp.',
           ),
       ],
     );

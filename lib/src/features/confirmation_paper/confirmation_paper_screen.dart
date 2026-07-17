@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'confirmation_paper_providers.dart';
 import 'confirmation_paper_model.dart';
 import '../../design_system/components/portal_async_state.dart';
+import '../../design_system/components/portal_info_row.dart';
 import '../../design_system/components/portal_scaffold.dart';
+import '../../design_system/components/portal_status_chip.dart';
+import '../../design_system/foundations/portal_spacing.dart';
 
 class ConfirmationPaperScreen extends ConsumerWidget {
   const ConfirmationPaperScreen({super.key});
@@ -19,25 +22,10 @@ class ConfirmationPaperScreen extends ConsumerWidget {
       body: asyncData.when(
         data: (data) => _buildContent(context, data, theme),
         loading: () => const PortalAsyncState.loading(),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Lỗi khi tải dữ liệu:\n$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref.refresh(confirmation_paperFutureProvider),
-                icon: Icon(Icons.refresh),
-                label: const Text('Thử lại'),
-              ),
-            ],
-          ),
+        error: (error, stack) => PortalAsyncState.error(
+          title: 'Không thể tải giấy xác nhận',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          onRetry: () => ref.invalidate(confirmation_paperFutureProvider),
         ),
       ),
     );
@@ -77,7 +65,10 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     if (data.parameters.isEmpty) {
-      return const Center(child: Text('Không có loại giấy xác nhận nào.'));
+      return const PortalAsyncState.empty(
+        title: 'Chưa có loại giấy xác nhận',
+        message: 'Hệ thống chưa cung cấp loại giấy xác nhận để đăng ký.',
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -85,41 +76,37 @@ class ConfirmationPaperScreen extends ConsumerWidget {
       itemBuilder: (context, index) {
         final param = data.parameters[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
-          ),
-          elevation: 0,
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(Icons.description, color: theme.colorScheme.primary),
-            ),
-            title: Text(
-              param.displayName ?? 'Giấy xác nhận',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                param.cost != null && param.cost! > 0
-                    ? 'Lệ phí: ${param.cost} VNĐ'
-                    : 'Miễn phí',
-                style: TextStyle(
-                  color: param.cost != null && param.cost! > 0
-                      ? Colors.orange
-                      : Colors.green,
-                  fontWeight: FontWeight.w600,
+          margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
+          child: Padding(
+            padding: const EdgeInsets.all(PortalSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  param.displayName ?? 'Giấy xác nhận',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ),
-            trailing: FilledButton.tonal(
-              onPressed: () {
-                // TODO: Implement register action
-              },
-              child: const Text('Đăng ký'),
+                const SizedBox(height: PortalSpacing.xs),
+                Text(
+                  param.cost == null
+                      ? 'Lệ phí: Chưa cập nhật'
+                      : param.cost! > 0
+                      ? 'Lệ phí: ${param.cost} VNĐ'
+                      : 'Miễn phí',
+                ),
+                const SizedBox(height: PortalSpacing.md),
+                const Text(
+                  'Chưa thể đăng ký trên ứng dụng',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: PortalSpacing.xs),
+                const FilledButton.tonal(
+                  onPressed: null,
+                  child: Text('Đăng ký'),
+                ),
+              ],
             ),
           ),
         );
@@ -133,22 +120,9 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     ThemeData theme,
   ) {
     if (data.history.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history, size: 48, color: theme.dividerColor),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có lịch sử đăng ký',
-              style: TextStyle(
-                color: theme.textTheme.bodyMedium?.color?.withValues(
-                  alpha: 0.6,
-                ),
-              ),
-            ),
-          ],
-        ),
+      return const PortalAsyncState.empty(
+        title: 'Chưa có lịch sử đăng ký',
+        message: 'Các yêu cầu giấy xác nhận sẽ xuất hiện tại đây.',
       );
     }
     return ListView.builder(
@@ -168,65 +142,41 @@ class ConfirmationPaperScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.paperName ?? 'Giấy xác nhận',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                    Text(
+                      item.paperName ?? 'Giấy xác nhận',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(
-                          item.status,
-                        ).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.status ?? 'Đang xử lý',
-                        style: TextStyle(
-                          color: _getStatusColor(item.status),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    const SizedBox(height: 8),
+                    PortalStatusChip(
+                      label: item.status ?? 'Chưa cập nhật',
+                      tone: _statusTone(item.status),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.numbers, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text('Số lượng: ${item.quantity ?? 1}'),
-                    const SizedBox(width: 16),
-                    const Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(item.requestDate ?? '--'),
-                  ],
+                PortalInfoRow(
+                  label: 'Số lượng',
+                  value: Text(item.quantity?.toString() ?? 'Chưa cập nhật'),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.payments, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Đã thanh toán: ${item.amountPaid ?? 0} / ${item.amountDue ?? 0} VNĐ',
-                    ),
-                  ],
+                PortalInfoRow(
+                  label: 'Ngày yêu cầu',
+                  value: Text(item.requestDate ?? 'Chưa cập nhật'),
+                ),
+                const SizedBox(height: 8),
+                PortalInfoRow(
+                  label: 'Thanh toán',
+                  value: Text(
+                    item.amountPaid == null || item.amountDue == null
+                        ? 'Chưa cập nhật'
+                        : '${item.amountPaid} / ${item.amountDue} VNĐ',
+                  ),
                 ),
               ],
             ),
@@ -236,12 +186,16 @@ class ConfirmationPaperScreen extends ConsumerWidget {
     );
   }
 
-  Color _getStatusColor(String? status) {
-    if (status == null) return Colors.grey;
+  PortalStatusTone _statusTone(String? status) {
+    if (status == null) return PortalStatusTone.neutral;
     final s = status.toLowerCase();
-    if (s.contains('đã in') || s.contains('hoàn thành')) return Colors.green;
-    if (s.contains('chờ') || s.contains('đang')) return Colors.orange;
-    if (s.contains('hủy')) return Colors.red;
-    return Colors.blue;
+    if (s.contains('đã in') || s.contains('hoàn thành')) {
+      return PortalStatusTone.success;
+    }
+    if (s.contains('chờ') || s.contains('đang')) {
+      return PortalStatusTone.warning;
+    }
+    if (s.contains('hủy')) return PortalStatusTone.error;
+    return PortalStatusTone.info;
   }
 }
