@@ -7,14 +7,7 @@ import 'package:uit_portal_app/src/portal_module_registry.dart';
 
 void main() {
   testWidgets('searches services by title and description', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: PortalTheme.light(),
-        home: const Scaffold(
-          body: SingleChildScrollView(child: ServiceBrowser()),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_browserApp());
 
     await tester.enterText(find.byType(SearchBar), 'ngoại ngữ');
     await tester.pump();
@@ -23,15 +16,41 @@ void main() {
     expect(find.text('Học phí'), findsNothing);
   });
 
-  testWidgets('filters services by financial category', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: PortalTheme.light(),
-        home: const Scaffold(
-          body: SingleChildScrollView(child: ServiceBrowser()),
-        ),
-      ),
+  testWidgets('finds Vietnamese services with an unaccented query', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_browserApp());
+
+    await tester.enterText(find.byType(SearchBar), 'thoi khoa bieu');
+    await tester.pump();
+
+    expect(find.text('Thời khóa biểu'), findsOneWidget);
+    expect(find.text('Bảng điểm'), findsNothing);
+  });
+
+  testWidgets('finds services from decomposed Vietnamese input', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_browserApp());
+
+    await tester.enterText(
+      find.byType(SearchBar),
+      'tho\u031b\u0300i khoa bieu',
     );
+    await tester.pump();
+
+    expect(find.text('Thời khóa biểu'), findsOneWidget);
+  });
+
+  testWidgets('renders the service search without elevation', (tester) async {
+    await tester.pumpWidget(_browserApp());
+
+    final searchBar = tester.widget<SearchBar>(find.byType(SearchBar));
+    expect(searchBar.elevation?.resolve({}), 0);
+  });
+
+  testWidgets('filters services by financial category', (tester) async {
+    await tester.pumpWidget(_browserApp());
 
     await tester.tap(find.text('Tài chính'));
     await tester.pump();
@@ -61,7 +80,6 @@ void main() {
       ),
     );
 
-    // Tap on the first module in the list (e.g. 'Giấy xác nhận')
     await tester.tap(find.text('Giấy xác nhận'));
     await tester.pump();
 
@@ -103,4 +121,11 @@ void main() {
 
     expect(find.text('Module Page: confirmation_paper'), findsOneWidget);
   });
+}
+
+Widget _browserApp() {
+  return MaterialApp(
+    theme: PortalTheme.light(),
+    home: const Scaffold(body: SingleChildScrollView(child: ServiceBrowser())),
+  );
 }

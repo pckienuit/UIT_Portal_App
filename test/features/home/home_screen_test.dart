@@ -93,4 +93,104 @@ void main() {
     expect(find.text('Tùy chỉnh trang chủ'), findsNothing);
     expect(find.text('Lịch học hôm nay'), findsNothing);
   });
+
+  testWidgets('shows current average, completed credits, and grade trend', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({
+      'widget_preferences': ['schedule', 'tuition', 'grades'],
+    });
+    final sharedPrefs = await SharedPreferences.getInstance();
+    final grades = GradesResponse(
+      semesterGroups: [
+        _semester('Học kỳ 2, 2025-2026', [
+          _subject(code: 'CURRENT-1', credits: 3, score: '8.0'),
+          _subject(code: 'CURRENT-2', credits: 2, score: '7.0'),
+        ]),
+        _semester('Học kỳ 1, 2025-2026', [
+          _subject(code: 'PREVIOUS', credits: 3, score: '6.0'),
+          _subject(code: 'CURRENT-1', credits: 3, score: '5.0'),
+        ]),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPrefs),
+          authControllerProvider.overrideWith((ref) => _MockAuthController()),
+          detailedProfileProvider.overrideWith((ref) async => null),
+          scheduleFutureProvider.overrideWith(
+            (ref) async => ScheduleResponse(
+              hocKy: 2,
+              namHoc: 2026,
+              tiets: [
+                ScheduleItem(
+                  id: 'today',
+                  maLop: 'TEST',
+                  maMonHoc: 'TEST',
+                  tenMonHoc: 'Môn học hôm nay',
+                  ngay: '',
+                  thu: DateTime.now().weekday == 7
+                      ? 8
+                      : DateTime.now().weekday + 1,
+                  tietBatDau: 1,
+                  tietKetThuc: 3,
+                ),
+              ],
+            ),
+          ),
+          tuitionListProvider.overrideWith((ref) async => []),
+          gradesFutureProvider.overrideWith((ref) async => grades),
+        ],
+        child: MaterialApp(
+          theme: PortalTheme.light(),
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('7,60'), findsOneWidget);
+    expect(find.text('8 tín chỉ đã hoàn thành'), findsOneWidget);
+    expect(find.text('Chưa có tổng tín chỉ chương trình'), findsOneWidget);
+    expect(find.byKey(const ValueKey('grade-trend-chart')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+SemesterGroup _semester(String label, List<GradeSubject> subjects) {
+  return SemesterGroup(
+    semesterKey: label,
+    semesterLabel: label,
+    yearName: '2025-2026',
+    subjects: subjects,
+  );
+}
+
+GradeSubject _subject({
+  required String code,
+  required int credits,
+  required String score,
+}) {
+  return GradeSubject(
+    id: score,
+    subjectCode: code,
+    subjectName: 'Môn kiểm thử',
+    numberOfCredit: credits,
+    trainingTypeCode: '',
+    processPoint: '',
+    midtermScore: '',
+    practicePoint: '',
+    finalPoint: '',
+    coursePoint: score,
+    statusPoint: 'normal',
+    subjectRequired: true,
+    note: '',
+  );
 }

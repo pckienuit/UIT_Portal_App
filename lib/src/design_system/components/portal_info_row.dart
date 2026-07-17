@@ -28,6 +28,7 @@ class PortalInfoRow extends StatelessWidget {
           const SizedBox(width: PortalSpacing.sm),
         ],
         Expanded(
+          flex: 2,
           child: Text(
             label,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -35,8 +36,9 @@ class PortalInfoRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: PortalSpacing.md),
-        Flexible(
+        const SizedBox(width: PortalSpacing.sm),
+        Expanded(
+          flex: 3,
           child: DefaultTextStyle.merge(
             textAlign: TextAlign.end,
             style: theme.textTheme.bodyMedium?.copyWith(

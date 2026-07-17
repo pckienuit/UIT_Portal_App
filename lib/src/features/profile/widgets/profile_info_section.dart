@@ -41,7 +41,7 @@ class ProfileInfoSection extends StatelessWidget {
           for (var index = 0; index < children.length; index++) ...[
             children[index],
             if (index < children.length - 1)
-              const SizedBox(height: PortalSpacing.md),
+              const SizedBox(height: PortalSpacing.xs),
           ],
         ],
       ),

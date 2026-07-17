@@ -32,33 +32,26 @@ class HomeBento extends StatelessWidget {
           );
         }
 
-        return SizedBox(
-          height: 320,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(flex: 3, child: children.first),
-              if (children.length > 1) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      for (var index = 1; index < children.length; index++)
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == children.length - 1 ? 0 : 12,
-                            ),
-                            child: children[index],
-                          ),
-                        ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: children.first),
+            if (children.length > 1) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    for (var index = 1; index < children.length; index++) ...[
+                      children[index],
+                      if (index != children.length - 1)
+                        const SizedBox(height: 12),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         );
       },
     );

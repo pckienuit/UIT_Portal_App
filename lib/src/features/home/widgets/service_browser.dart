@@ -46,7 +46,7 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _query.trim().toLowerCase();
+    final query = _normalizeVietnamese(_query.trim());
     final categoryIds = _categories[_category]!;
     final modules = PortalModuleRegistry.modules.where((module) {
       if (_excludedIds.contains(module.id)) return false;
@@ -54,8 +54,8 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
         return false;
       }
       if (query.isEmpty) return true;
-      return module.title.toLowerCase().contains(query) ||
-          module.description.toLowerCase().contains(query);
+      return _normalizeVietnamese(module.title).contains(query) ||
+          _normalizeVietnamese(module.description).contains(query);
     }).toList();
 
     return Column(
@@ -64,6 +64,7 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
         SearchBar(
           hintText: 'Tìm dịch vụ',
           leading: const Icon(Icons.search),
+          elevation: const WidgetStatePropertyAll(0),
           onChanged: (value) => setState(() => _query = value),
         ),
         const SizedBox(height: 12),
@@ -111,5 +112,25 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
           ),
       ],
     );
+  }
+
+  String _normalizeVietnamese(String value) {
+    const accented = [
+      'àáạảãâầấậẩẫăằắặẳẵ',
+      'èéẹẻẽêềếệểễ',
+      'ìíịỉĩ',
+      'òóọỏõôồốộổỗơờớợởỡ',
+      'ùúụủũưừứựửữ',
+      'ỳýỵỷỹ',
+      'đ',
+    ];
+    const plain = ['a', 'e', 'i', 'o', 'u', 'y', 'd'];
+    var normalized = value.toLowerCase();
+    for (var group = 0; group < accented.length; group++) {
+      for (final character in accented[group].split('')) {
+        normalized = normalized.replaceAll(character, plain[group]);
+      }
+    }
+    return normalized.replaceAll(RegExp(r'[\u0300-\u036f]'), '');
   }
 }

@@ -108,6 +108,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('gives profile values more width and uses compact row spacing', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(411, 890);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_appWith(_profile()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thông tin cá nhân'));
+    await tester.pumpAndSettle();
+
+    final labelBox = tester.renderObject<RenderBox>(find.text('Email trường'));
+    final valueBox = tester.renderObject<RenderBox>(find.text('an@uit.edu.vn'));
+    expect(valueBox.size.width, greaterThan(labelBox.size.width));
+
+    final firstTop = tester.getTopLeft(find.text('Email trường')).dy;
+    final secondTop = tester.getTopLeft(find.text('Email cá nhân')).dy;
+    expect(secondTop - firstTop, lessThanOrEqualTo(48));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('confirms before signing out through the auth controller', (
     tester,
   ) async {
@@ -135,11 +158,8 @@ void main() {
     await tester.pumpWidget(_appWith(_profile()));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('Thông tin ngân hàng'),
-      400,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.text('Thông tin ngân hàng'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Thông tin ngân hàng'));
     await tester.pumpAndSettle();
 
