@@ -9,6 +9,7 @@ import '../application/ai_portal_context_builder.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_context_consent_sheet.dart';
 import 'ai_provider_settings_screen.dart';
+import 'ai_provider_switcher_sheet.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
   const AiChatScreen({super.key});
@@ -70,6 +71,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
+  void _showProviderSwitcher() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => const AiProviderSwitcherSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(aiChatControllerProvider);
@@ -100,6 +108,19 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           ),
         ),
         actions: [
+          if (hasProvider)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: ActionChip(
+                label: Text(
+                  '${state.activeProvider!.name} · ${state.activeProvider!.modelId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11),
+                ),
+                onPressed: _showProviderSwitcher,
+              ),
+            ),
           IconButton(
             tooltip: 'Hội thoại mới',
             icon: const Icon(Icons.add_comment_outlined),
