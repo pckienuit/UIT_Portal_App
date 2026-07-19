@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 /// Một SSE event được decode từ Server-Sent Events stream.
 class SseEvent {
@@ -26,6 +25,7 @@ class SseDecoder {
     String buffer = '';
     
     return stream
+        .cast<List<int>>() // Cast Uint8List sang List<int> để tương thích Utf8Decoder ở runtime
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .expand((line) {

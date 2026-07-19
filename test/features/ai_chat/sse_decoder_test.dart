@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/sse_decoder.dart';
 
@@ -14,7 +15,7 @@ void main() {
         '\n',
       ];
 
-      final byteStream = Stream.fromIterable(sseLines.map((s) => s.codeUnits));
+      final byteStream = Stream.fromIterable(sseLines.map((s) => utf8.encode(s)));
       final decoded = await const SseDecoder().bind(byteStream).toList();
 
       expect(decoded.length, 3);
@@ -33,7 +34,7 @@ void main() {
         '\n',
       ];
 
-      final byteStream = Stream.fromIterable(sseLines.map((s) => s.codeUnits));
+      final byteStream = Stream.fromIterable(sseLines.map((s) => utf8.encode(s)));
       final decoded = await const SseDecoder().bind(byteStream).toList();
 
       expect(decoded.length, 1);
@@ -41,9 +42,12 @@ void main() {
     });
 
     test('reconstructs split multi-byte characters', () async {
-      // Chữ "Tiếng Việt" chứa ký tự Unicode có thể bị cắt ngang byte chunk
-      final firstPart = 'data: Tiế'.codeUnits;
-      final secondPart = 'ng Việt\n\n'.codeUnits;
+      // Dùng utf8.encode để có các byte UTF-8 chuẩn xác, và cắt ngang ở byte ranh giới
+      final fullBytes = utf8.encode('data: Tiếng Việt\n\n');
+      
+      // Cắt đôi mảng byte tại vị trí ngẫu nhiên (ví dụ byte thứ 10, rơi vào giữa chữ 'ế')
+      final firstPart = fullBytes.sublist(0, 10);
+      final secondPart = fullBytes.sublist(10);
 
       final byteStream = Stream.fromIterable([firstPart, secondPart]);
       final decoded = await const SseDecoder().bind(byteStream).toList();

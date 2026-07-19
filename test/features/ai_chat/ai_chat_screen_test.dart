@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
-import 'package:uit_portal_app/src/features/ai_chat/application/ai_chat_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_chat_screen.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
 import 'dart:io';

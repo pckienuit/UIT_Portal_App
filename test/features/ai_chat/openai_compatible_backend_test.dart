@@ -15,7 +15,7 @@ void main() {
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
         modelId: 'gpt-4o',
-        apiKey: 'test-key',
+        apiKey: '',
         dio: dio,
       );
 
@@ -25,12 +25,12 @@ void main() {
     });
 
     test('testConnection maps 401 error', () async {
-      final adapter = _StaticAdapter(statusCode: 401, responseBody: 'Unauthorized');
+      final adapter = _StaticAdapter(statusCode: 401, responseBody: '{"error": "Unauthorized"}');
       final dio = Dio()..httpClientAdapter = adapter;
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
         modelId: 'gpt-4o',
-        apiKey: 'bad-key',
+        apiKey: '',
         dio: dio,
       );
 
@@ -48,7 +48,7 @@ void main() {
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
         modelId: 'gpt-4o',
-        apiKey: 'test-key',
+        apiKey: '',
         dio: dio,
       );
 
@@ -71,13 +71,13 @@ void main() {
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
         modelId: 'gpt-4o',
-        apiKey: 'test-key',
+        apiKey: '',
         dio: dio,
       );
 
       final req = AiChatRequest(
         config: _FakeProviderConfig(),
-        apiKey: 'test-key',
+        apiKey: '',
         messages: [
           AiChatMessage(
             id: '1',

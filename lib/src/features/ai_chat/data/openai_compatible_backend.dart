@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../domain/ai_chat_backend.dart';
-import '../domain/ai_chat_models.dart';
 import 'sse_decoder.dart';
 
 class OpenAiCompatibleBackend implements AiChatBackend {

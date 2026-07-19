@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import '../ai_chat_providers.dart';
 import '../application/ai_chat_controller.dart';
 import '../data/local_model_catalog.dart';
 import '../data/local_model_manager.dart';

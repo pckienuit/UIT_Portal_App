@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_portal_context_builder.dart';
 

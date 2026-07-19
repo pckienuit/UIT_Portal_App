@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/local_model_catalog.dart';
 

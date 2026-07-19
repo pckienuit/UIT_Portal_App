@@ -1,4 +1,3 @@
-import '../domain/ai_chat_models.dart';
 
 class LocalModelInfo {
   const LocalModelInfo({

@@ -6,7 +6,9 @@ import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
 import '../data/ai_backend_factory.dart';
 import '../data/ai_provider_repository.dart';
+import '../data/local_model_catalog.dart';
 import '../domain/ai_chat_models.dart';
+import 'ai_model_download_section.dart';
 
 class AiProviderSettingsScreen extends ConsumerStatefulWidget {
   const AiProviderSettingsScreen({super.key});
@@ -144,7 +146,7 @@ class _AiProviderSettingsScreenState extends ConsumerState<AiProviderSettingsScr
 
     return PortalScaffold(
       appBar: AppBar(
-        title: const Text('Cấu hình API Trợ lý AI'),
+        title: const Text('Cấu hình Trợ lý AI'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(PortalSpacing.md),
@@ -154,7 +156,14 @@ class _AiProviderSettingsScreenState extends ConsumerState<AiProviderSettingsScr
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'API Provider OpenAI-Compatible',
+                'Mô hình chạy trên máy (Local offline)',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: PortalSpacing.sm),
+              const AiModelDownloadSection(modelInfo: LocalModelCatalog.qwen08b),
+              const SizedBox(height: PortalSpacing.lg),
+              Text(
+                'Hoặc kết nối qua API (OpenAI-Compatible)',
                 style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: PortalSpacing.sm),

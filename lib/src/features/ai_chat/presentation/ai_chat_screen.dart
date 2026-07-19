@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:go_router/go_router.dart';
 import '../../../design_system/components/portal_scaffold.dart';
 import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
+import '../application/ai_portal_context_builder.dart';
 import '../domain/ai_chat_models.dart';
+import 'ai_context_consent_sheet.dart';
 import 'ai_provider_settings_screen.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
@@ -19,6 +20,7 @@ class AiChatScreen extends ConsumerStatefulWidget {
 class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _shareContextConsented = false;
 
   @override
   void dispose() {
@@ -39,12 +41,39 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     }
   }
 
+  void _sendMessage() {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+
+    if (_shareContextConsented) {
+      final snapshot = const AiPortalContextBuilder().buildSnapshot(ref);
+      ref.read(aiChatControllerProvider.notifier).sendMessage(text, contextSnapshot: snapshot);
+    } else {
+      ref.read(aiChatControllerProvider.notifier).sendMessage(text);
+    }
+    _textController.clear();
+  }
+
+  void _showConsentSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return AiContextConsentSheet(
+          onConsentChanged: (consented) {
+            setState(() {
+              _shareContextConsented = consented;
+            });
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(aiChatControllerProvider);
     final notifier = ref.read(aiChatControllerProvider.notifier);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     // Auto scroll khi có tin nhắn mới hoặc đang stream
     ref.listen(aiChatControllerProvider, (prev, next) {
@@ -88,9 +117,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       body: !hasProvider
           ? _buildNoProviderState(context)
           : conversation == null || conversation.messages.isEmpty
-              ? _buildEmptyState(context, notifier)
+              ? _buildEmptyState(context)
               : _buildChatList(context, conversation, state),
-      bottomNavigationBar: hasProvider ? _buildComposer(context, state, notifier) : null,
+      bottomNavigationBar: hasProvider ? _buildComposer(context, state) : null,
     );
   }
 
@@ -132,9 +161,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, AiChatController notifier) {
+  Widget _buildEmptyState(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
 
     final suggestions = [
       'Lịch học tuần này của tôi?',
@@ -162,7 +190,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                   label: Text(suggestion),
                   onPressed: () {
                     _textController.text = suggestion;
-                    notifier.sendMessage(suggestion);
+                    _sendMessage();
                   },
                 ),
               ),
@@ -259,7 +287,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildComposer(BuildContext context, AiChatState state, AiChatController notifier) {
+  Widget _buildComposer(BuildContext context, AiChatState state) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
@@ -269,46 +297,62 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           left: PortalSpacing.md,
           right: PortalSpacing.md,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _textController,
-                decoration: const InputDecoration(
-                  hintText: 'Nhập tin nhắn...',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: PortalSpacing.md,
-                    vertical: PortalSpacing.sm,
+            Row(
+              children: [
+                Checkbox(
+                  value: _shareContextConsented,
+                  onChanged: (val) {
+                    if (val == true) {
+                      _showConsentSheet();
+                    } else {
+                      setState(() {
+                        _shareContextConsented = false;
+                      });
+                    }
+                  },
+                ),
+                const Text(
+                  'Chia sẻ ngữ cảnh học tập (Điểm, Lịch học, Học phí)',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    decoration: const InputDecoration(
+                      hintText: 'Nhập tin nhắn...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: PortalSpacing.md,
+                        vertical: PortalSpacing.sm,
+                      ),
+                    ),
+                    maxLines: 5,
+                    minLines: 1,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (val) {
+                      _sendMessage();
+                    },
                   ),
                 ),
-                maxLines: 5,
-                minLines: 1,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (val) {
-                  if (val.trim().isNotEmpty) {
-                    notifier.sendMessage(val);
-                    _textController.clear();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: PortalSpacing.xs),
-            IconButton(
-              onPressed: state.isGenerating
-                  ? notifier.stopGeneration
-                  : () {
-                      final val = _textController.text;
-                      if (val.trim().isNotEmpty) {
-                        notifier.sendMessage(val);
-                        _textController.clear();
-                      }
-                    },
-              icon: Icon(
-                state.isGenerating ? Icons.stop_circle : Icons.send,
-                color: colorScheme.primary,
-                size: 28,
-              ),
+                const SizedBox(width: PortalSpacing.xs),
+                IconButton(
+                  onPressed: state.isGenerating
+                      ? ref.read(aiChatControllerProvider.notifier).stopGeneration
+                      : _sendMessage,
+                  icon: Icon(
+                    state.isGenerating ? Icons.stop_circle : Icons.send,
+                    color: colorScheme.primary,
+                    size: 28,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

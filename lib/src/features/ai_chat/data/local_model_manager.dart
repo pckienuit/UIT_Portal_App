@@ -85,7 +85,7 @@ class LocalModelManager {
         int downloadedBytes = startBytes;
         final completer = Completer<void>();
 
-        _cancelToken?.whenCancel.then((_) {
+        _cancelToken!.whenCancel.then((_) {
           outputSink.close();
           if (!completer.isCompleted) completer.completeError(CanceledError());
         });

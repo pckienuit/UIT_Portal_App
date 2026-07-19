@@ -69,6 +69,8 @@ class AiChatController extends Notifier<AiChatState> {
     final store = await ref.read(chatHistoryStoreProvider.future);
     final history = await store.readHistory();
 
+    if (!ref.mounted) return;
+
     state = state.copyWith(
       activeProvider: () => activeProvider,
       conversations: history,
@@ -163,7 +165,6 @@ class AiChatController extends Notifier<AiChatState> {
     }
     if (currentConv == null) return;
 
-    // 1. Thêm message người dùng vào UI state
     final userMsg = AiChatMessage(
       id: 'msg-usr-${DateTime.now().microsecondsSinceEpoch}',
       role: AiMessageRole.user,
@@ -174,7 +175,6 @@ class AiChatController extends Notifier<AiChatState> {
 
     final updatedMessages = List<AiChatMessage>.from(currentConv.messages)..add(userMsg);
     
-    // Tự đặt title nếu là tin nhắn đầu tiên
     final title = currentConv.messages.isEmpty 
         ? (text.length > 48 ? '${text.substring(0, 48)}...' : text)
         : currentConv.title;
@@ -191,19 +191,19 @@ class AiChatController extends Notifier<AiChatState> {
     _updateConversationInList(updatedConvo);
     state = state.copyWith(isGenerating: true, errorMessage: () => null);
 
-    // 2. Tạo placeholder assistant message
     final assistantMsgId = 'msg-ast-${DateTime.now().microsecondsSinceEpoch}';
     var assistantContent = '';
 
     final req = AiChatRequest(
       config: state.activeProvider!,
-      apiKey: '', // Backend factory đã tự bind key từ secure storage
+      apiKey: '',
       messages: updatedMessages,
       context: contextSnapshot,
     );
 
     _streamSub = _activeBackend!.streamChat(req).listen(
       (event) {
+        if (!ref.mounted) return;
         if (event.type == AiStreamEventType.chunk && event.content != null) {
           assistantContent += event.content!;
           
@@ -237,11 +237,12 @@ class AiChatController extends Notifier<AiChatState> {
         }
       },
       onError: (err) {
+        if (!ref.mounted) return;
         state = state.copyWith(errorMessage: () => err.toString());
         _finalizeActiveConversation(assistantMsgId, assistantContent, AiMessageStatus.failed);
       },
       onDone: () {
-        // Dự phòng nếu DONE stream không được phát ra rõ ràng
+        if (!ref.mounted) return;
         if (state.isGenerating) {
           _finalizeActiveConversation(assistantMsgId, assistantContent, AiMessageStatus.complete);
         }
@@ -254,7 +255,6 @@ class AiChatController extends Notifier<AiChatState> {
     _streamSub = null;
     _activeBackend?.cancel();
     
-    // Đóng băng assistant message hiện tại ở trạng thái cancelled
     if (state.activeConversation != null && state.activeConversation!.messages.isNotEmpty) {
       final lastMsg = state.activeConversation!.messages.last;
       if (lastMsg.role == AiMessageRole.assistant && lastMsg.status == AiMessageStatus.streaming) {
@@ -296,9 +296,10 @@ class AiChatController extends Notifier<AiChatState> {
     _updateConversationInList(finalConv);
     state = state.copyWith(isGenerating: false);
 
-    // Save history
     ref.read(chatHistoryStoreProvider.future).then((store) {
-      store.writeHistory(state.conversations);
+      if (ref.mounted) {
+        store.writeHistory(state.conversations);
+      }
     });
   }
 
@@ -308,7 +309,7 @@ class AiChatController extends Notifier<AiChatState> {
     if (index >= 0) {
       list.removeAt(index);
     }
-    list.insert(0, convo); // Đẩy cuộc trò chuyện vừa cập nhật lên đầu list
+    list.insert(0, convo);
 
     state = state.copyWith(
       conversations: list,

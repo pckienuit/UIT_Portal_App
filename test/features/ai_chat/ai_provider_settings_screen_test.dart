@@ -40,7 +40,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('API Provider OpenAI-Compatible'), findsOneWidget);
+    expect(find.text('Hoặc kết nối qua API (OpenAI-Compatible)'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Tên Provider'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Base URL'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'API Key'), findsOneWidget);
