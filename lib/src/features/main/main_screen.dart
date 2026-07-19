@@ -45,9 +45,9 @@ class MainScreen extends StatelessWidget {
                   label: 'Lịch học',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.notifications_outlined),
-                  selectedIcon: Icon(Icons.notifications),
-                  label: 'Thông báo',
+                  icon: Icon(Icons.assistant_outlined),
+                  selectedIcon: Icon(Icons.assistant),
+                  label: 'Trợ lý AI',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline),

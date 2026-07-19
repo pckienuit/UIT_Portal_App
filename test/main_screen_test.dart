@@ -22,7 +22,7 @@ void main() {
           branches: [
             _branch('/', 'Home'),
             _branch('/schedule', 'Schedule'),
-            _branch('/notifications', 'Notifications'),
+            _branch('/ai-chat', 'AI Chat'),
             _branch('/profile-tab', 'Profile'),
           ],
         ),
@@ -46,7 +46,7 @@ void main() {
 
     expect(find.text('Trang chủ'), findsOneWidget);
     expect(find.text('Lịch học'), findsOneWidget);
-    expect(find.text('Thông báo'), findsOneWidget);
+    expect(find.text('Trợ lý AI'), findsOneWidget);
     expect(find.text('Cá nhân'), findsOneWidget);
     expect(
       tester.getSize(find.byType(NavigationBar)).height,

@@ -33,6 +33,7 @@ import 'features/exam_schedule/exam_schedule_screen.dart';
 import 'features/teaching_survey/teaching_survey_screen.dart';
 import 'features/main/main_screen.dart';
 import 'features/notifications/notifications_screen.dart';
+import 'features/ai_chat/presentation/ai_chat_screen.dart';
 import 'portal_module_registry.dart';
 import 'design_system/theme/portal_theme.dart';
 
@@ -76,8 +77,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/notifications',
-                builder: (context, state) => const NotificationsScreen(),
+                path: '/ai-chat',
+                builder: (context, state) => const AiChatScreen(),
               ),
             ],
           ),
@@ -121,6 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             'lich-thi' => const ExamScheduleScreen(),
             'khao-sat-giang-day' => const TeachingSurveyScreen(),
             'hoc-phi' => const TuitionScreen(),
+            'notifications' => const NotificationsScreen(),
             _ => NativeModuleScreen(
               module: PortalModule(
                 id: moduleId,
