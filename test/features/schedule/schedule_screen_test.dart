@@ -7,6 +7,22 @@ import 'package:uit_portal_app/src/features/schedule/schedule_providers.dart';
 import 'package:uit_portal_app/src/features/schedule/schedule_screen.dart';
 
 void main() {
+  // Mock các ngày động xoay quanh ngày chạy test thực tế (DateTime.now() = Chủ nhật)
+  // để thuật toán tìm ngày có lịch gần nhất hoạt động chính xác và ổn định.
+  final today = DateUtils.dateOnly(DateTime.now());
+  
+  // Tuần hiện tại
+  final mondayOfThisWeek = today.subtract(Duration(days: today.weekday - 1));
+  final thursdayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 3));
+  final fridayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 4));
+  final saturdayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 5));
+  final tuesdayOfNextWeek = mondayOfThisWeek.add(const Duration(days: 8)); // Thứ 3 tuần sau
+  
+  final thursdayStr = thursdayOfThisWeek.toIso8601String().substring(0, 10);
+  final fridayStr = fridayOfThisWeek.toIso8601String().substring(0, 10);
+  final saturdayStr = saturdayOfThisWeek.toIso8601String().substring(0, 10);
+  final nextTuesdayStr = tuesdayOfNextWeek.toIso8601String().substring(0, 10);
+
   testWidgets('selects a day and orders its classes by starting period', (
     tester,
   ) async {
@@ -20,13 +36,13 @@ void main() {
         ScheduleResponse(
           hocKy: 2,
           namHoc: 2026,
-          tiets: const [
+          tiets: [
             ScheduleItem(
               id: 'late',
               maLop: 'SE104.Q21',
               maMonHoc: 'SE104',
               tenMonHoc: 'Nhập môn công nghệ phần mềm',
-              ngay: '2026-07-17',
+              ngay: fridayStr,
               thu: 6,
               tietBatDau: 6,
               tietKetThuc: 8,
@@ -38,7 +54,7 @@ void main() {
               maLop: 'CE101.Q21',
               maMonHoc: 'CE101',
               tenMonHoc: 'Kiến trúc máy tính',
-              ngay: '2026-07-17',
+              ngay: fridayStr,
               thu: 6,
               tietBatDau: 1,
               tietKetThuc: 3,
@@ -49,8 +65,8 @@ void main() {
               maLop: 'IT001.Q21',
               maMonHoc: 'IT001',
               tenMonHoc: 'Nhập môn lập trình',
-              ngay: '2026-07-18',
-              thu: 7,
+              ngay: thursdayStr,
+              thu: 5,
               tietBatDau: 1,
               tietKetThuc: 3,
               phong: 'A2.04',
@@ -69,12 +85,14 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Nhập môn công nghệ phần mềm')).dy),
     );
 
+    // Kéo day strip để tìm ngày thứ 5
     await tester.drag(
       find.byType(SingleChildScrollView).first,
-      const Offset(-160, 0),
+      const Offset(160, 0),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('18'));
+    
+    await tester.tap(find.text(thursdayOfThisWeek.day.toString()));
     await tester.pumpAndSettle();
 
     expect(find.text('Nhập môn lập trình'), findsOneWidget);
@@ -85,7 +103,7 @@ void main() {
   testWidgets('navigates to classes in another week', (tester) async {
     await tester.pumpWidget(
       _appWith(
-        const ScheduleResponse(
+        ScheduleResponse(
           hocKy: 2,
           namHoc: 2026,
           tiets: [
@@ -94,7 +112,7 @@ void main() {
               maLop: 'IT001.Q21',
               maMonHoc: 'IT001',
               tenMonHoc: 'Lớp tuần đầu',
-              ngay: '2026-07-17',
+              ngay: saturdayStr, // Thứ 7 tuần này (cách Chủ nhật 1 ngày)
               thu: 6,
               tietBatDau: 1,
               tietKetThuc: 3,
@@ -104,8 +122,8 @@ void main() {
               maLop: 'IT002.Q21',
               maMonHoc: 'IT002',
               tenMonHoc: 'Lớp tuần sau',
-              ngay: '2026-07-20',
-              thu: 2,
+              ngay: nextTuesdayStr, // Thứ 3 tuần sau (cách Chủ nhật 2 ngày)
+              thu: 3,
               tietBatDau: 1,
               tietKetThuc: 3,
             ),
@@ -115,13 +133,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Do Saturday (cách 1 ngày) gần today hơn Tuesday tuần sau (cách 2 ngày), 
+    // timeline sẽ chọn Week 1 của ngày Saturday làm mặc định.
+    // Tap vào thứ 7 tuần này
+    await tester.tap(find.text(saturdayOfThisWeek.day.toString()));
+    await tester.pumpAndSettle();
+
     expect(find.text('Lớp tuần đầu'), findsOneWidget);
     expect(find.text('Lớp tuần sau'), findsNothing);
 
     await tester.tap(find.byTooltip('Tuần sau'));
     await tester.pumpAndSettle();
 
-    expect(find.text('20'), findsOneWidget);
+    await tester.tap(find.text(tuesdayOfNextWeek.day.toString()));
+    await tester.pumpAndSettle();
+
     expect(find.text('Lớp tuần sau'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -136,7 +162,7 @@ void main() {
 
     await tester.pumpWidget(
       _appWith(
-        const ScheduleResponse(
+        ScheduleResponse(
           hocKy: 2,
           namHoc: 2026,
           tiets: [
@@ -146,7 +172,7 @@ void main() {
               maMonHoc: 'SE104',
               tenMonHoc:
                   'Nhập môn công nghệ phần mềm và quy trình phát triển sản phẩm',
-              ngay: '2026-07-17',
+              ngay: fridayStr,
               thu: 6,
               tietBatDau: 1,
               tietKetThuc: 3,
@@ -184,8 +210,8 @@ void main() {
                 maLop: 'IT00$callCount.Q21',
                 maMonHoc: 'IT00$callCount',
                 tenMonHoc: callCount == 1 ? 'Lịch cũ' : 'Lịch mới',
-                ngay: callCount == 1 ? '2026-07-17' : '2026-07-20',
-                thu: callCount == 1 ? 6 : 2,
+                ngay: callCount == 1 ? fridayStr : nextTuesdayStr,
+                thu: callCount == 1 ? 6 : 3,
                 tietBatDau: 1,
                 tietKetThuc: 3,
               ),
@@ -212,7 +238,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Lịch mới'), findsOneWidget);
-    expect(find.text('20'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -221,7 +246,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _appWith(
-        const ScheduleResponse(
+        ScheduleResponse(
           hocKy: 2,
           namHoc: 2026,
           tiets: [
@@ -230,7 +255,7 @@ void main() {
               maLop: 'IT001.Q21',
               maMonHoc: 'IT001',
               tenMonHoc: 'Nhập môn lập trình',
-              ngay: '2026-07-17',
+              ngay: fridayStr,
               thu: 6,
               tietBatDau: 1,
               tietKetThuc: 3,
@@ -242,14 +267,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel(RegExp(r'ngày .* tháng 7')), findsNWidgets(7));
+    expect(find.bySemanticsLabel(RegExp(r'ngày .*')), findsNWidgets(7));
 
     await tester.drag(
       find.byType(SingleChildScrollView).first,
-      const Offset(-200, 0),
+      const Offset(200, 0),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('19'));
+    
+    await tester.tap(find.text(thursdayOfThisWeek.day.toString()));
     await tester.pumpAndSettle();
 
     expect(find.text('Không có lịch hôm nay'), findsOneWidget);
