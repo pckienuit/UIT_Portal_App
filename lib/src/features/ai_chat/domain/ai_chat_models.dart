@@ -41,6 +41,24 @@ class AiProviderConfig {
         presetId: json['presetId'] as String?,
         systemPrompt: json['systemPrompt'] as String?,
       );
+
+  AiProviderConfig copyWith({
+    String? name,
+    String? baseUrl,
+    String? modelId,
+    String? Function()? presetId,
+    String? Function()? systemPrompt,
+  }) {
+    return AiProviderConfig(
+      id: id,
+      name: name ?? this.name,
+      kind: kind,
+      baseUrl: baseUrl ?? this.baseUrl,
+      modelId: modelId ?? this.modelId,
+      presetId: presetId != null ? presetId() : this.presetId,
+      systemPrompt: systemPrompt != null ? systemPrompt() : this.systemPrompt,
+    );
+  }
 }
 
 class AiChatMessage {
