@@ -1,6 +1,10 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+import 'local_llama_backend.dart';
+import 'local_model_catalog.dart';
 import 'openai_compatible_backend.dart';
 
 class AiBackendFactory {
@@ -18,8 +22,13 @@ class AiBackendFactory {
           apiKey: key,
         );
       case AiBackendKind.localLlama:
-        // Sẽ được implement trong Phase 4
-        return null;
+        final catalog = LocalModelCatalog.byId(config.id);
+        if (catalog == null) return null;
+        
+        final appSupport = await getApplicationSupportDirectory();
+        final modelPath = p.join(appSupport.path, 'ai_models', catalog.fileName);
+        
+        return LocalLlamaBackend(modelPath: modelPath);
     }
   }
 }
