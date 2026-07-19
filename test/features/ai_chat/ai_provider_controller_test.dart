@@ -3,67 +3,82 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
-import 'package:uit_portal_app/src/features/ai_chat/application/ai_chat_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
-import 'dart:io';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late Directory tempDir;
   late SharedPreferences prefs;
   late _FakeSecureStorage fakeSecureStorage;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('ai_chat_controller_test');
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     fakeSecureStorage = _FakeSecureStorage();
   });
 
-  tearDown(() async {
-    await tempDir.delete(recursive: true);
-  });
-
-  test('initializes with active provider and loaded history', () async {
+  test('AiProviderController manages CRUD and active selection correctly', () async {
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
         secureStorageProvider.overrideWithValue(fakeSecureStorage),
       ],
     );
     addTearDown(container.dispose);
 
-    // Lưu một provider config giả lập vào prefs trước thông qua repo
-    final repo = container.read(aiProviderRepositoryProvider);
-    final config = AiProviderConfig(
+    final controller = container.read(aiProviderControllerProvider.notifier);
+    expect(container.read(aiProviderControllerProvider).providers, isEmpty);
+    expect(container.read(aiProviderControllerProvider).activeProviderId, isNull);
+
+    // Add provider
+    final c1 = AiProviderConfig(
       id: 'p1',
-      name: 'Test',
+      name: 'Provider 1',
       kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'http://localhost',
+      baseUrl: 'http://localhost/v1',
       modelId: 'm1',
+      presetId: 'openai',
     );
-    await repo.saveProvider(config, apiKey: 'mock-api-key');
-    await repo.setActiveProviderId('p1');
+    await controller.saveProvider(c1);
 
-    // Đọc provider controller để trigger build()
-    container.read(aiProviderControllerProvider);
+    var state = container.read(aiProviderControllerProvider);
+    expect(state.providers.length, 1);
+    expect(state.providers.first.id, 'p1');
+    expect(state.activeProviderId, 'p1');
 
-    // Đọc chat provider để trigger build() và _init()
-    final initial = container.read(aiChatControllerProvider);
-    expect(initial.activeProvider, isNull); // Ban đầu là null do chạy async
+    // Add second provider
+    final c2 = AiProviderConfig(
+      id: 'p2',
+      name: 'Provider 2',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'http://localhost/v2',
+      modelId: 'm2',
+      presetId: '9router',
+    );
+    await controller.saveProvider(c2);
 
-    // Đợi async store & history load xong
-    await Future.delayed(const Duration(milliseconds: 100));
+    state = container.read(aiProviderControllerProvider);
+    expect(state.providers.length, 2);
+    expect(state.activeProviderId, 'p1');
 
-    final state = container.read(aiChatControllerProvider);
-    expect(state.activeProvider?.id, 'p1');
-    expect(state.conversations, isEmpty);
-    expect(state.activeConversation, isNull);
+    // Switch active
+    await controller.selectActiveProvider('p2');
+    expect(container.read(aiProviderControllerProvider).activeProviderId, 'p2');
+
+    // Delete active provider p2
+    await controller.deleteProvider('p2');
+    state = container.read(aiProviderControllerProvider);
+    expect(state.providers.length, 1);
+    expect(state.activeProviderId, 'p1');
+
+    // Delete final provider
+    await controller.deleteProvider('p1');
+    state = container.read(aiProviderControllerProvider);
+    expect(state.providers, isEmpty);
+    expect(state.activeProviderId, isNull);
   });
 }
 

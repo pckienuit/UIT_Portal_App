@@ -23,6 +23,7 @@ void main() {
       kind: AiBackendKind.openAiCompatible,
       baseUrl: 'https://api.openai.com/v1',
       modelId: 'gpt-4o',
+      presetId: 'openai',
     );
 
     await repository.saveProvider(config, apiKey: 'sk-secret-key-value');
@@ -31,6 +32,7 @@ void main() {
     expect(list.length, 1);
     expect(list.first.id, 'prov-1');
     expect(list.first.name, 'OpenAI Test');
+    expect(list.first.presetId, 'openai');
 
     // Chứng minh key không nằm trong shared preferences raw string
     final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
@@ -39,6 +41,36 @@ void main() {
     // Chứng minh key được lưu trong secure storage
     final key = await repository.getApiKey('prov-1');
     expect(key, 'sk-secret-key-value');
+  });
+
+  test('saves multiple different configs successfully', () async {
+    final c1 = AiProviderConfig(
+      id: 'prov-1',
+      name: 'P1',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://api.openai.com/v1',
+      modelId: 'gpt-4o',
+      presetId: 'openai',
+    );
+    final c2 = AiProviderConfig(
+      id: 'prov-2',
+      name: 'P2',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'http://localhost:20128/v1',
+      modelId: 'gemini-3',
+      presetId: '9router',
+    );
+
+    await repository.saveProvider(c1, apiKey: 'key-1');
+    await repository.saveProvider(c2, apiKey: 'key-2');
+
+    final list = repository.listProviders();
+    expect(list.length, 2);
+    expect(list.any((e) => e.id == 'prov-1'), isTrue);
+    expect(list.any((e) => e.id == 'prov-2'), isTrue);
+
+    expect(await repository.getApiKey('prov-1'), 'key-1');
+    expect(await repository.getApiKey('prov-2'), 'key-2');
   });
 
   test('active provider preferences management', () async {

@@ -5,33 +5,34 @@ import '../data/ai_backend_factory.dart';
 import '../data/ai_provider_repository.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+import 'ai_provider_controller.dart';
 
 class AiChatState {
   AiChatState({
+    this.activeProvider,
     this.activeConversation,
     this.conversations = const [],
-    this.activeProvider,
     this.isGenerating = false,
     this.errorMessage,
   });
 
+  final AiProviderConfig? activeProvider;
   final AiConversation? activeConversation;
   final List<AiConversation> conversations;
-  final AiProviderConfig? activeProvider;
   final bool isGenerating;
   final String? errorMessage;
 
   AiChatState copyWith({
+    AiProviderConfig? Function()? activeProvider,
     AiConversation? Function()? activeConversation,
     List<AiConversation>? conversations,
-    AiProviderConfig? Function()? activeProvider,
     bool? isGenerating,
     String? Function()? errorMessage,
   }) {
     return AiChatState(
+      activeProvider: activeProvider != null ? activeProvider() : this.activeProvider,
       activeConversation: activeConversation != null ? activeConversation() : this.activeConversation,
       conversations: conversations ?? this.conversations,
-      activeProvider: activeProvider != null ? activeProvider() : this.activeProvider,
       isGenerating: isGenerating ?? this.isGenerating,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
     );
@@ -49,36 +50,56 @@ class AiChatController extends Notifier<AiChatState> {
       _activeBackend?.dispose();
     });
 
+    ref.listen<AiProviderState>(aiProviderControllerProvider, (prev, next) {
+      if (prev?.activeProviderId != next.activeProviderId) {
+        _handleActiveProviderChanged(next);
+      }
+    });
+
     _init();
     return AiChatState();
   }
 
   Future<void> _init() async {
-    final repo = ref.read(aiProviderRepositoryProvider);
-    final activeId = repo.getActiveProviderId();
-    final providers = repo.listProviders();
-    
-    AiProviderConfig? activeProvider;
-    if (activeId != null) {
-      activeProvider = providers.firstWhere((e) => e.id == activeId, orElse: () => providers.first);
-    } else if (providers.isNotEmpty) {
-      activeProvider = providers.first;
-      await repo.setActiveProviderId(activeProvider.id);
-    }
-
+    final providerState = ref.read(aiProviderControllerProvider);
     final store = await ref.read(chatHistoryStoreProvider.future);
     final history = await store.readHistory();
 
     if (!ref.mounted) return;
 
+    final activeConfig = _getActiveConfig(providerState);
     state = state.copyWith(
-      activeProvider: () => activeProvider,
+      activeProvider: () => activeConfig,
       conversations: history,
       activeConversation: () => history.isNotEmpty ? history.first : null,
     );
 
-    if (activeProvider != null) {
-      _loadBackend(activeProvider);
+    if (activeConfig != null) {
+      _loadBackend(activeConfig);
+    }
+  }
+
+  AiProviderConfig? _getActiveConfig(AiProviderState providerState) {
+    final activeId = providerState.activeProviderId;
+    if (activeId == null) return null;
+    try {
+      return providerState.providers.firstWhere((e) => e.id == activeId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _handleActiveProviderChanged(AiProviderState providerState) async {
+    final activeConfig = _getActiveConfig(providerState);
+    state = state.copyWith(
+      activeProvider: () => activeConfig,
+      errorMessage: () => null,
+    );
+    if (activeConfig != null) {
+      await _loadBackend(activeConfig);
+    } else {
+      await _activeBackend?.dispose();
+      _activeBackend = null;
     }
   }
 
@@ -92,10 +113,8 @@ class AiChatController extends Notifier<AiChatState> {
   }
 
   Future<void> switchProvider(AiProviderConfig config) async {
-    final repo = ref.read(aiProviderRepositoryProvider);
-    await repo.setActiveProviderId(config.id);
-    state = state.copyWith(activeProvider: () => config, errorMessage: () => null);
-    await _loadBackend(config);
+    await ref.read(aiProviderControllerProvider.notifier).saveProvider(config);
+    await ref.read(aiProviderControllerProvider.notifier).selectActiveProvider(config.id);
   }
 
   Future<void> startNewConversation() async {
