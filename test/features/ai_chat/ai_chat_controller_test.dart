@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,8 +8,25 @@ import 'package:uit_portal_app/src/features/ai_chat/application/ai_chat_controll
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
+import 'package:uit_portal_app/src/features/auth/auth_controller.dart';
+import 'package:uit_portal_app/src/features/auth/auth_providers.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
 import 'dart:io';
+
+class _FakeAuthController extends ChangeNotifier implements AuthController {
+  @override
+  AuthStatus get status => AuthStatus.signedIn;
+
+  @override
+  bool get isSignedIn => true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName == #status) return AuthStatus.signedIn;
+    if (invocation.memberName == #isSignedIn) return true;
+    return super.noSuchMethod(invocation);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +52,7 @@ void main() {
         sharedPreferencesProvider.overrideWithValue(prefs),
         chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
         secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        authControllerProvider.overrideWith((ref) => _FakeAuthController()),
       ],
     );
     addTearDown(container.dispose);
@@ -55,7 +74,7 @@ void main() {
 
     // Đọc chat provider để trigger build() và _init()
     final initial = container.read(aiChatControllerProvider);
-    expect(initial.activeProvider, isNull); // Ban đầu là null do chạy async
+    expect(initial.activeProvider?.id, 'p1');
 
     // Đợi async store & history load xong
     await Future.delayed(const Duration(milliseconds: 100));

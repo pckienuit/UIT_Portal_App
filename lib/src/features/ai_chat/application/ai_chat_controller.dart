@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../ai_chat_providers.dart';
+import '../../auth/auth_providers.dart';
+import '../../auth/auth_controller.dart';
 import '../data/ai_backend_factory.dart';
 import '../data/ai_provider_repository.dart';
 import '../domain/ai_chat_backend.dart';
@@ -56,27 +58,48 @@ class AiChatController extends Notifier<AiChatState> {
       }
     });
 
-    _init();
-    return AiChatState();
+    final authState = ref.watch(authControllerProvider);
+    if (authState.status == AuthStatus.signedOut) {
+      // Đăng xuất: Clear file history bất đồng bộ, trả về state rỗng ngay lập tức
+      Future.microtask(() async {
+        if (!ref.mounted) return;
+        _streamSub?.cancel();
+        _streamSub = null;
+        await _activeBackend?.dispose();
+        _activeBackend = null;
+        
+        if (!ref.mounted) return;
+        final store = await ref.read(chatHistoryStoreProvider.future);
+        if (!ref.mounted) return;
+        await store.clearAll();
+      });
+      return AiChatState();
+    }
+
+    return _init();
   }
 
-  Future<void> _init() async {
+  AiChatState _init() {
     final providerState = ref.read(aiProviderControllerProvider);
-    final store = await ref.read(chatHistoryStoreProvider.future);
-    final history = await store.readHistory();
-
-    if (!ref.mounted) return;
+    
+    ref.read(chatHistoryStoreProvider.future).then((store) async {
+      final history = await store.readHistory();
+      if (ref.mounted) {
+        state = state.copyWith(
+          conversations: history,
+          activeConversation: () => history.isNotEmpty ? history.first : state.activeConversation,
+        );
+      }
+    });
 
     final activeConfig = _getActiveConfig(providerState);
-    state = state.copyWith(
-      activeProvider: () => activeConfig,
-      conversations: history,
-      activeConversation: () => history.isNotEmpty ? history.first : null,
-    );
-
     if (activeConfig != null) {
       _loadBackend(activeConfig);
     }
+
+    return AiChatState(
+      activeProvider: activeConfig,
+    );
   }
 
   AiProviderConfig? _getActiveConfig(AiProviderState providerState) {

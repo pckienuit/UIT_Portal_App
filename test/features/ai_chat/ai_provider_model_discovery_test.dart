@@ -1,10 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
-import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
-import 'package:uit_portal_app/src/features/ai_chat/data/ai_backend_factory.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
-import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 
 void main() {
   test('Model discovery parsing is tolerant and handles fallback states', () {

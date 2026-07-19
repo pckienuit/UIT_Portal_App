@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
 import '../domain/ai_chat_backend.dart';
@@ -208,7 +207,6 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
   }
 
   Widget _buildCapabilitiesChips(BuildContext context, AiModelCapabilities caps) {
-    final colorScheme = Theme.of(context).colorScheme;
     final list = <Widget>[];
 
     if (caps.vision) {

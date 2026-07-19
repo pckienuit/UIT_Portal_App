@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
-import '../domain/ai_chat_models.dart';
-import '../domain/ai_provider_catalog.dart';
 import 'ai_model_picker_sheet.dart';
 
 class AiProviderSwitcherSheet extends ConsumerWidget {

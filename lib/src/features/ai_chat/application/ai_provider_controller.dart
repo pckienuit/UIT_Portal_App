@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/ai_provider_repository.dart';
 import '../domain/ai_chat_models.dart';
-import '../domain/ai_provider_catalog.dart';
 import '../domain/ai_chat_backend.dart';
 
 enum AiProviderHealth { unchecked, checking, connected, failed }
