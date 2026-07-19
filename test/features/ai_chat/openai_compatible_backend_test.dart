@@ -39,7 +39,7 @@ void main() {
       expect(result.errorMessage, 'API Key không hợp lệ hoặc không có quyền truy cập.');
     });
 
-    test('listModels parses OpenAI response format', () async {
+    test('listModels parses standard OpenAI response format', () async {
       final adapter = _StaticAdapter(
         statusCode: 200,
         responseBody: '{"object":"list","data":[{"id":"m1","name":"Model 1"},{"id":"m2"}]}',
@@ -56,7 +56,52 @@ void main() {
       expect(models.length, 2);
       expect(models[0].id, 'm1');
       expect(models[0].name, 'Model 1');
+      expect(models[0].owner, isNull);
+      expect(models[0].capabilities.vision, isFalse);
       expect(models[1].id, 'm2');
+    });
+
+    test('listModels parses 9Router capability metadata format', () async {
+      final adapter = _StaticAdapter(
+        statusCode: 200,
+        responseBody: '''
+        {
+          "object": "list",
+          "data": [
+            {
+              "id": "ag/gemini-3-flash",
+              "name": "Gemini 3 Flash (Agent)",
+              "owned_by": "ag",
+              "capabilities": {
+                "vision": true,
+                "reasoning": true,
+                "tools": false,
+                "contextWindow": 1048576,
+                "maxOutput": 65536
+              }
+            }
+          ]
+        }
+        ''',
+      );
+      final dio = Dio()..httpClientAdapter = adapter;
+      final backend = OpenAiCompatibleBackend(
+        baseUrl: 'http://localhost/v1',
+        modelId: 'gpt-4o',
+        apiKey: '',
+        dio: dio,
+      );
+
+      final models = await backend.listModels();
+      expect(models.length, 1);
+      expect(models[0].id, 'ag/gemini-3-flash');
+      expect(models[0].name, 'Gemini 3 Flash (Agent)');
+      expect(models[0].owner, 'ag');
+      expect(models[0].capabilities.vision, isTrue);
+      expect(models[0].capabilities.reasoning, isTrue);
+      expect(models[0].capabilities.tools, isFalse);
+      expect(models[0].capabilities.contextWindow, 1048576);
+      expect(models[0].capabilities.maxOutput, 65536);
     });
 
     test('streamChat streams completions and yields chunks', () async {

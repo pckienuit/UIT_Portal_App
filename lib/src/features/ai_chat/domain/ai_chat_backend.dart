@@ -58,10 +58,34 @@ class AiChatRequest {
   final dynamic config; // Để tránh dependency cycle hoặc dynamic reference
 }
 
+class AiModelCapabilities {
+  const AiModelCapabilities({
+    this.vision = false,
+    this.reasoning = false,
+    this.tools = false,
+    this.contextWindow,
+    this.maxOutput,
+  });
+
+  final bool vision;
+  final bool reasoning;
+  final bool tools;
+  final int? contextWindow;
+  final int? maxOutput;
+}
+
 class AiModelOption {
-  const AiModelOption({required this.id, required this.name});
+  const AiModelOption({
+    required this.id,
+    required this.name,
+    this.owner,
+    this.capabilities = const AiModelCapabilities(),
+  });
+
   final String id;
   final String name;
+  final String? owner;
+  final AiModelCapabilities capabilities;
 }
 
 class AiConnectionResult {

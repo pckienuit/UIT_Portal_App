@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/ai_provider_validator.dart';
 import 'sse_decoder.dart';
 
 class OpenAiCompatibleBackend implements AiChatBackend {
@@ -25,8 +26,9 @@ class OpenAiCompatibleBackend implements AiChatBackend {
   @override
   Future<AiConnectionResult> testConnection() async {
     try {
-      final response = await _dio.get(
-        '$baseUrl/models',
+      final endpoint = AiProviderValidator.endpoint(baseUrl, 'models');
+      final response = await _dio.getUri(
+        endpoint,
         options: Options(headers: {
           'Authorization': 'Bearer $apiKey',
           'Accept': 'application/json',
@@ -47,8 +49,9 @@ class OpenAiCompatibleBackend implements AiChatBackend {
   @override
   Future<List<AiModelOption>> listModels() async {
     try {
-      final response = await _dio.get(
-        '$baseUrl/models',
+      final endpoint = AiProviderValidator.endpoint(baseUrl, 'models');
+      final response = await _dio.getUri(
+        endpoint,
         options: Options(headers: {
           'Authorization': 'Bearer $apiKey',
           'Accept': 'application/json',
@@ -59,10 +62,30 @@ class OpenAiCompatibleBackend implements AiChatBackend {
       if (data is Map<String, dynamic> && data['data'] is List) {
         final list = data['data'] as List;
         return list.map((e) {
-          final map = e as Map<String, dynamic>;
+          if (e is! Map<String, dynamic>) return const AiModelOption(id: '', name: '');
+          
+          final id = e['id']?.toString() ?? '';
+          final name = e['name']?.toString() ?? id;
+          final owner = e['owned_by']?.toString();
+          
+          // Parse capabilities nếu có (đặc thù của 9Router metadata)
+          AiModelCapabilities caps = const AiModelCapabilities();
+          final capData = e['capabilities'];
+          if (capData is Map<String, dynamic>) {
+            caps = AiModelCapabilities(
+              vision: capData['vision'] == true,
+              reasoning: capData['reasoning'] == true,
+              tools: capData['tools'] == true,
+              contextWindow: capData['contextWindow'] as int?,
+              maxOutput: capData['maxOutput'] as int?,
+            );
+          }
+
           return AiModelOption(
-            id: map['id']?.toString() ?? '',
-            name: map['name']?.toString() ?? map['id']?.toString() ?? '',
+            id: id,
+            name: name,
+            owner: owner,
+            capabilities: caps,
           );
         }).where((e) => e.id.isNotEmpty).toList();
       }
@@ -81,11 +104,10 @@ class OpenAiCompatibleBackend implements AiChatBackend {
         ? '${request.context!.buildSystemInstruction()}\n\nSystem prompt: ${request.config.systemPrompt ?? "You are a helpful assistant"}'
         : (request.config.systemPrompt ?? "You are a helpful assistant");
 
-    // request.messages có kiểu List<AiChatMessage>
     final messagesPayload = [
       {'role': 'system', 'content': systemPrompt},
       ...request.messages.map((m) => {
-            'role': m.role.name,
+            'role': m.role.toString().split('.').last,
             'content': m.content,
           }),
     ];
@@ -98,8 +120,9 @@ class OpenAiCompatibleBackend implements AiChatBackend {
 
     Future<void> run() async {
       try {
-        final response = await _dio.post<ResponseBody>(
-          '$baseUrl/chat/completions',
+        final endpoint = AiProviderValidator.endpoint(baseUrl, 'chat/completions');
+        final response = await _dio.postUri<ResponseBody>(
+          endpoint,
           data: body,
           cancelToken: _cancelToken,
           options: Options(
