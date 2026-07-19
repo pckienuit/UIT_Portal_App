@@ -94,34 +94,25 @@ class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
   final Map<String, String> _storage = {};
 
   @override
-  Future<void> write({
-    required String key,
-    required String? value,
-    Map<String, String>? iOptions,
-    Map<String, String>? aOptions,
-  }) async {
-    if (value == null) {
+  dynamic noSuchMethod(Invocation invocation) {
+    final name = invocation.memberName.toString();
+    if (name.contains('write')) {
+      final key = invocation.namedArguments[#key] as String;
+      final value = invocation.namedArguments[#value] as String?;
+      if (value == null) {
+        _storage.remove(key);
+      } else {
+        _storage[key] = value;
+      }
+      return Future<void>.value();
+    } else if (name.contains('read')) {
+      final key = invocation.namedArguments[#key] as String;
+      return Future<String?>.value(_storage[key]);
+    } else if (name.contains('delete')) {
+      final key = invocation.namedArguments[#key] as String;
       _storage.remove(key);
-    } else {
-      _storage[key] = value;
+      return Future<void>.value();
     }
-  }
-
-  @override
-  Future<String?> read({
-    required String key,
-    Map<String, String>? iOptions,
-    Map<String, String>? aOptions,
-  }) async {
-    return _storage[key];
-  }
-
-  @override
-  Future<void> delete({
-    required String key,
-    Map<String, String>? iOptions,
-    Map<String, String>? aOptions,
-  }) async {
-    _storage.remove(key);
+    return super.noSuchMethod(invocation);
   }
 }
