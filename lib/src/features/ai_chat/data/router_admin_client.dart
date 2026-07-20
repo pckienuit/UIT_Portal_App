@@ -176,6 +176,25 @@ class RouterAdminClient {
     }
     return null;
   }
+
+  // Reset toàn bộ dữ liệu 9Router (providers, usage, quota)
+  Future<bool> resetData() async {
+    try {
+      // 1. Clear API keys trong secure storage
+      final providers = await listProviders();
+      for (final p in providers) {
+        await secureStorage.delete(key: '$_kSecretPrefix${p.id}');
+      }
+      
+      // 2. Clear local DB file bằng cách gửi request reset sang Node core
+      // Nhìn lại main.js, ta chưa định nghĩa route /internal/reset. Sẽ patch Node core sau.
+      final res = await _dio.post('/internal/reset');
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Failed to reset core data: $e');
+      return false;
+    }
+  }
 }
 
 final routerAdminClientProvider = Provider<RouterAdminClient>((ref) {
