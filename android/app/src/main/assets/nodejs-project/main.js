@@ -347,6 +347,16 @@ try {
       return sendJson(response, 200, { success: true, snapshot });
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/reset') {
+      const dbReset = {
+        providers: [],
+        usage: [],
+        quota: {}
+      };
+      saveDb(dbReset);
+      return sendJson(response, 200, { success: true });
+    }
+
     sendJson(response, 404, { error: 'not_found' });
   });
 

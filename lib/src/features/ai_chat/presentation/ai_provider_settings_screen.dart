@@ -8,6 +8,7 @@ import '../domain/ai_chat_models.dart';
 import '../domain/ai_provider_catalog.dart';
 import 'ai_model_download_section.dart';
 import 'ai_provider_editor_sheet.dart';
+import '../data/router_admin_client.dart';
 import 'widgets/ai_provider_card.dart';
 import 'widgets/ai_provider_tier_section.dart';
 import 'widgets/embedded_router_dashboard.dart';
@@ -80,8 +81,62 @@ class AiProviderSettingsScreen extends ConsumerWidget {
                     _buildPresetItem(context, preset, providerState, providerNotifier),
                 ],
               ),
+
+            const SizedBox(height: PortalSpacing.lg),
+            const Divider(),
+            const SizedBox(height: PortalSpacing.md),
+            
+            // 4. Action Reset Data
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: PortalSpacing.sm),
+              ),
+              icon: const Icon(Icons.delete_forever_outlined),
+              label: const Text('Xóa toàn bộ dữ liệu 9Router'),
+              onPressed: () => _confirmResetAll(context, ref),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmResetAll(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa toàn bộ dữ liệu 9Router?'),
+        content: const Text(
+          'Hành động này sẽ xóa vĩnh viễn toàn bộ cấu hình, API keys, '
+          'lịch sử sử dụng và hạn ngạch (quota) của 9Router trên thiết bị.\n\n'
+          'Ứng dụng sẽ tự động tải lại trạng thái mặc định.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final client = ref.read(routerAdminClientProvider);
+              final ok = await client.resetData();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok 
+                      ? 'Đã xóa sạch dữ liệu 9Router thành công!' 
+                      : 'Lỗi khi xóa dữ liệu, vui lòng thử lại.'
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text('Xóa sạch', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

@@ -48,3 +48,8 @@ app.*.map.json
 
 .hermes/
 /.cache/
+
+# 9Router Mobile Build & Binary Artifacts
+/android/app/libnode/
+/android/app/build/
+/router_mobile_core/
