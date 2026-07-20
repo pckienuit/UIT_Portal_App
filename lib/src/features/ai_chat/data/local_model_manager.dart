@@ -112,8 +112,7 @@ class LocalModelManager {
           cancelOnError: true,
         );
 
-        await completer.future;
-        await sub?.cancel();
+        sub.cancel();
 
         controller.add(const LocalModelProgress(status: LocalModelStatus.verifying));
 
@@ -150,6 +149,7 @@ class LocalModelManager {
 
   void cancelDownload() {
     _cancelToken?.cancel();
+    _cancelToken = null; // Reset cancel token
   }
 
   Future<void> deleteModel(LocalModelInfo model) async {

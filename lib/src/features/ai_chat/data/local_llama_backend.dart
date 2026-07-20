@@ -59,7 +59,7 @@ class LocalLlamaBackend implements AiChatBackend {
         final stream = _engine!.create(
           chatMessages,
           params: const GenerationParams(
-            maxTokens: 512,
+            maxTokens: 4096, // Increase from 512 to prevent cutoffs
             temp: 0.7,
           ),
         );
@@ -87,8 +87,10 @@ class LocalLlamaBackend implements AiChatBackend {
   @override
   Future<void> cancel() async {
     // llamadart dispose sẽ tự động đóng các handle active streams
-    await _engine?.unloadModel();
-    await _engine?.dispose();
+    try {
+      await _engine?.unloadModel();
+      await _engine?.dispose();
+    } catch (_) {}
     _engine = null;
   }
 

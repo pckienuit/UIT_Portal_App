@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../application/ai_chat_controller.dart';
+import '../application/ai_provider_controller.dart';
 import '../data/local_model_catalog.dart';
 import '../data/local_model_manager.dart';
 import '../domain/ai_chat_models.dart';
@@ -37,6 +38,25 @@ class LocalModelController extends Notifier<LocalModelProgress> {
     final exists = await _manager!.checkModelExists(_modelInfo!);
     if (exists) {
       state = const LocalModelProgress(status: LocalModelStatus.ready, progressPercent: 100.0);
+      
+      // Auto register/select local provider config if downloaded but not configured
+      final providerController = ref.read(aiProviderControllerProvider.notifier);
+      final hasLocalConfig = providerController.state.providers.any((p) => p.id == _modelInfo!.id);
+      if (!hasLocalConfig) {
+        final config = AiProviderConfig(
+          id: _modelInfo!.id,
+          name: _modelInfo!.name,
+          kind: AiBackendKind.localLlama,
+          baseUrl: '',
+          modelId: _modelInfo!.fileName,
+        );
+        await providerController.saveProvider(config);
+        // Switch chat controller provider to it as well if no active provider is set
+        final chatController = ref.read(aiChatControllerProvider.notifier);
+        if (chatController.state.activeProvider == null) {
+          await chatController.switchProvider(config);
+        }
+      }
     } else {
       state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
     }

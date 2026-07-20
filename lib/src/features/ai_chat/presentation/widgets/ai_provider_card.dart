@@ -79,11 +79,15 @@ class AiProviderCard extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              hasConfig ? config!.name : preset.name,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
+                            Expanded(
+                              child: Text(
+                                hasConfig ? config!.name : preset.name,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isActive) ...[
