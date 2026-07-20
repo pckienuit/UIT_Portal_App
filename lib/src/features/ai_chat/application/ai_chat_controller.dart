@@ -131,7 +131,7 @@ class AiChatController extends Notifier<AiChatState> {
     _activeBackend = null;
     
     final secureStorage = ref.read(secureStorageProvider);
-    final factory = AiBackendFactory(secureStorage: secureStorage);
+    final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
     _activeBackend = await factory.buildBackend(config);
   }
 

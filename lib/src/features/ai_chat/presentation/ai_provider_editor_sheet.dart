@@ -86,7 +86,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     try {
       await repo.saveProvider(config, apiKey: key);
       
-      final factory = AiBackendFactory(secureStorage: secureStorage);
+      final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
       final backend = await factory.buildBackend(config);
       
       if (backend != null) {
@@ -151,7 +151,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     
     try {
       final secureStorage = ref.read(secureStorageProvider);
-      final factory = AiBackendFactory(secureStorage: secureStorage);
+      final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
       final backend = await factory.buildBackend(config);
       
       if (backend != null) {

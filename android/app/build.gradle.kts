@@ -4,6 +4,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    testImplementation(kotlin("test"))
+}
+
 android {
     namespace = "com.personal.uit_portal_app"
     compileSdk = flutter.compileSdkVersion
@@ -26,6 +30,24 @@ android {
         manifestPlaceholders.putAll(
             mapOf("appAuthRedirectScheme" to "com.personal.uitportal")
         )
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
+        ndk {
+            abiFilters += setOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    sourceSets {
+        getByName("main").jniLibs.srcDirs("libnode/bin")
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     buildTypes {

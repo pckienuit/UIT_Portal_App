@@ -10,6 +10,7 @@ import 'ai_model_download_section.dart';
 import 'ai_provider_editor_sheet.dart';
 import 'widgets/ai_provider_card.dart';
 import 'widgets/ai_provider_tier_section.dart';
+import 'widgets/embedded_router_dashboard.dart';
 
 class AiProviderSettingsScreen extends ConsumerWidget {
   const AiProviderSettingsScreen({super.key});
@@ -39,6 +40,10 @@ class AiProviderSettingsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 0. Dashboard 9Router
+            const EmbeddedRouterDashboard(),
+            const SizedBox(height: PortalSpacing.md),
+
             // 1. Local Offline Model
             Text(
               'Mô hình chạy trên máy (Local offline)',

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/ai_provider_repository.dart';
+import '../data/router_admin_client.dart';
 import '../domain/ai_chat_models.dart';
 import '../domain/ai_chat_backend.dart';
 
@@ -65,12 +66,21 @@ class AiProviderController extends Notifier<AiProviderState> {
   Future<void> saveProvider(AiProviderConfig config, {String? apiKey}) async {
     await _repository.saveProvider(config, apiKey: apiKey);
     
+    // Đồng bộ sang embedded 9Router core
+    try {
+      final client = ref.read(routerAdminClientProvider);
+      await client.saveProvider(config, apiKey: apiKey);
+    } catch (_) {}
+    
     final providers = _repository.listProviders();
     var activeId = state.activeProviderId;
     
     if (activeId == null && providers.isNotEmpty) {
       activeId = config.id;
       await _repository.setActiveProviderId(activeId);
+      try {
+        await ref.read(routerAdminClientProvider).setActiveProvider(activeId);
+      } catch (_) {}
     }
 
     state = state.copyWith(
@@ -82,12 +92,21 @@ class AiProviderController extends Notifier<AiProviderState> {
   Future<void> deleteProvider(String id) async {
     await _repository.deleteProvider(id);
     
+    // Đồng bộ xóa sang embedded 9Router core
+    try {
+      final client = ref.read(routerAdminClientProvider);
+      await client.deleteProvider(id);
+    } catch (_) {}
+    
     final providers = _repository.listProviders();
     String? activeId = _repository.getActiveProviderId();
     
     if (activeId == null && providers.isNotEmpty) {
       activeId = providers.first.id;
       await _repository.setActiveProviderId(activeId);
+      try {
+        await ref.read(routerAdminClientProvider).setActiveProvider(activeId);
+      } catch (_) {}
     }
 
     final newHealth = Map<String, AiProviderHealth>.from(state.health)..remove(id);
@@ -105,6 +124,14 @@ class AiProviderController extends Notifier<AiProviderState> {
 
   Future<void> selectActiveProvider(String? id) async {
     await _repository.setActiveProviderId(id);
+    
+    if (id != null) {
+      try {
+        final client = ref.read(routerAdminClientProvider);
+        await client.setActiveProvider(id);
+      } catch (_) {}
+    }
+    
     state = state.copyWith(activeProviderId: () => id);
   }
 

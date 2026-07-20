@@ -11,10 +11,8 @@ val newBuildDir: Directory =
         .get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
-subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
+// Keep plugin build directories under their own source roots. AGP 9 fails
+// configuring unit-test tasks when a Pub cache plugin on C: writes into D:.
 subprojects {
     project.evaluationDependsOn(":app")
 }

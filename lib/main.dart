@@ -6,6 +6,9 @@ import 'src/app.dart';
 import 'src/features/auth/auth_controller.dart';
 import 'src/features/auth/auth_providers.dart';
 import 'src/features/home/providers/widget_preferences_provider.dart';
+import 'src/features/ai_chat/application/router_runtime_service.dart';
+import 'src/features/ai_chat/data/ai_provider_repository.dart';
+import 'src/features/ai_chat/data/router_admin_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,13 +17,44 @@ void main() async {
   
   final authController = AuthController();
   await authController.restoreSession();
+
+  // Khởi chạy 9Router nội bộ qua MethodChannel JNI
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      authControllerProvider.overrideWith((ref) => authController),
+    ],
+  );
+
+  container.read(routerRuntimeServiceProvider.notifier).ensureStarted().then((status) async {
+    debugPrint('9Router runtime initialization status: ${status.state}. BaseUrl: ${status.baseUrl}');
+    if (status.state == RouterState.ready) {
+      // Đồng bộ các connection hiện có vào core
+      try {
+        final repo = container.read(aiProviderRepositoryProvider);
+        final client = container.read(routerAdminClientProvider);
+        final providers = repo.listProviders();
+        for (final p in providers) {
+          final apiKey = await repo.getApiKey(p.id);
+          await client.saveProvider(p, apiKey: apiKey);
+        }
+        
+        final activeId = repo.getActiveProviderId();
+        if (activeId != null) {
+          await client.setActiveProvider(activeId);
+        }
+        debugPrint('Synchronized ${providers.length} provider connections with Node core.');
+      } catch (e) {
+        debugPrint('Failed to sync connections with Node core: $e');
+      }
+    }
+  }).catchError((err) {
+    debugPrint('Failed to initialize 9Router: $err');
+  });
   
   runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-        authControllerProvider.overrideWith((ref) => authController),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const UitPortalApp(),
     ),
   );
