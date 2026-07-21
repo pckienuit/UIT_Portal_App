@@ -5,6 +5,8 @@ const UPSTREAM_ROOT = 'C:/Users/Chi Kien/AppData/Local/Temp/9router-reference-20
 const REGISTRY_DIR = path.join(UPSTREAM_ROOT, 'open-sse/providers/registry');
 const SUPPORT_FILE = './tools/9router_mobile/provider-support.json';
 const OUTPUT_FILE = './android/app/src/main/assets/nodejs-project/provider_catalog.json';
+const CHECK_ONLY = process.argv.includes('--check');
+const SUPPORTED_CATEGORIES = new Set(['oauth', 'free', 'freeTier', 'apikey']);
 
 function run() {
   if (!fs.existsSync(REGISTRY_DIR)) {
@@ -32,6 +34,7 @@ function run() {
 
     const id = idMatch[1];
     const category = catMatch ? catMatch[1] : 'custom';
+    if (!SUPPORTED_CATEGORIES.has(category)) continue;
     
     // Check if provider has LLM capability by parsing serviceKinds or display info
     const serviceKindsMatch = content.match(/\bserviceKinds\s*:\s*\[([^\]]+)\]/);
@@ -114,8 +117,21 @@ function run() {
     return a.id.localeCompare(b.id);
   });
 
+  const serialized = `${JSON.stringify({ providers: catalog }, null, 2)}\n`;
+  if (CHECK_ONLY) {
+    const current = fs.existsSync(OUTPUT_FILE)
+      ? fs.readFileSync(OUTPUT_FILE, 'utf8')
+      : '';
+    if (current !== serialized) {
+      console.error(`Generated catalog is stale: ${OUTPUT_FILE}`);
+      process.exit(1);
+    }
+    console.log(`Catalog is current with ${catalog.length} providers`);
+    return;
+  }
+
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify({ providers: catalog }, null, 2), 'utf8');
+  fs.writeFileSync(OUTPUT_FILE, serialized, 'utf8');
   console.log(`Generated manifest catalog with ${catalog.length} items at ${OUTPUT_FILE}`);
 }
 
