@@ -1,0 +1,70 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'router_models.dart';
+
+class RouterCatalog {
+  RouterCatalog._();
+
+  static List<RouterProviderDefinition> _providers = [];
+
+  static List<RouterProviderDefinition> get providers => _providers;
+
+  static Future<void> load(String jsonString) async {
+    try {
+      final data = jsonDecode(jsonString) as Map<String, dynamic>;
+      final list = data['providers'] as List<dynamic>;
+      _providers = list.map((e) => RouterProviderDefinition.fromJson(e as Map<String, dynamic>)).toList();
+      
+      // Inject local model
+      _providers.insert(0, const RouterProviderDefinition(
+        id: 'local_qwen',
+        name: 'Qwen 3.5 0.8B (Local)',
+        category: RouterProviderCategory.local,
+        authModes: [RouterAuthMode.none],
+        note: 'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
+        models: [
+          RouterModelDefinition(id: 'qwen-0.8b-local', name: 'Qwen 3.5 0.8B (Local)')
+        ]
+      ));
+
+      // Inject custom OpenAI
+      _providers.insert(1, const RouterProviderDefinition(
+        id: 'custom',
+        name: 'Tùy chỉnh (OpenAI Compatible)',
+        category: RouterProviderCategory.custom,
+        authModes: [RouterAuthMode.custom],
+        note: 'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
+        models: []
+      ));
+    } catch (e) {
+      // Fallback in case of failure
+      _providers = [
+        const RouterProviderDefinition(
+          id: 'local_qwen',
+          name: 'Qwen 3.5 0.8B (Local)',
+          category: RouterProviderCategory.local,
+          authModes: [RouterAuthMode.none],
+          note: 'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
+          models: [
+            RouterModelDefinition(id: 'qwen-0.8b-local', name: 'Qwen 3.5 0.8B (Local)')
+          ]
+        ),
+        const RouterProviderDefinition(
+          id: 'custom',
+          name: 'Tùy chỉnh (OpenAI Compatible)',
+          category: RouterProviderCategory.custom,
+          authModes: [RouterAuthMode.custom],
+          note: 'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
+          models: []
+        )
+      ];
+    }
+  }
+
+  static RouterProviderDefinition? byId(String id) {
+    for (final p in _providers) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+}

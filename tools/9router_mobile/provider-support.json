@@ -1,0 +1,55 @@
+{
+  "oauth": {
+    "antigravity": { "mobileSupported": true },
+    "claude": { "mobileSupported": true },
+    "cline": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
+    "clinepass": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
+    "codebuddy-cn": { "mobileSupported": false, "unsupportedReason": "Desktop-only utility authentication" },
+    "codex": { "mobileSupported": true },
+    "cursor": { "mobileSupported": false, "unsupportedReason": "Requires local Cursor SQLite DB path parsing" },
+    "github": { "mobileSupported": true },
+    "gitlab": { "mobileSupported": false, "unsupportedReason": "Requires desktop token flow" },
+    "grok-cli": { "mobileSupported": false, "unsupportedReason": "Requires local CLI configuration path access" },
+    "iflow": { "mobileSupported": false, "unsupportedReason": "Requires desktop system configuration" },
+    "kilocode": { "mobileSupported": false, "unsupportedReason": "Requires local CLI helper launch" },
+    "kimchi": { "mobileSupported": false, "unsupportedReason": "Requires browser automation helper" },
+    "kimi": { "mobileSupported": false, "unsupportedReason": "Requires desktop cookie extractor" },
+    "qwen": { "mobileSupported": false, "unsupportedReason": "Requires desktop IDE connection" },
+    "xai": { "mobileSupported": true }
+  },
+  "free": {
+    "gemini-cli": { "mobileSupported": false, "unsupportedReason": "Requires desktop CLI configuration" },
+    "kiro": { "mobileSupported": false, "unsupportedReason": "Requires local desktop daemon" },
+    "mimo-free": { "mobileSupported": false, "unsupportedReason": "Requires desktop environment variables" },
+    "opencode": { "mobileSupported": true },
+    "qoder": { "mobileSupported": false, "unsupportedReason": "Requires Google SSO token copy-paste flow" }
+  },
+  "freeTier": {
+    "byteplus-modelark": { "mobileSupported": true },
+    "cloudflare-ai": { "mobileSupported": true },
+    "coqui-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "edge-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "gemini": { "mobileSupported": true },
+    "google-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "local-device": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "nvidia": { "mobileSupported": true },
+    "ollama-cloud": { "mobileSupported": true },
+    "openrouter": { "mobileSupported": true },
+    "searxng": { "mobileSupported": false, "unsupportedReason": "Search-only provider excluded from Chat" },
+    "tortoise-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "vertex": { "mobileSupported": true }
+  },
+  "apikey": {
+    "deepseek": { "mobileSupported": true },
+    "groq": { "mobileSupported": true },
+    "mistral": { "mobileSupported": true },
+    "openai": { "mobileSupported": true },
+    "assemblyai": { "mobileSupported": false, "unsupportedReason": "Audio-only provider excluded from Chat" },
+    "aws-polly": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "cartesia": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "deepgram": { "mobileSupported": false, "unsupportedReason": "Audio-only provider excluded from Chat" },
+    "elevenlabs": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "inworld": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
+    "playht": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" }
+  }
+}

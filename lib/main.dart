@@ -10,6 +10,10 @@ import 'src/features/ai_chat/application/router_runtime_service.dart';
 import 'src/features/ai_chat/data/ai_provider_repository.dart';
 import 'src/features/ai_chat/data/router_admin_client.dart';
 
+import 'package:flutter/services.dart';
+import 'src/features/ai_chat/domain/router_catalog.dart';
+import 'src/features/ai_chat/domain/router_models.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -17,6 +21,15 @@ void main() async {
   
   final authController = AuthController();
   await authController.restoreSession();
+
+  // Load 9Router catalog from assets
+  try {
+    final catalogStr = await rootBundle.loadString('android/app/src/main/assets/nodejs-project/provider_catalog.json');
+    await RouterCatalog.load(catalogStr);
+  } catch (e) {
+    debugPrint('Could not load provider catalog: $e');
+    await RouterCatalog.load('{"providers":[]}');
+  }
 
   // Khởi chạy 9Router nội bộ qua MethodChannel JNI
   final container = ProviderContainer(
