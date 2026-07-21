@@ -67,14 +67,43 @@ function createStateStore({ dataDir, now = () => new Date() }) {
     };
   }
 
+  function migrateLegacy(input) {
+    const providers = Array.isArray(input.providers) ? input.providers : [];
+    const active = providers.find((provider) => provider.active);
+    return {
+      connections: providers.map((provider) => ({
+        id: provider.id,
+        providerId: provider.presetId || provider.id,
+        displayName: provider.name,
+        authMode: 'apiKey',
+        modelId: provider.modelId,
+        enabled: provider.enabled !== false,
+        createdAt: provider.createdAt,
+        updatedAt: provider.updatedAt,
+      })),
+      activeRoute: active
+        ? {
+            connectionId: active.id,
+            modelId: active.modelId,
+            local: false,
+          }
+        : null,
+      usage: input.usage,
+      quota: input.quota,
+    };
+  }
+
   function load() {
     if (!fs.existsSync(statePath)) return freshState(now);
     try {
       const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-      if (parsed.schemaVersion !== SCHEMA_VERSION) {
-        throw new Error('unsupported schema');
+      if (parsed.schemaVersion === SCHEMA_VERSION) {
+        return normalize(parsed);
       }
-      return normalize(parsed);
+      if (Array.isArray(parsed.providers)) {
+        return save(migrateLegacy(parsed));
+      }
+      throw new Error('unsupported schema');
     } catch (_) {
       const stamp = now().toISOString().replace(/[:.]/g, '-');
       fs.renameSync(statePath, `${statePath}.corrupt-${stamp}`);

@@ -84,3 +84,44 @@ test('caps retained usage details at 2000 newest records', () => {
   assert.equal(state.usage[0].id, 'usage-5');
   assert.equal(state.usage.at(-1).id, 'usage-2004');
 });
+
+test('migrates legacy providers to connections without carrying api keys', () => {
+  const dataDir = tempDir();
+  const statePath = path.join(dataDir, '9router_state.json');
+  fs.writeFileSync(
+    statePath,
+    JSON.stringify({
+      providers: [{
+        id: 'legacy-openai',
+        name: 'OpenAI',
+        presetId: 'openai',
+        kind: 'openAiCompatible',
+        baseUrl: 'https://api.openai.com/v1',
+        modelId: 'gpt-4o-mini',
+        active: true,
+        apiKey: 'must-not-survive',
+      }],
+      usage: [],
+      quota: {},
+    }),
+    'utf8',
+  );
+  const store = createStateStore({
+    dataDir,
+    now: () => new Date('2026-07-21T02:00:00.000Z'),
+  });
+
+  const state = store.load();
+
+  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.connections[0].id, 'legacy-openai');
+  assert.equal(state.connections[0].providerId, 'openai');
+  assert.equal(state.connections[0].displayName, 'OpenAI');
+  assert.equal(state.connections[0].authMode, 'apiKey');
+  assert.deepEqual(state.activeRoute, {
+    connectionId: 'legacy-openai',
+    modelId: 'gpt-4o-mini',
+    local: false,
+  });
+  assert.doesNotMatch(fs.readFileSync(statePath, 'utf8'), /must-not-survive/);
+});
