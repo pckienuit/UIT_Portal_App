@@ -12,8 +12,15 @@ class RouterCatalog {
     try {
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
       final list = data['providers'] as List<dynamic>;
-      _providers = list.map((e) => RouterProviderDefinition.fromJson(e as Map<String, dynamic>)).toList();
-      
+      const supportedCategories = {'oauth', 'free', 'freeTier', 'apikey'};
+      _providers = list
+          .cast<Map<String, dynamic>>()
+          .where(
+            (item) => supportedCategories.contains(item['category'] as String?),
+          )
+          .map(RouterProviderDefinition.fromJson)
+          .toList();
+
       // Inject local model
       _providers.insert(0, const RouterProviderDefinition(
         id: 'local_qwen',
