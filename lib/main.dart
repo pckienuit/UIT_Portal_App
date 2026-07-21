@@ -12,7 +12,6 @@ import 'src/features/ai_chat/data/router_admin_client.dart';
 
 import 'package:flutter/services.dart';
 import 'src/features/ai_chat/domain/router_catalog.dart';
-import 'src/features/ai_chat/domain/router_models.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
