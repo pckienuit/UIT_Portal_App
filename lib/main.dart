@@ -15,15 +15,17 @@ import 'src/features/ai_chat/domain/router_catalog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   final prefs = await SharedPreferences.getInstance();
-  
+
   final authController = AuthController();
   await authController.restoreSession();
 
   // Load 9Router catalog from assets
   try {
-    final catalogStr = await rootBundle.loadString('android/app/src/main/assets/nodejs-project/provider_catalog.json');
+    final catalogStr = await rootBundle.loadString(
+      'android/app/src/main/assets/nodejs-project/provider_catalog.json',
+    );
     await RouterCatalog.load(catalogStr);
   } catch (e) {
     debugPrint('Could not load provider catalog: $e');
@@ -38,32 +40,44 @@ void main() async {
     ],
   );
 
-  container.read(routerRuntimeServiceProvider.notifier).ensureStarted().then((status) async {
-    debugPrint('9Router runtime initialization status: ${status.state}. BaseUrl: ${status.baseUrl}');
-    if (status.state == RouterState.ready) {
-      // Đồng bộ các connection hiện có vào core
-      try {
-        final repo = container.read(aiProviderRepositoryProvider);
-        final client = container.read(routerAdminClientProvider);
-        final providers = repo.listProviders();
-        for (final p in providers) {
-          final apiKey = await repo.getApiKey(p.id);
-          await client.saveProvider(p, apiKey: apiKey);
+  container
+      .read(routerRuntimeServiceProvider.notifier)
+      .ensureStarted()
+      .then((status) async {
+        debugPrint(
+          '9Router runtime initialization status: ${status.state}. BaseUrl: ${status.baseUrl}',
+        );
+        if (status.state == RouterState.ready) {
+          // Đồng bộ các connection hiện có vào core
+          try {
+            final repo = container.read(aiProviderRepositoryProvider);
+            final client = container.read(routerAdminClientProvider);
+            final providers = repo.listProviders();
+            final coreProviders = providers.where(
+              RouterAdminClient.supportsProvider,
+            );
+            for (final p in coreProviders) {
+              final apiKey = await repo.getApiKey(p.id);
+              await client.saveProvider(p, apiKey: apiKey);
+            }
+
+            final activeId = repo.getActiveProviderId();
+            if (activeId != null &&
+                coreProviders.any((p) => p.id == activeId)) {
+              await client.setActiveProvider(activeId);
+            }
+            debugPrint(
+              'Synchronized ${coreProviders.length} provider connections with Node core.',
+            );
+          } catch (e) {
+            debugPrint('Failed to sync connections with Node core: $e');
+          }
         }
-        
-        final activeId = repo.getActiveProviderId();
-        if (activeId != null) {
-          await client.setActiveProvider(activeId);
-        }
-        debugPrint('Synchronized ${providers.length} provider connections with Node core.');
-      } catch (e) {
-        debugPrint('Failed to sync connections with Node core: $e');
-      }
-    }
-  }).catchError((err) {
-    debugPrint('Failed to initialize 9Router: $err');
-  });
-  
+      })
+      .catchError((err) {
+        debugPrint('Failed to initialize 9Router: $err');
+      });
+
   runApp(
     UncontrolledProviderScope(
       container: container,

@@ -7,10 +7,7 @@ import '../domain/ai_chat_models.dart';
 import 'ai_provider_repository.dart';
 
 class RouterAdminClient {
-  RouterAdminClient({
-    required this.ref,
-    required this.secureStorage,
-  }) {
+  RouterAdminClient({required this.ref, required this.secureStorage}) {
     _dio = Dio();
     // Tự động gán bearer token khi gọi loopback
     _dio.interceptors.add(
@@ -33,13 +30,19 @@ class RouterAdminClient {
 
   static const String _kSecretPrefix = 'ai_provider_key_';
 
+  static bool supportsProvider(AiProviderConfig config) =>
+      config.kind == AiBackendKind.openAiCompatible &&
+      config.baseUrl.isNotEmpty;
+
   // Lấy danh sách providers từ internal Node API
   Future<List<AiProviderConfig>> listProviders() async {
     try {
       final res = await _dio.get('/internal/providers');
       if (res.statusCode == 200) {
         final list = res.data as List<dynamic>;
-        return list.map((e) => AiProviderConfig.fromJson(e as Map<String, dynamic>)).toList();
+        return list
+            .map((e) => AiProviderConfig.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     } catch (e) {
       debugPrint('Failed to list providers from core: $e');
@@ -50,18 +53,23 @@ class RouterAdminClient {
   // Thêm / Cập nhật provider connection
   Future<bool> saveProvider(AiProviderConfig config, {String? apiKey}) async {
     // Chỉ đồng bộ các connection OpenAI compatible có baseUrl mạng hợp lệ
-    if (config.kind != AiBackendKind.openAiCompatible || config.baseUrl.isEmpty) {
-      return true; 
+    if (!supportsProvider(config)) {
+      return true;
     }
 
     try {
       // 1. Lưu API Key vào Secure Storage an toàn
       if (apiKey != null) {
-        await secureStorage.write(key: '$_kSecretPrefix${config.id}', value: apiKey);
+        await secureStorage.write(
+          key: '$_kSecretPrefix${config.id}',
+          value: apiKey,
+        );
       }
 
       // 2. Lấy API Key ra (nếu có) để sync qua Core
-      final key = apiKey ?? await secureStorage.read(key: '$_kSecretPrefix${config.id}');
+      final key =
+          apiKey ??
+          await secureStorage.read(key: '$_kSecretPrefix${config.id}');
 
       final providers = await listProviders();
       final exists = providers.any((p) => p.id == config.id);
@@ -72,7 +80,10 @@ class RouterAdminClient {
       }
 
       if (exists) {
-        final res = await _dio.patch('/internal/providers/${config.id}', data: payload);
+        final res = await _dio.patch(
+          '/internal/providers/${config.id}',
+          data: payload,
+        );
         return res.statusCode == 200;
       } else {
         final res = await _dio.post('/internal/providers', data: payload);
@@ -99,7 +110,10 @@ class RouterAdminClient {
   // Đặt connection active
   Future<bool> setActiveProvider(String id) async {
     try {
-      final res = await _dio.patch('/internal/providers/$id', data: {'active': true});
+      final res = await _dio.patch(
+        '/internal/providers/$id',
+        data: {'active': true},
+      );
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('Failed to set active provider in core: $e');
@@ -185,7 +199,7 @@ class RouterAdminClient {
       for (final p in providers) {
         await secureStorage.delete(key: '$_kSecretPrefix${p.id}');
       }
-      
+
       // 2. Clear local DB file bằng cách gửi request reset sang Node core
       // Nhìn lại main.js, ta chưa định nghĩa route /internal/reset. Sẽ patch Node core sau.
       final res = await _dio.post('/internal/reset');
