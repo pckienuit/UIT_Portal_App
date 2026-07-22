@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -165,6 +166,41 @@ void main() {
     expect(find.text('12.000 / 50.000 tokens'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'GitHub OAuth is actionable while desktop-only OAuth stays unavailable',
+    (tester) async {
+      await RouterCatalog.load('''{"providers":[
+      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]},
+      {"id":"cline","name":"Cline","category":"oauth","hasOAuth":true,"mobileSupported":false,"unsupportedReason":"Requires browser extension","models":[]}
+    ]}''');
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          routerRuntimeServiceProvider.overrideWith(
+            _StoppedRouterRuntimeService.new,
+          ),
+          githubOAuthServiceProvider.overrideWithValue(
+            GithubOAuthService(clientId: 'test-client'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AiProviderSettingsScreen()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Đăng nhập GitHub'), findsOneWidget);
+      expect(find.text('Dùng qua 9Router'), findsOneWidget);
+      expect(find.text('Chưa hỗ trợ'), findsOneWidget);
+    },
+  );
 }
 
 class _StoppedRouterRuntimeService extends RouterRuntimeService {

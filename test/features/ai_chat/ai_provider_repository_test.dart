@@ -13,35 +13,41 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     secureStorage = _FakeSecureStorage();
-    repository = AiProviderRepository(prefs: prefs, secureStorage: secureStorage);
-  });
-
-  test('saves and lists configs without exposing secret API key in prefs', () async {
-    final config = AiProviderConfig(
-      id: 'prov-1',
-      name: 'OpenAI Test',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://api.openai.com/v1',
-      modelId: 'gpt-4o',
-      presetId: 'openai',
+    repository = AiProviderRepository(
+      prefs: prefs,
+      secureStorage: secureStorage,
     );
-
-    await repository.saveProvider(config, apiKey: 'sk-secret-key-value');
-
-    final list = repository.listProviders();
-    expect(list.length, 1);
-    expect(list.first.id, 'prov-1');
-    expect(list.first.name, 'OpenAI Test');
-    expect(list.first.presetId, 'openai');
-
-    // Chứng minh key không nằm trong shared preferences raw string
-    final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
-    expect(rawPrefs, isNot(contains('sk-secret-key-value')));
-
-    // Chứng minh key được lưu trong secure storage
-    final key = await repository.getApiKey('prov-1');
-    expect(key, 'sk-secret-key-value');
   });
+
+  test(
+    'saves and lists configs without exposing secret API key in prefs',
+    () async {
+      final config = AiProviderConfig(
+        id: 'prov-1',
+        name: 'OpenAI Test',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://api.openai.com/v1',
+        modelId: 'gpt-4o',
+        presetId: 'openai',
+      );
+
+      await repository.saveProvider(config, apiKey: 'sk-secret-key-value');
+
+      final list = repository.listProviders();
+      expect(list.length, 1);
+      expect(list.first.id, 'prov-1');
+      expect(list.first.name, 'OpenAI Test');
+      expect(list.first.presetId, 'openai');
+
+      // Chứng minh key không nằm trong shared preferences raw string
+      final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
+      expect(rawPrefs, isNot(contains('sk-secret-key-value')));
+
+      // Chứng minh key được lưu trong secure storage
+      final key = await repository.getApiKey('prov-1');
+      expect(key, 'sk-secret-key-value');
+    },
+  );
 
   test('saves multiple different configs successfully', () async {
     final c1 = AiProviderConfig(
@@ -83,24 +89,27 @@ void main() {
     expect(repository.getActiveProviderId(), isNull);
   });
 
-  test('delete provider removes configuration and secure storage api key', () async {
-    final config = AiProviderConfig(
-      id: 'prov-1',
-      name: 'OpenAI Test',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://api.openai.com/v1',
-      modelId: 'gpt-4o',
-    );
+  test(
+    'delete provider removes configuration and secure storage api key',
+    () async {
+      final config = AiProviderConfig(
+        id: 'prov-1',
+        name: 'OpenAI Test',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://api.openai.com/v1',
+        modelId: 'gpt-4o',
+      );
 
-    await repository.saveProvider(config, apiKey: 'secret');
-    await repository.setActiveProviderId('prov-1');
+      await repository.saveProvider(config, apiKey: 'secret');
+      await repository.setActiveProviderId('prov-1');
 
-    await repository.deleteProvider('prov-1');
+      await repository.deleteProvider('prov-1');
 
-    expect(repository.listProviders(), isEmpty);
-    expect(await repository.getApiKey('prov-1'), isNull);
-    expect(repository.getActiveProviderId(), isNull);
-  });
+      expect(repository.listProviders(), isEmpty);
+      expect(await repository.getApiKey('prov-1'), isNull);
+      expect(repository.getActiveProviderId(), isNull);
+    },
+  );
 
   test('clear all wipes out everything', () async {
     final config = AiProviderConfig(
@@ -120,6 +129,35 @@ void main() {
     expect(await repository.getApiKey('prov-1'), isNull);
     expect(repository.getActiveProviderId(), isNull);
   });
+
+  test(
+    'OAuth tokens stay in secure storage and never enter prefs JSON',
+    () async {
+      const config = AiProviderConfig(
+        id: 'github-oauth',
+        name: 'GitHub Copilot',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://api.githubcopilot.com',
+        modelId: 'gpt-5.4',
+        presetId: 'github',
+        authMode: 'oauth',
+      );
+
+      await repository.saveProvider(
+        config,
+        oauthAccessToken: 'oauth-secret',
+        oauthRefreshToken: 'refresh-secret',
+      );
+
+      expect(await repository.getApiKey(config.id), 'oauth-secret');
+      expect(await repository.getOAuthSourceToken(config.id), 'refresh-secret');
+      expect(
+        prefs.getString('ai_provider_configs_v1'),
+        isNot(contains('secret')),
+      );
+      expect(repository.listProviders().single.authMode, 'oauth');
+    },
+  );
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {

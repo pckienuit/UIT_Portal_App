@@ -1,5 +1,7 @@
 package com.personal.uit_portal_app
 
+import android.content.Intent
+import android.net.Uri
 import com.personal.uit_portal_app.router.RouterRuntime
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -19,6 +21,22 @@ class MainActivity : FlutterActivity() {
                         runOnUiThread { result.success(status.toMap()) }
                     }
                     "status" -> result.success(routerRuntime.currentStatus().toMap())
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.personal.uitportal/oauth")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "openUrl" -> {
+                        val url = call.argument<String>("url")
+                        if (url == null) {
+                            result.error("invalid_url", "Missing URL", null)
+                        } else {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            result.success(null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

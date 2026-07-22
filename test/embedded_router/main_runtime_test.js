@@ -96,6 +96,7 @@ test('provider create and activation persist schema v2 state', async (t) => {
     baseUrl: 'https://api.openai.com/v1',
     modelId: 'gpt-4o-mini',
     systemPrompt: '',
+    authMode: 'apiKey',
     active: true,
   }]);
 
@@ -199,4 +200,36 @@ test('edit delete and reset preserve schema v2 semantics', async (t) => {
   assert.deepEqual(state.connections, []);
   assert.deepEqual(state.usage, []);
   assert.deepEqual(state.quota, {});
+});
+
+test('OAuth auth mode persists as metadata while token remains runtime-only', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'oauth-test-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const secret = 'oauth-runtime-secret';
+
+  assert.equal(
+    (await request(baseUrl, token, 'POST', '/internal/providers', {
+      id: 'github-oauth',
+      name: 'GitHub Copilot',
+      kind: 'openAiCompatible',
+      presetId: 'github',
+      authMode: 'oauth',
+      baseUrl: 'https://api.githubcopilot.com',
+      modelId: 'gpt-5.4',
+      apiKey: secret,
+    })).status,
+    201,
+  );
+
+  const stateText = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  const state = JSON.parse(stateText);
+  assert.equal(state.connections[0].authMode, 'oauth');
+  assert.doesNotMatch(stateText, new RegExp(secret));
 });

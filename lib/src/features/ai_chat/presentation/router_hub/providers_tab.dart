@@ -11,6 +11,7 @@ import '../../domain/router_models.dart';
 import '../ai_model_download_section.dart';
 import '../ai_provider_editor_sheet.dart';
 import '../widgets/ai_provider_card.dart';
+import 'github_oauth_sheet.dart';
 
 class RouterProvidersTab extends ConsumerStatefulWidget {
   const RouterProvidersTab({super.key});
@@ -33,9 +34,11 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
     final definitions = RouterCatalog.providers
-        .where((definition) =>
-            definition.id != 'local_qwen' &&
-            definition.name.toLowerCase().contains(query))
+        .where(
+          (definition) =>
+              definition.id != 'local_qwen' &&
+              definition.name.toLowerCase().contains(query),
+        )
         .toList();
 
     return SingleChildScrollView(
@@ -119,6 +122,50 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
         .toList();
 
     if (definition.category == RouterProviderCategory.oauth) {
+      if (definition.id == 'github' && definition.mobileSupported) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
+          child: Padding(
+            padding: const EdgeInsets.all(PortalSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  definition.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: PortalSpacing.xs),
+                const Text(
+                  'Đăng nhập native bằng GitHub Device Flow hoặc dùng connection có sẵn qua 9Router.',
+                ),
+                const SizedBox(height: PortalSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) =>
+                              GithubOAuthSheet(definition: definition),
+                        ),
+                        child: const Text('Đăng nhập GitHub'),
+                      ),
+                    ),
+                    const SizedBox(width: PortalSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _openGatewayEditor(definition),
+                        child: const Text('Dùng qua 9Router'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return _UnavailableProviderCard(
         definition: definition,
         reason: definition.mobileSupported
@@ -180,12 +227,11 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       tier: definition.category == RouterProviderCategory.apiKey
           ? AiProviderTier.officialApi
           : definition.category == RouterProviderCategory.custom
-              ? AiProviderTier.custom
-              : AiProviderTier.freeQuota,
+          ? AiProviderTier.custom
+          : AiProviderTier.freeQuota,
       baseUrl: definition.defaultBaseUrl ?? legacy?.baseUrl ?? '',
-      defaultModelId: definition.models.firstOrNull?.id ??
-          legacy?.defaultModelId ??
-          '',
+      defaultModelId:
+          definition.models.firstOrNull?.id ?? legacy?.defaultModelId ?? '',
       requiresBaseUrl: definition.id == 'custom',
       note: definition.note ?? legacy?.note,
     );
@@ -198,6 +244,20 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       builder: (_) => AiProviderEditorSheet(preset: preset, config: config),
     );
   }
+
+  void _openGatewayEditor(RouterProviderDefinition definition) {
+    final modelId = definition.models.firstOrNull?.id ?? '';
+    _openEditor(
+      AiProviderPreset(
+        id: definition.id,
+        name: '${definition.name} qua 9Router',
+        tier: AiProviderTier.gateway,
+        baseUrl: 'http://10.0.2.2:20128/v1',
+        defaultModelId: '${definition.id}/$modelId',
+        note: 'Dùng credential đã đăng nhập trên 9Router desktop.',
+      ),
+    );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -207,14 +267,14 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: PortalSpacing.sm),
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: PortalSpacing.sm),
+    child: Text(
+      title,
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 class _UnavailableProviderCard extends StatelessWidget {
@@ -238,9 +298,9 @@ class _UnavailableProviderCard extends StatelessWidget {
         subtitle: Text(reason),
         trailing: Text(
           'Chưa hỗ trợ',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant),
         ),
       ),
     );

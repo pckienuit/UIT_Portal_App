@@ -45,6 +45,7 @@ try {
         baseUrl: connection.mobileMetadata?.baseUrl || '',
         modelId: connection.modelId,
         systemPrompt: connection.mobileMetadata?.systemPrompt || '',
+        authMode: connection.authMode || 'apiKey',
         active: connection.id === activeConnectionId,
         apiKey: runtimeSecrets.get(connection.id) || '',
       })),
@@ -61,7 +62,7 @@ try {
         id: provider.id,
         providerId: provider.presetId || provider.id,
         displayName: provider.name,
-        authMode: 'apiKey',
+        authMode: provider.authMode || 'apiKey',
         modelId: provider.modelId,
         enabled: true,
         mobileMetadata: {
@@ -272,6 +273,7 @@ try {
           baseUrl: data.baseUrl,
           modelId: data.modelId,
           systemPrompt: data.systemPrompt || '',
+          authMode: data.authMode || 'apiKey',
           active: !!data.active,
           apiKey: data.apiKey || ''
         });
