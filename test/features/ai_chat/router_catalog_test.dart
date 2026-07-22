@@ -46,5 +46,27 @@ void main() {
       RouterCatalog.providers.map((item) => item.id),
       isNot(containsAll(<String>['grok-web', 'perplexity-web'])),
     );
+
+    final github = RouterCatalog.byId('github')!;
+    expect(github.androidAuth, RouterAndroidAuth.device);
+    expect(github.nativeStatus, RouterNativeStatus.ready);
+    expect(github.gatewayFallback, isTrue);
+    expect(github.tokenRefresh, RouterTokenRefresh.exchange);
+    expect(github.defaultBaseUrl, 'https://api.githubcopilot.com');
+
+    final xai = RouterCatalog.byId('xai')!;
+    expect(xai.androidAuth, RouterAndroidAuth.apiKey);
+    expect(xai.authModes, contains(RouterAuthMode.apiKey));
+    expect(xai.authModes, isNot(contains(RouterAuthMode.oauth)));
+
+    final unknown = RouterProviderDefinition.fromJson({
+      'id': 'future-provider',
+      'name': 'Future Provider',
+      'category': 'oauth',
+      'androidAuth': 'future-flow',
+      'nativeStatus': 'future-status',
+    });
+    expect(unknown.androidAuth, RouterAndroidAuth.unsupported);
+    expect(unknown.nativeStatus, RouterNativeStatus.blocked);
   });
 }

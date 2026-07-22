@@ -10,6 +10,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "gateway",
+      "gatewayFallback": true,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": "public_client_registration_missing",
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gemini-3-flash-agent",
@@ -63,6 +69,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "gateway",
+      "gatewayFallback": true,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": "public_client_registration_missing",
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "claude-fable-5",
@@ -96,6 +108,12 @@
       "unsupportedReason": "Requires browser extension port extraction",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "anthropic/claude-opus-4.7",
@@ -141,6 +159,12 @@
       "unsupportedReason": "Requires browser extension port extraction",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "cline-pass/glm-5.2",
@@ -194,6 +218,12 @@
       "unsupportedReason": "Desktop-only utility authentication",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "glm-5.2",
@@ -267,6 +297,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "gateway",
+      "gatewayFallback": true,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": "public_client_registration_missing",
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gpt-5.6-sol",
@@ -340,6 +376,12 @@
       "unsupportedReason": "Requires local Cursor SQLite DB path parsing",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "default",
@@ -409,6 +451,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "device",
+      "gatewayFallback": true,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "exchange",
+      "defaultBaseUrl": "https://api.githubcopilot.com",
       "models": [
         {
           "id": "gpt-5.2",
@@ -498,6 +546,12 @@
       "unsupportedReason": "Requires desktop token flow",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -510,6 +564,12 @@
       "unsupportedReason": "Requires local CLI configuration path access",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "grok-4.5",
@@ -539,6 +599,12 @@
       "unsupportedReason": "Requires desktop system configuration",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "qwen3-coder-plus",
@@ -612,6 +678,12 @@
       "unsupportedReason": "Requires local CLI helper launch",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "anthropic/claude-sonnet-4-20250514",
@@ -657,6 +729,12 @@
       "unsupportedReason": "Requires browser automation helper",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "minimax-m3",
@@ -702,6 +780,12 @@
       "unsupportedReason": "Requires desktop cookie extractor",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "kimi-k3",
@@ -755,6 +839,12 @@
       "unsupportedReason": "Requires desktop IDE connection",
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "qwen3-coder-plus",
@@ -784,6 +874,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": true,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": "https://api.x.ai/v1",
       "models": [
         {
           "id": "grok-4",
@@ -817,6 +913,12 @@
       "unsupportedReason": "Requires desktop CLI configuration",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gemini-3.1-pro-preview",
@@ -858,6 +960,12 @@
       "unsupportedReason": "Requires local desktop daemon",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "claude-opus-4.8",
@@ -935,6 +1043,12 @@
       "unsupportedReason": "Requires desktop environment variables",
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "mimo-auto",
@@ -952,6 +1066,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "gateway",
+      "gatewayFallback": true,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -964,6 +1084,12 @@
       "unsupportedReason": "Requires Google SSO token copy-paste flow",
       "hasOAuth": true,
       "quotaSupported": true,
+      "androidAuth": "unsupported",
+      "gatewayFallback": false,
+      "nativeStatus": "blocked",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "auto",
@@ -1025,6 +1151,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "seed-2-0-pro-260328",
@@ -1066,6 +1198,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "@cf/meta/llama-3.2-1b-instruct",
@@ -1135,6 +1273,12 @@
       "unsupportedReason": null,
       "hasOAuth": true,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gemini-3.1-pro-preview",
@@ -1196,6 +1340,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "minimaxai/minimax-m2.7",
@@ -1245,6 +1395,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gpt-oss:120b",
@@ -1286,6 +1442,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "openai/text-embedding-3-large",
@@ -1343,6 +1505,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gemini-3.1-pro-preview",
@@ -1372,6 +1540,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "qwen3.5-plus",
@@ -1417,6 +1591,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "qwen3.5-plus",
@@ -1458,6 +1638,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "qwen3.5-plus",
@@ -1499,6 +1685,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "claude-sonnet-4-20250514",
@@ -1524,6 +1716,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -1536,6 +1734,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "claude-fable-5",
@@ -1589,6 +1793,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gpt-oss-120b",
@@ -1626,6 +1836,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -1638,6 +1854,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "command-r-plus-08-2024",
@@ -1663,6 +1885,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "deepseek/deepseek-v4-pro",
@@ -1720,6 +1948,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "deepseek-v4-pro",
@@ -1757,6 +1991,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "deepseek-ai/DeepSeek-V4-Pro",
@@ -1798,6 +2038,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "accounts/fireworks/models/deepseek-v3p1",
@@ -1827,6 +2073,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "glm-5.2",
@@ -1860,6 +2112,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "glm-5.2",
@@ -1897,6 +2155,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "llama-3.3-70b-versatile",
@@ -1930,6 +2194,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "Qwen/QwQ-32B",
@@ -1975,6 +2245,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "MiniMax-M3",
@@ -2008,6 +2284,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "MiniMax-M3",
@@ -2069,6 +2351,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "mistral-large-latest",
@@ -2098,6 +2386,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "mimo-auto",
@@ -2115,6 +2409,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "meta-llama/Llama-3.3-70B-Instruct",
@@ -2136,6 +2436,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -2148,6 +2454,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "gpt-5.4",
@@ -2269,6 +2581,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "glm-5.2",
@@ -2338,6 +2656,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "sonar-pro",
@@ -2359,6 +2683,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "perplexity/sonar",
@@ -2416,6 +2746,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "deepseek-ai/DeepSeek-V4-Pro",
@@ -2493,6 +2829,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
@@ -2530,6 +2872,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "venice-uncensored-1-2",
@@ -2595,6 +2943,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": true,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": []
     },
     {
@@ -2607,6 +2961,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "deepseek-ai/deepseek-v3.2-maas",
@@ -2636,6 +2996,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "Doubao-Seed-2.0-Code",
@@ -2685,6 +3051,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "mimo-v2.5-pro",
@@ -2714,6 +3086,12 @@
       "unsupportedReason": null,
       "hasOAuth": false,
       "quotaSupported": false,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": null,
       "models": [
         {
           "id": "mimo-v2.5-pro",

@@ -1,13 +1,13 @@
 {
   "oauth": {
-    "antigravity": { "mobileSupported": true },
-    "claude": { "mobileSupported": true },
+    "antigravity": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
+    "claude": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
     "cline": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
     "clinepass": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
     "codebuddy-cn": { "mobileSupported": false, "unsupportedReason": "Desktop-only utility authentication" },
-    "codex": { "mobileSupported": true },
+    "codex": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
     "cursor": { "mobileSupported": false, "unsupportedReason": "Requires local Cursor SQLite DB path parsing" },
-    "github": { "mobileSupported": true },
+    "github": { "mobileSupported": true, "androidAuth": "device", "gatewayFallback": true, "nativeStatus": "ready", "tokenRefresh": "exchange", "defaultBaseUrl": "https://api.githubcopilot.com" },
     "gitlab": { "mobileSupported": false, "unsupportedReason": "Requires desktop token flow" },
     "grok-cli": { "mobileSupported": false, "unsupportedReason": "Requires local CLI configuration path access" },
     "iflow": { "mobileSupported": false, "unsupportedReason": "Requires desktop system configuration" },
@@ -15,7 +15,7 @@
     "kimchi": { "mobileSupported": false, "unsupportedReason": "Requires browser automation helper" },
     "kimi": { "mobileSupported": false, "unsupportedReason": "Requires desktop cookie extractor" },
     "qwen": { "mobileSupported": false, "unsupportedReason": "Requires desktop IDE connection" },
-    "xai": { "mobileSupported": true }
+    "xai": { "mobileSupported": true, "androidAuth": "apiKey", "gatewayFallback": true, "nativeStatus": "ready", "defaultBaseUrl": "https://api.x.ai/v1" }
   },
   "free": {
     "gemini-cli": { "mobileSupported": false, "unsupportedReason": "Requires desktop CLI configuration" },

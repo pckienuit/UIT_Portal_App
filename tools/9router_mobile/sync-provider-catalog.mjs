@@ -78,6 +78,19 @@ function run() {
       }
     }
 
+    const providerSupport = support[category]?.[id] || {};
+    const androidAuth = providerSupport.androidAuth || (
+      category === 'apikey' || category === 'freeTier'
+        ? 'apiKey'
+        : mobileSupported
+          ? 'gateway'
+          : 'unsupported'
+    );
+    const gatewayFallback = providerSupport.gatewayFallback ?? androidAuth === 'gateway';
+    const nativeStatus = providerSupport.nativeStatus || (
+      androidAuth === 'apiKey' ? 'ready' : 'blocked'
+    );
+
     // Collect capability flags
     const hasOAuth = content.includes('oauth:') || content.includes('hasOAuth');
     const hasUsage = content.includes('usage: true') || content.includes('features:');
@@ -104,6 +117,12 @@ function run() {
       unsupportedReason,
       hasOAuth,
       quotaSupported: hasUsage,
+      androidAuth,
+      gatewayFallback,
+      nativeStatus,
+      nativeBlockReason: providerSupport.nativeBlockReason || null,
+      tokenRefresh: providerSupport.tokenRefresh || 'none',
+      defaultBaseUrl: providerSupport.defaultBaseUrl || null,
       models,
     });
   }

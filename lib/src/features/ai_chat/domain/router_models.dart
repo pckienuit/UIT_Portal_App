@@ -1,12 +1,17 @@
 enum RouterProviderCategory { local, custom, oauth, free, freeTier, apiKey }
+
 enum RouterAuthMode { none, apiKey, oauth, custom }
+
 enum RouterConnectionHealth { unchecked, checking, connected, failed, disabled }
 
+enum RouterAndroidAuth { device, pkce, apiKey, gateway, unsupported }
+
+enum RouterNativeStatus { ready, experimental, blocked }
+
+enum RouterTokenRefresh { exchange, refreshToken, none }
+
 class RouterModelDefinition {
-  const RouterModelDefinition({
-    required this.id,
-    required this.name,
-  });
+  const RouterModelDefinition({required this.id, required this.name});
 
   final String id;
   final String name;
@@ -18,10 +23,7 @@ class RouterModelDefinition {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-      };
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class RouterProviderDefinition {
@@ -36,6 +38,11 @@ class RouterProviderDefinition {
     this.models = const [],
     this.note,
     this.defaultBaseUrl,
+    this.androidAuth = RouterAndroidAuth.unsupported,
+    this.gatewayFallback = false,
+    this.nativeStatus = RouterNativeStatus.blocked,
+    this.nativeBlockReason,
+    this.tokenRefresh = RouterTokenRefresh.none,
   });
 
   final String id;
@@ -48,6 +55,11 @@ class RouterProviderDefinition {
   final List<RouterModelDefinition> models;
   final String? note;
   final String? defaultBaseUrl;
+  final RouterAndroidAuth androidAuth;
+  final bool gatewayFallback;
+  final RouterNativeStatus nativeStatus;
+  final String? nativeBlockReason;
+  final RouterTokenRefresh tokenRefresh;
 
   factory RouterProviderDefinition.fromJson(Map<String, dynamic> json) {
     final catStr = json['category'] as String;
@@ -64,17 +76,26 @@ class RouterProviderDefinition {
       category = RouterProviderCategory.custom;
     }
 
-    final modelsList = (json['models'] as List<dynamic>?)
-            ?.map((e) => RouterModelDefinition.fromJson(e as Map<String, dynamic>))
+    final modelsList =
+        (json['models'] as List<dynamic>?)
+            ?.map(
+              (e) => RouterModelDefinition.fromJson(e as Map<String, dynamic>),
+            )
             .toList() ??
         [];
 
+    final androidAuth = _enumByName(
+      RouterAndroidAuth.values,
+      json['androidAuth'] as String?,
+      RouterAndroidAuth.unsupported,
+    );
     final authModes = <RouterAuthMode>[];
-    if (json['hasOAuth'] == true) {
-      authModes.add(RouterAuthMode.oauth);
-    }
-    if (category == RouterProviderCategory.apiKey || category == RouterProviderCategory.freeTier) {
+    if (androidAuth == RouterAndroidAuth.apiKey ||
+        category == RouterProviderCategory.apiKey ||
+        category == RouterProviderCategory.freeTier) {
       authModes.add(RouterAuthMode.apiKey);
+    } else if (json['hasOAuth'] == true) {
+      authModes.add(RouterAuthMode.oauth);
     }
 
     return RouterProviderDefinition(
@@ -86,6 +107,28 @@ class RouterProviderDefinition {
       unsupportedReason: json['unsupportedReason'] as String?,
       quotaSupported: json['quotaSupported'] as bool? ?? false,
       models: modelsList,
+      note: json['note'] as String?,
+      defaultBaseUrl: json['defaultBaseUrl'] as String?,
+      androidAuth: androidAuth,
+      gatewayFallback: json['gatewayFallback'] as bool? ?? false,
+      nativeStatus: _enumByName(
+        RouterNativeStatus.values,
+        json['nativeStatus'] as String?,
+        RouterNativeStatus.blocked,
+      ),
+      nativeBlockReason: json['nativeBlockReason'] as String?,
+      tokenRefresh: _enumByName(
+        RouterTokenRefresh.values,
+        json['tokenRefresh'] as String?,
+        RouterTokenRefresh.none,
+      ),
     );
   }
+}
+
+T _enumByName<T extends Enum>(List<T> values, String? name, T fallback) {
+  for (final value in values) {
+    if (value.name == name) return value;
+  }
+  return fallback;
 }
