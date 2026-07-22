@@ -176,9 +176,13 @@ try {
         const targetUrl = `${activeProvider.baseUrl}/chat/completions`;
 
         if (body.stream) {
+          const providerKey = customKey || activeProvider.apiKey;
           const upstreamResponse = await fetch(targetUrl, {
             method: 'POST',
-            headers,
+            headers: {
+              ...headers,
+              ...(providerKey ? { authorization: `Bearer ${providerKey}` } : {})
+            },
             body: JSON.stringify(body)
           });
 
@@ -202,12 +206,15 @@ try {
           db.usage.push({
             id: randomUUID(),
             timestamp: new Date().toISOString(),
-            providerId: activeProvider.id,
+            providerId: activeProvider.presetId || activeProvider.id,
+            connectionId: activeProvider.id,
             modelId: activeProvider.modelId,
+            status: upstreamResponse.ok ? 'success' : 'error',
             promptTokens: 0,
             completionTokens: 0,
-            cost: 0.0,
-            latency: Date.now() - startTime
+            cachedTokens: 0,
+            estimatedCost: 0.0,
+            latencyMs: Date.now() - startTime
           });
           saveDb(db);
           return;

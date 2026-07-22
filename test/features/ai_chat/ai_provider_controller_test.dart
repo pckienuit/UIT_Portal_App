@@ -6,6 +6,8 @@ import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_cont
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/ai_backend_factory.dart';
+import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
 
 void main() {
@@ -27,6 +29,28 @@ void main() {
 
     expect(RouterAdminClient.supportsProvider(local), isFalse);
     expect(RouterAdminClient.supportsProvider(remote), isTrue);
+  });
+
+  test('network provider chat uses ready embedded core for usage tracking', () {
+    const remote = AiProviderConfig(
+      id: 'remote',
+      name: 'Remote',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://example.com/v1',
+      modelId: 'model',
+    );
+
+    expect(
+      AiBackendFactory.shouldUseEmbeddedCore(
+        remote,
+        const RouterStatus(
+          state: RouterState.ready,
+          baseUrl: 'http://127.0.0.1:1234',
+          bearer: 'internal',
+        ),
+      ),
+      isTrue,
+    );
   });
 
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -9,30 +9,32 @@ import 'local_model_catalog.dart';
 import 'openai_compatible_backend.dart';
 
 class AiBackendFactory {
-  AiBackendFactory({
-    required this.ref,
-    required this.secureStorage,
-  });
+  AiBackendFactory({required this.ref, required this.secureStorage});
 
   final dynamic ref;
   final FlutterSecureStorage secureStorage;
 
+  static bool shouldUseEmbeddedCore(
+    AiProviderConfig config,
+    RouterStatus runtime,
+  ) =>
+      config.kind == AiBackendKind.openAiCompatible &&
+      runtime.state == RouterState.ready;
+
   Future<AiChatBackend?> buildBackend(AiProviderConfig config) async {
-    // Nếu là 9Router connection chạy embedded qua Node
-    if (config.id == '9router' || config.presetId == '9router') {
-      final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
-      if (runtimeState.state == RouterState.ready) {
-        return OpenAiCompatibleBackend(
-          baseUrl: runtimeState.baseUrl!,
-          modelId: config.modelId,
-          apiKey: runtimeState.bearer!,
-        );
-      }
+    final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
+    if (shouldUseEmbeddedCore(config, runtimeState)) {
+      return OpenAiCompatibleBackend(
+        baseUrl: runtimeState.baseUrl!,
+        modelId: config.modelId,
+        apiKey: runtimeState.bearer!,
+      );
     }
 
     switch (config.kind) {
       case AiBackendKind.openAiCompatible:
-        final key = await secureStorage.read(key: 'ai_provider_key_${config.id}') ?? '';
+        final key =
+            await secureStorage.read(key: 'ai_provider_key_${config.id}') ?? '';
         return OpenAiCompatibleBackend(
           baseUrl: config.baseUrl,
           modelId: config.modelId,
@@ -41,10 +43,14 @@ class AiBackendFactory {
       case AiBackendKind.localLlama:
         final catalog = LocalModelCatalog.byId(config.id);
         if (catalog == null) return null;
-        
+
         final appSupport = await getApplicationSupportDirectory();
-        final modelPath = p.join(appSupport.path, 'ai_models', catalog.fileName);
-        
+        final modelPath = p.join(
+          appSupport.path,
+          'ai_models',
+          catalog.fileName,
+        );
+
         return LocalLlamaBackend(modelPath: modelPath);
     }
   }
