@@ -18,7 +18,7 @@ class AiProviderRepository {
   static const String _kConfigsKey = 'ai_provider_configs_v1';
   static const String _kActiveIdKey = 'ai_active_provider_id_v1';
   static const String _kSecretPrefix = 'ai_provider_key_';
-  static const String _kRefreshPrefix = 'ai_provider_refresh_';
+  static const String _kSourcePrefix = 'ai_provider_source_';
 
   List<AiProviderConfig> listProviders() {
     final raw = prefs.getString(_kConfigsKey);
@@ -50,6 +50,7 @@ class AiProviderRepository {
     String? apiKey,
     String? oauthAccessToken,
     String? oauthRefreshToken,
+    String? oauthSourceToken,
   }) async {
     final current = listProviders();
     final index = current.indexWhere((e) => e.id == config.id);
@@ -71,10 +72,11 @@ class AiProviderRepository {
         value: accessToken,
       );
     }
-    if (oauthRefreshToken != null) {
+    final sourceToken = oauthSourceToken ?? oauthRefreshToken;
+    if (sourceToken != null) {
       await secureStorage.write(
-        key: '$_kRefreshPrefix${config.id}',
-        value: oauthRefreshToken,
+        key: '$_kSourcePrefix${config.id}',
+        value: sourceToken,
       );
     }
   }
@@ -87,7 +89,7 @@ class AiProviderRepository {
       jsonEncode(current.map((e) => e.toJson()).toList()),
     );
     await secureStorage.delete(key: '$_kSecretPrefix$id');
-    await secureStorage.delete(key: '$_kRefreshPrefix$id');
+    await secureStorage.delete(key: '$_kSourcePrefix$id');
 
     if (getActiveProviderId() == id) {
       await setActiveProviderId(null);
@@ -99,14 +101,14 @@ class AiProviderRepository {
   }
 
   Future<String?> getOAuthSourceToken(String id) async {
-    return await secureStorage.read(key: '$_kRefreshPrefix$id');
+    return secureStorage.read(key: '$_kSourcePrefix$id');
   }
 
   Future<void> clearAll() async {
     final providers = listProviders();
     for (final p in providers) {
       await secureStorage.delete(key: '$_kSecretPrefix${p.id}');
-      await secureStorage.delete(key: '$_kRefreshPrefix${p.id}');
+      await secureStorage.delete(key: '$_kSourcePrefix${p.id}');
     }
     await prefs.remove(_kConfigsKey);
     await prefs.remove(_kActiveIdKey);

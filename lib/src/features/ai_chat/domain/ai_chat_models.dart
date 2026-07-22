@@ -14,6 +14,8 @@ class AiProviderConfig {
     this.presetId,
     this.systemPrompt,
     this.authMode = 'apiKey',
+    this.credentialKind,
+    this.tokenExpiresAt,
   });
 
   final String id;
@@ -24,6 +26,8 @@ class AiProviderConfig {
   final String? presetId;
   final String? systemPrompt;
   final String authMode;
+  final String? credentialKind;
+  final DateTime? tokenExpiresAt;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -34,6 +38,8 @@ class AiProviderConfig {
     'presetId': presetId,
     'systemPrompt': systemPrompt,
     'authMode': authMode,
+    'credentialKind': credentialKind,
+    'tokenExpiresAt': tokenExpiresAt?.toUtc().toIso8601String(),
   };
 
   factory AiProviderConfig.fromJson(Map<String, dynamic> json) =>
@@ -46,6 +52,10 @@ class AiProviderConfig {
         presetId: json['presetId'] as String?,
         systemPrompt: json['systemPrompt'] as String?,
         authMode: json['authMode'] as String? ?? 'apiKey',
+        credentialKind: json['credentialKind'] as String?,
+        tokenExpiresAt: json['tokenExpiresAt'] == null
+            ? null
+            : DateTime.tryParse(json['tokenExpiresAt'] as String),
       );
 
   AiProviderConfig copyWith({
@@ -55,6 +65,8 @@ class AiProviderConfig {
     String? Function()? presetId,
     String? Function()? systemPrompt,
     String? authMode,
+    String? Function()? credentialKind,
+    DateTime? Function()? tokenExpiresAt,
   }) {
     return AiProviderConfig(
       id: id,
@@ -65,6 +77,12 @@ class AiProviderConfig {
       presetId: presetId != null ? presetId() : this.presetId,
       systemPrompt: systemPrompt != null ? systemPrompt() : this.systemPrompt,
       authMode: authMode ?? this.authMode,
+      credentialKind: credentialKind != null
+          ? credentialKind()
+          : this.credentialKind,
+      tokenExpiresAt: tokenExpiresAt != null
+          ? tokenExpiresAt()
+          : this.tokenExpiresAt,
     );
   }
 }

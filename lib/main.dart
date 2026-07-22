@@ -6,11 +6,15 @@ import 'src/app.dart';
 import 'src/features/auth/auth_controller.dart';
 import 'src/features/auth/auth_providers.dart';
 import 'src/features/home/providers/widget_preferences_provider.dart';
+import 'src/features/ai_chat/application/ai_provider_controller.dart';
 import 'src/features/ai_chat/application/router_runtime_service.dart';
 import 'src/features/ai_chat/data/ai_provider_repository.dart';
+import 'src/features/ai_chat/data/github_oauth_service.dart';
+import 'src/features/ai_chat/data/provider_credential_broker.dart';
 import 'src/features/ai_chat/data/router_admin_client.dart';
 
 import 'package:flutter/services.dart';
+import 'src/features/ai_chat/domain/ai_chat_models.dart';
 import 'src/features/ai_chat/domain/router_catalog.dart';
 
 void main() async {
@@ -52,7 +56,24 @@ void main() async {
           try {
             final repo = container.read(aiProviderRepositoryProvider);
             final client = container.read(routerAdminClientProvider);
-            final providers = repo.listProviders();
+            final githubOAuth = container.read(githubOAuthServiceProvider);
+            final broker = ProviderCredentialBroker(
+              repository: repo,
+              exchangeGithubToken: githubOAuth.exchangeCopilotToken,
+            );
+            final providers = <AiProviderConfig>[];
+            for (final provider in repo.listProviders()) {
+              try {
+                providers.add(await broker.ensureRuntimeCredential(provider));
+              } catch (error) {
+                debugPrint(
+                  'Skipped unavailable OAuth connection ${provider.id}: $error',
+                );
+              }
+            }
+            container
+                .read(aiProviderControllerProvider.notifier)
+                .reloadFromRepository();
             final coreProviders = providers.where(
               RouterAdminClient.supportsProvider,
             );

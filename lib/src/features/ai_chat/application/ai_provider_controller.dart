@@ -30,7 +30,9 @@ class AiProviderState {
   }) {
     return AiProviderState(
       providers: providers ?? this.providers,
-      activeProviderId: activeProviderId != null ? activeProviderId() : this.activeProviderId,
+      activeProviderId: activeProviderId != null
+          ? activeProviderId()
+          : this.activeProviderId,
       health: health ?? this.health,
       models: models ?? this.models,
       errors: errors ?? this.errors,
@@ -50,7 +52,7 @@ class AiProviderController extends Notifier<AiProviderState> {
   AiProviderState _init() {
     final providers = _repository.listProviders();
     final activeId = _repository.getActiveProviderId();
-    
+
     String? activeProviderId = activeId;
     if (activeProviderId == null && providers.isNotEmpty) {
       activeProviderId = providers.first.id;
@@ -63,18 +65,28 @@ class AiProviderController extends Notifier<AiProviderState> {
     );
   }
 
-  Future<void> saveProvider(AiProviderConfig config, {String? apiKey}) async {
-    await _repository.saveProvider(config, apiKey: apiKey);
-    
+  Future<void> saveProvider(
+    AiProviderConfig config, {
+    String? apiKey,
+    String? oauthAccessToken,
+    String? oauthSourceToken,
+  }) async {
+    await _repository.saveProvider(
+      config,
+      apiKey: apiKey,
+      oauthAccessToken: oauthAccessToken,
+      oauthSourceToken: oauthSourceToken,
+    );
+
     // Đồng bộ sang embedded 9Router core
     try {
       final client = ref.read(routerAdminClientProvider);
-      await client.saveProvider(config, apiKey: apiKey);
+      await client.saveProvider(config, apiKey: oauthAccessToken ?? apiKey);
     } catch (_) {}
-    
+
     final providers = _repository.listProviders();
     var activeId = state.activeProviderId;
-    
+
     if (activeId == null && providers.isNotEmpty) {
       activeId = config.id;
       await _repository.setActiveProviderId(activeId);
@@ -91,16 +103,16 @@ class AiProviderController extends Notifier<AiProviderState> {
 
   Future<void> deleteProvider(String id) async {
     await _repository.deleteProvider(id);
-    
+
     // Đồng bộ xóa sang embedded 9Router core
     try {
       final client = ref.read(routerAdminClientProvider);
       await client.deleteProvider(id);
     } catch (_) {}
-    
+
     final providers = _repository.listProviders();
     String? activeId = _repository.getActiveProviderId();
-    
+
     if (activeId == null && providers.isNotEmpty) {
       activeId = providers.first.id;
       await _repository.setActiveProviderId(activeId);
@@ -109,8 +121,10 @@ class AiProviderController extends Notifier<AiProviderState> {
       } catch (_) {}
     }
 
-    final newHealth = Map<String, AiProviderHealth>.from(state.health)..remove(id);
-    final newModels = Map<String, List<AiModelOption>>.from(state.models)..remove(id);
+    final newHealth = Map<String, AiProviderHealth>.from(state.health)
+      ..remove(id);
+    final newModels = Map<String, List<AiModelOption>>.from(state.models)
+      ..remove(id);
     final newErrors = Map<String, String>.from(state.errors)..remove(id);
 
     state = state.copyWith(
@@ -124,24 +138,34 @@ class AiProviderController extends Notifier<AiProviderState> {
 
   Future<void> selectActiveProvider(String? id) async {
     await _repository.setActiveProviderId(id);
-    
+
     if (id != null) {
       try {
         final client = ref.read(routerAdminClientProvider);
         await client.setActiveProvider(id);
       } catch (_) {}
     }
-    
+
     state = state.copyWith(activeProviderId: () => id);
   }
 
   void updateProviderModels(String providerId, List<AiModelOption> list) {
-    final newModels = Map<String, List<AiModelOption>>.from(state.models)..[providerId] = list;
+    final newModels = Map<String, List<AiModelOption>>.from(state.models)
+      ..[providerId] = list;
     state = state.copyWith(models: newModels);
   }
 
-  void updateProviderHealth(String providerId, AiProviderHealth healthStatus, {String? errorMessage}) {
-    final newHealth = Map<String, AiProviderHealth>.from(state.health)..[providerId] = healthStatus;
+  void reloadFromRepository() {
+    state = _init();
+  }
+
+  void updateProviderHealth(
+    String providerId,
+    AiProviderHealth healthStatus, {
+    String? errorMessage,
+  }) {
+    final newHealth = Map<String, AiProviderHealth>.from(state.health)
+      ..[providerId] = healthStatus;
     final newErrors = Map<String, String>.from(state.errors);
     if (errorMessage != null) {
       newErrors[providerId] = errorMessage;
@@ -152,6 +176,7 @@ class AiProviderController extends Notifier<AiProviderState> {
   }
 }
 
-final aiProviderControllerProvider = NotifierProvider<AiProviderController, AiProviderState>(() {
-  return AiProviderController();
-});
+final aiProviderControllerProvider =
+    NotifierProvider<AiProviderController, AiProviderState>(() {
+      return AiProviderController();
+    });

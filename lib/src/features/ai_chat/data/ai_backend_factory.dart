@@ -7,6 +7,10 @@ import '../domain/ai_chat_models.dart';
 import 'local_llama_backend.dart';
 import 'local_model_catalog.dart';
 import 'openai_compatible_backend.dart';
+import 'ai_provider_repository.dart';
+import 'github_oauth_service.dart';
+import 'provider_credential_broker.dart';
+import 'router_admin_client.dart';
 
 class AiBackendFactory {
   AiBackendFactory({required this.ref, required this.secureStorage});
@@ -25,6 +29,18 @@ class AiBackendFactory {
       '${runtimeBaseUrl.replaceFirst(RegExp(r'/$'), '')}/v1';
 
   Future<AiChatBackend?> buildBackend(AiProviderConfig config) async {
+    if (config.presetId == 'github' && config.authMode == 'oauth') {
+      final repository =
+          ref.read(aiProviderRepositoryProvider) as AiProviderRepository;
+      final oauth = ref.read(githubOAuthServiceProvider) as GithubOAuthService;
+      final broker = ProviderCredentialBroker(
+        repository: repository,
+        exchangeGithubToken: oauth.exchangeCopilotToken,
+      );
+      config = await broker.ensureRuntimeCredential(config);
+      await (ref.read(routerAdminClientProvider) as RouterAdminClient)
+          .saveProvider(config, apiKey: await repository.getApiKey(config.id));
+    }
     final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
     if (shouldUseEmbeddedCore(config, runtimeState)) {
       return OpenAiCompatibleBackend(

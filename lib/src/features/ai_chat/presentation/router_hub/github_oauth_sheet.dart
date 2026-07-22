@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/foundations/portal_spacing.dart';
 import '../../application/ai_provider_controller.dart';
-import '../../data/ai_provider_repository.dart';
+
 import '../../data/github_oauth_service.dart';
 import '../../domain/ai_chat_models.dart';
 import '../../domain/router_models.dart';
@@ -85,16 +85,15 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet> {
         modelId: modelId,
         presetId: 'github',
         authMode: 'oauth',
+        credentialKind: 'githubSourceToken',
+        tokenExpiresAt: copilot.expiresAt,
       );
       await ref
           .read(aiProviderControllerProvider.notifier)
-          .saveProvider(config, apiKey: copilot.accessToken);
-      await ref
-          .read(aiProviderRepositoryProvider)
           .saveProvider(
             config,
             oauthAccessToken: copilot.accessToken,
-            oauthRefreshToken: oauth.refreshToken ?? oauth.accessToken,
+            oauthSourceToken: oauth.accessToken,
           );
       if (mounted) Navigator.of(context).pop();
     } catch (error) {

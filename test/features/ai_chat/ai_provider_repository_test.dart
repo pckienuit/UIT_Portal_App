@@ -141,6 +141,8 @@ void main() {
         modelId: 'gpt-5.4',
         presetId: 'github',
         authMode: 'oauth',
+        credentialKind: 'githubSourceToken',
+        tokenExpiresAt: null,
       );
 
       await repository.saveProvider(
@@ -156,8 +158,33 @@ void main() {
         isNot(contains('secret')),
       );
       expect(repository.listProviders().single.authMode, 'oauth');
+      expect(
+        repository.listProviders().single.credentialKind,
+        'githubSourceToken',
+      );
     },
   );
+
+  test('OAuth source and runtime tokens use separate secure keys', () async {
+    const config = AiProviderConfig(
+      id: 'github-oauth',
+      name: 'GitHub Copilot',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://api.githubcopilot.com',
+      modelId: 'gpt-5.4',
+      presetId: 'github',
+      authMode: 'oauth',
+    );
+
+    await repository.saveProvider(
+      config,
+      oauthAccessToken: 'copilot-runtime',
+      oauthSourceToken: 'github-source',
+    );
+
+    expect(await repository.getApiKey(config.id), 'copilot-runtime');
+    expect(await repository.getOAuthSourceToken(config.id), 'github-source');
+  });
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
