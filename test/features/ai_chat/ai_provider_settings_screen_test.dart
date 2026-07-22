@@ -8,6 +8,7 @@ import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
+import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
 
 void main() {
@@ -96,6 +97,73 @@ void main() {
     expect(find.text('Chưa có dữ liệu sử dụng'), findsOneWidget);
     expect(find.text('Base URL'), findsNothing);
     expect(find.text('API Key'), findsNothing);
+  });
+
+  testWidgets('renders real usage and quota snapshots without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+        routerUsageProvider.overrideWith(
+          (ref) async => [
+            {
+              'id': 'usage-1',
+              'providerId': 'openai',
+              'modelId': 'gpt-4o-mini',
+              'promptTokens': 120,
+              'completionTokens': 30,
+              'latencyMs': 450,
+              'timestamp': '2026-07-22T08:00:00.000Z',
+            },
+          ],
+        ),
+        routerQuotaProvider.overrideWith(
+          (ref) async => {
+            'snapshot': {
+              'connectionId': 'openai-1',
+              'used': 12000,
+              'total': 50000,
+              'unit': 'tokens',
+              'percentage': 24,
+              'fetchedAt': '2026-07-22T08:00:00.000Z',
+            },
+          },
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.tap(find.text('Usage'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 yêu cầu'), findsOneWidget);
+    expect(find.text('150 tokens'), findsNWidgets(2));
+    expect(find.text('gpt-4o-mini'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('Quota Tracker'));
+    await tester.tap(find.text('Quota Tracker'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('24%'), findsOneWidget);
+    expect(find.text('12.000 / 50.000 tokens'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 
