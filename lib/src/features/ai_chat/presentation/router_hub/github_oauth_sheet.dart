@@ -27,6 +27,15 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet> {
   bool _busy = false;
   String? _error;
 
+  @override
+  void dispose() {
+    final flow = _flow;
+    if (flow != null) {
+      ref.read(githubOAuthServiceProvider).cancel(flow).catchError((_) {});
+    }
+    super.dispose();
+  }
+
   Future<void> _start() async {
     setState(() {
       _busy = true;
@@ -34,12 +43,21 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet> {
     });
     try {
       final flow = await ref.read(githubOAuthServiceProvider).start();
+      if (!mounted) {
+        await ref.read(githubOAuthServiceProvider).cancel(flow);
+        return;
+      }
+      setState(() => _flow = flow);
       await Clipboard.setData(ClipboardData(text: flow.userCode));
       await _platform.invokeMethod<void>('openUrl', {
         'url': flow.verificationUri,
       });
-      if (mounted) setState(() => _flow = flow);
     } catch (error) {
+      final flow = _flow;
+      if (flow != null) {
+        await ref.read(githubOAuthServiceProvider).cancel(flow);
+        _flow = null;
+      }
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -56,13 +74,7 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet> {
     try {
       final service = ref.read(githubOAuthServiceProvider);
       final oauth = await service.poll(flow);
-      if (oauth == null) {
-        setState(
-          () => _error =
-              'GitHub chưa xác nhận. Hoàn tất trên trình duyệt rồi thử lại.',
-        );
-        return;
-      }
+      if (oauth == null) return;
       final copilot = await service.exchangeCopilotToken(oauth.accessToken);
       final modelId = widget.definition.models.firstOrNull?.id ?? 'gpt-5.4';
       final config = AiProviderConfig(

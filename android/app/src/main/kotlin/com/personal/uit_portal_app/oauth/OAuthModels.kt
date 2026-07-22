@@ -55,3 +55,21 @@ data class NativeDeviceFlow(
         "intervalSeconds" to intervalSeconds,
     )
 }
+
+data class NativeOAuthCredential(
+    val accessToken: String,
+    val refreshToken: String?,
+    val expiresAt: String?,
+    val scope: String?,
+) {
+    init {
+        require(accessToken.isNotBlank()) { "OAuth access token is required" }
+    }
+
+    fun toMap(): Map<String, Any?> = mapOf(
+        "accessToken" to accessToken,
+        "refreshToken" to refreshToken,
+        "expiresAt" to expiresAt,
+        "scope" to scope,
+    )
+}

@@ -45,6 +45,39 @@ class NativeDeviceFlow {
   }
 }
 
+class NativeOAuthCredential {
+  const NativeOAuthCredential({
+    required this.accessToken,
+    this.refreshToken,
+    this.expiresAt,
+    this.scope,
+  });
+
+  final String accessToken;
+  final String? refreshToken;
+  final DateTime? expiresAt;
+  final String? scope;
+
+  factory NativeOAuthCredential.fromMap(Map<Object?, Object?> map) {
+    final accessToken = map['accessToken'];
+    final expiresAtValue = map['expiresAt'] as String?;
+    final expiresAt = expiresAtValue == null
+        ? null
+        : DateTime.tryParse(expiresAtValue);
+    if (accessToken is! String ||
+        accessToken.isEmpty ||
+        (expiresAtValue != null && expiresAt == null)) {
+      throw const NativeOAuthException('Credential OAuth native không hợp lệ.');
+    }
+    return NativeOAuthCredential(
+      accessToken: accessToken,
+      refreshToken: map['refreshToken'] as String?,
+      expiresAt: expiresAt,
+      scope: map['scope'] as String?,
+    );
+  }
+}
+
 class NativeOAuthException implements Exception {
   const NativeOAuthException(this.message);
 
@@ -54,18 +87,28 @@ class NativeOAuthException implements Exception {
   String toString() => message;
 }
 
-class NativeOAuthClient {
+abstract interface class NativeOAuthApi {
+  Future<NativeDeviceFlow> startDevice(String providerId, {String? clientId});
+  Future<NativeOAuthCredential> completeDevice(String flowId);
+  Future<void> cancel(String flowId);
+}
+
+class NativeOAuthClient implements NativeOAuthApi {
   const NativeOAuthClient();
 
   static const _channel = MethodChannel(
     'com.personal.uitportal/provider_oauth',
   );
 
-  Future<NativeDeviceFlow> startDevice(String providerId) async {
+  @override
+  Future<NativeDeviceFlow> startDevice(
+    String providerId, {
+    String? clientId,
+  }) async {
     try {
       final response = await _channel.invokeMapMethod<Object?, Object?>(
         'startDevice',
-        {'providerId': providerId},
+        {'providerId': providerId, 'clientId': clientId},
       );
       if (response == null) {
         throw const NativeOAuthException('OAuth native không trả dữ liệu.');
@@ -76,6 +119,23 @@ class NativeOAuthClient {
     }
   }
 
+  @override
+  Future<NativeOAuthCredential> completeDevice(String flowId) async {
+    try {
+      final response = await _channel.invokeMapMethod<Object?, Object?>(
+        'completeDevice',
+        {'flowId': flowId},
+      );
+      if (response == null) {
+        throw const NativeOAuthException('OAuth native không trả credential.');
+      }
+      return NativeOAuthCredential.fromMap(response);
+    } on PlatformException catch (error) {
+      throw NativeOAuthException(error.message ?? 'OAuth native thất bại.');
+    }
+  }
+
+  @override
   Future<void> cancel(String flowId) =>
       _channel.invokeMethod<void>('cancel', {'flowId': flowId});
 }

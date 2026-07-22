@@ -49,6 +49,11 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler(nativeOAuthCoordinator::handle)
     }
 
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        nativeOAuthCoordinator.close()
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     private fun RouterRuntime.Status.toMap(): Map<String, String> = when (this) {
         RouterRuntime.Status.Stopped -> mapOf("state" to "stopped")
         RouterRuntime.Status.Starting -> mapOf("state" to "starting")

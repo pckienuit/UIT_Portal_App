@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'native_oauth_client.dart';
 
 class GithubDeviceFlow {
   const GithubDeviceFlow({
@@ -50,16 +51,19 @@ class GithubOAuthException implements Exception {
 class GithubOAuthService {
   GithubOAuthService({
     Dio? dio,
+    NativeOAuthApi? nativeOAuth,
     this.clientId = const String.fromEnvironment(
       'GITHUB_OAUTH_CLIENT_ID',
       defaultValue: 'Iv1.b507a08c87ecfe98',
     ),
-  }) : _dio = dio ?? Dio();
+  }) : _dio = dio ?? Dio(),
+       _nativeOAuth = nativeOAuth ?? const NativeOAuthClient();
 
   static const deviceCodeUrl = 'https://github.com/login/device/code';
   static const tokenUrl = 'https://github.com/login/oauth/access_token';
 
   final Dio _dio;
+  final NativeOAuthApi _nativeOAuth;
   final String clientId;
 
   bool get isConfigured => clientId.trim().isNotEmpty;
@@ -68,52 +72,28 @@ class GithubOAuthService {
     if (!isConfigured) {
       throw const GithubOAuthException('Chưa cấu hình GITHUB_OAUTH_CLIENT_ID.');
     }
-    final response = await _dio.post<Map<String, dynamic>>(
-      deviceCodeUrl,
-      data: 'client_id=${Uri.encodeQueryComponent(clientId)}&scope=read%3Auser',
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-        headers: {'Accept': 'application/json'},
-      ),
-    );
-    final data = response.data ?? const <String, dynamic>{};
+    final flow = await _nativeOAuth.startDevice('github', clientId: clientId);
     return GithubDeviceFlow(
-      deviceCode: data['device_code'] as String,
-      userCode: data['user_code'] as String,
-      verificationUri: data['verification_uri'] as String,
-      expiresIn: Duration(seconds: data['expires_in'] as int),
-      interval: Duration(seconds: data['interval'] as int? ?? 5),
+      deviceCode: flow.flowId,
+      userCode: flow.userCode,
+      verificationUri: flow.verificationUri.toString(),
+      expiresIn: flow.expiresAt.difference(DateTime.now()),
+      interval: flow.interval,
     );
   }
 
   Future<GithubOAuthToken?> poll(GithubDeviceFlow flow) async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      tokenUrl,
-      data: [
-        'client_id=${Uri.encodeQueryComponent(clientId)}',
-        'device_code=${Uri.encodeQueryComponent(flow.deviceCode)}',
-        'grant_type=${Uri.encodeQueryComponent('urn:ietf:params:oauth:grant-type:device_code')}',
-      ].join('&'),
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-        headers: {'Accept': 'application/json'},
-      ),
-    );
-    final data = response.data ?? const <String, dynamic>{};
-    final error = data['error'] as String?;
-    if (error == 'authorization_pending' || error == 'slow_down') return null;
-    if (error != null) {
-      throw GithubOAuthException(data['error_description'] as String? ?? error);
-    }
+    final credential = await _nativeOAuth.completeDevice(flow.deviceCode);
     return GithubOAuthToken(
-      accessToken: data['access_token'] as String,
-      refreshToken: data['refresh_token'] as String?,
-      expiresIn: data['expires_in'] is int
-          ? Duration(seconds: data['expires_in'] as int)
-          : null,
-      scope: data['scope'] as String?,
+      accessToken: credential.accessToken,
+      refreshToken: credential.refreshToken,
+      expiresIn: credential.expiresAt?.difference(DateTime.now()),
+      scope: credential.scope,
     );
   }
+
+  Future<void> cancel(GithubDeviceFlow flow) =>
+      _nativeOAuth.cancel(flow.deviceCode);
 
   Future<GithubCopilotToken> exchangeCopilotToken(
     String githubAccessToken,

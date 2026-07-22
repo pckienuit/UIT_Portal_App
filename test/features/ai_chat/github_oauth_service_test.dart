@@ -1,63 +1,81 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/native_oauth_client.dart';
 
 void main() {
   test('bundled GitHub OAuth app enables device flow without secrets', () {
     expect(GithubOAuthService().isConfigured, isTrue);
   });
 
-  test(
-    'starts GitHub device flow with client id and read:user scope',
-    () async {
-      final dio = Dio()
-        ..httpClientAdapter = _FakeAdapter((options) {
-          expect(options.path, 'https://github.com/login/device/code');
-          expect(options.data.toString(), contains('client_id=client-id'));
-          expect(options.data.toString(), contains('scope=read%3Auser'));
-          return {
-            'device_code': 'device',
-            'user_code': 'ABCD-EFGH',
-            'verification_uri': 'https://github.com/login/device',
-            'expires_in': 900,
-            'interval': 5,
-          };
-        });
+  test('starts GitHub device flow through native Android bridge', () async {
+    final native = _FakeNativeOAuth(
+      flow: NativeDeviceFlow(
+        flowId: 'flow-1',
+        userCode: 'ABCD-EFGH',
+        verificationUri: Uri.parse('https://github.com/login/device'),
+        expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+        interval: const Duration(seconds: 5),
+      ),
+    );
 
-      final flow = await GithubOAuthService(
-        dio: dio,
-        clientId: 'client-id',
-      ).start();
+    final flow = await GithubOAuthService(
+      nativeOAuth: native,
+      clientId: 'client-id',
+    ).start();
 
-      expect(flow.userCode, 'ABCD-EFGH');
-      expect(flow.interval, const Duration(seconds: 5));
-    },
-  );
+    expect(native.startedProviderId, 'github');
+    expect(native.startedClientId, 'client-id');
+    expect(flow.deviceCode, 'flow-1');
+    expect(flow.userCode, 'ABCD-EFGH');
+    expect(flow.interval, const Duration(seconds: 5));
+  });
 
-  test('maps pending and successful token polls', () async {
-    var calls = 0;
-    final dio = Dio()
-      ..httpClientAdapter = _FakeAdapter((options) {
-        calls++;
-        return calls == 1
-            ? {'error': 'authorization_pending'}
-            : {
-                'access_token': 'secret',
-                'token_type': 'bearer',
-                'scope': 'read:user',
-              };
-      });
-    final service = GithubOAuthService(dio: dio, clientId: 'client-id');
+  test('completes GitHub device flow through native Android bridge', () async {
+    final native = _FakeNativeOAuth(
+      credential: NativeOAuthCredential(
+        accessToken: 'source-token',
+        refreshToken: 'refresh-token',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        scope: 'read:user',
+      ),
+    );
+    final service = GithubOAuthService(
+      nativeOAuth: native,
+      clientId: 'client-id',
+    );
     const flow = GithubDeviceFlow(
-      deviceCode: 'device',
+      deviceCode: 'flow-1',
       userCode: 'CODE',
       verificationUri: 'https://github.com/login/device',
       expiresIn: Duration(minutes: 15),
       interval: Duration(seconds: 5),
     );
 
-    expect(await service.poll(flow), isNull);
-    expect((await service.poll(flow))?.accessToken, 'secret');
+    final token = await service.poll(flow);
+
+    expect(native.completedFlowId, 'flow-1');
+    expect(token?.accessToken, 'source-token');
+    expect(token?.refreshToken, 'refresh-token');
+  });
+
+  test('cancels GitHub device flow through native Android bridge', () async {
+    final native = _FakeNativeOAuth();
+    final service = GithubOAuthService(
+      nativeOAuth: native,
+      clientId: 'client-id',
+    );
+    const flow = GithubDeviceFlow(
+      deviceCode: 'flow-1',
+      userCode: 'CODE',
+      verificationUri: 'https://github.com/login/device',
+      expiresIn: Duration(minutes: 15),
+      interval: Duration(seconds: 5),
+    );
+
+    await service.cancel(flow);
+
+    expect(native.cancelledFlowId, 'flow-1');
   });
 
   test('exchanges GitHub access token for a Copilot runtime token', () async {
@@ -73,11 +91,44 @@ void main() {
 
     final token = await GithubOAuthService(
       dio: dio,
+      nativeOAuth: _FakeNativeOAuth(),
       clientId: 'client-id',
     ).exchangeCopilotToken('github-token');
 
     expect(token.accessToken, 'copilot-token');
   });
+}
+
+class _FakeNativeOAuth implements NativeOAuthApi {
+  _FakeNativeOAuth({this.flow, this.credential});
+
+  final NativeDeviceFlow? flow;
+  final NativeOAuthCredential? credential;
+  String? startedProviderId;
+  String? startedClientId;
+  String? completedFlowId;
+  String? cancelledFlowId;
+
+  @override
+  Future<NativeDeviceFlow> startDevice(
+    String providerId, {
+    String? clientId,
+  }) async {
+    startedProviderId = providerId;
+    startedClientId = clientId;
+    return flow!;
+  }
+
+  @override
+  Future<NativeOAuthCredential> completeDevice(String flowId) async {
+    completedFlowId = flowId;
+    return credential!;
+  }
+
+  @override
+  Future<void> cancel(String flowId) async {
+    cancelledFlowId = flowId;
+  }
 }
 
 class _FakeAdapter implements HttpClientAdapter {
