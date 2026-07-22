@@ -50,7 +50,10 @@ class GithubOAuthException implements Exception {
 class GithubOAuthService {
   GithubOAuthService({
     Dio? dio,
-    this.clientId = const String.fromEnvironment('GITHUB_OAUTH_CLIENT_ID'),
+    this.clientId = const String.fromEnvironment(
+      'GITHUB_OAUTH_CLIENT_ID',
+      defaultValue: 'Iv1.b507a08c87ecfe98',
+    ),
   }) : _dio = dio ?? Dio();
 
   static const deviceCodeUrl = 'https://github.com/login/device/code';

@@ -166,6 +166,22 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
           ),
         );
       }
+      if (definition.mobileSupported) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
+          child: ListTile(
+            leading: const Icon(Icons.hub_outlined),
+            title: Text(definition.name),
+            subtitle: const Text(
+              'OAuth native riêng chưa ổn định. Có thể dùng credential đang đăng nhập trên 9Router.',
+            ),
+            trailing: TextButton(
+              onPressed: () => _openGatewayEditor(definition),
+              child: const Text('Dùng qua 9Router'),
+            ),
+          ),
+        );
+      }
       return _UnavailableProviderCard(
         definition: definition,
         reason: definition.mobileSupported

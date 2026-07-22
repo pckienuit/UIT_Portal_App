@@ -3,6 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
 
 void main() {
+  test('bundled GitHub OAuth app enables device flow without secrets', () {
+    expect(GithubOAuthService().isConfigured, isTrue);
+  });
+
   test(
     'starts GitHub device flow with client id and read:user scope',
     () async {
