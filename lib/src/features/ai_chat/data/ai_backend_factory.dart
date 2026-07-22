@@ -21,11 +21,14 @@ class AiBackendFactory {
       config.kind == AiBackendKind.openAiCompatible &&
       runtime.state == RouterState.ready;
 
+  static String embeddedCoreBaseUrl(String runtimeBaseUrl) =>
+      '${runtimeBaseUrl.replaceFirst(RegExp(r'/$'), '')}/v1';
+
   Future<AiChatBackend?> buildBackend(AiProviderConfig config) async {
     final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
     if (shouldUseEmbeddedCore(config, runtimeState)) {
       return OpenAiCompatibleBackend(
-        baseUrl: runtimeState.baseUrl!,
+        baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
         modelId: config.modelId,
         apiKey: runtimeState.bearer!,
       );
