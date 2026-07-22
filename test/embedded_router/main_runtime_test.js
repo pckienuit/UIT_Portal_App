@@ -147,3 +147,56 @@ test('quota refresh is honest when provider has no quota adapter', async (t) => 
   );
   assert.deepEqual(state.quota, {});
 });
+
+
+test('edit delete and reset preserve schema v2 semantics', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'crud-test-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-1',
+    name: 'Before',
+    baseUrl: 'https://example.com/v1',
+    modelId: 'model-1',
+    active: true,
+    apiKey: 'secret-before',
+  })).status, 201);
+  assert.equal((await request(
+    baseUrl,
+    token,
+    'PATCH',
+    '/internal/providers/provider-1',
+    { name: 'After', modelId: 'model-2', apiKey: 'secret-after' },
+  )).status, 200);
+
+  const statePath = path.join(dataDir, '9router_state.json');
+  let raw = fs.readFileSync(statePath, 'utf8');
+  let state = JSON.parse(raw);
+  assert.equal(state.connections[0].displayName, 'After');
+  assert.equal(state.connections[0].modelId, 'model-2');
+  assert.doesNotMatch(raw, /secret-before|secret-after/);
+
+  assert.equal((await request(
+    baseUrl,
+    token,
+    'DELETE',
+    '/internal/providers/provider-1',
+  )).status, 200);
+  state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  assert.deepEqual(state.connections, []);
+  assert.equal(state.activeRoute, null);
+
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/reset')).status, 200);
+  state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  assert.equal(state.schemaVersion, 2);
+  assert.deepEqual(state.connections, []);
+  assert.deepEqual(state.usage, []);
+  assert.deepEqual(state.quota, {});
+});
