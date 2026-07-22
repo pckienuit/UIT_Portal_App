@@ -1,0 +1,109 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const net = require('node:net');
+const { spawn } = require('node:child_process');
+
+const mainPath = path.resolve(
+  __dirname,
+  '../../android/app/src/main/assets/nodejs-project/main.js',
+);
+
+function tempDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'uit-router-runtime-'));
+}
+
+async function freePort() {
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}
+
+async function waitUntilReady(baseUrl, token, child) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (child.exitCode !== null) throw new Error(`core exited with ${child.exitCode}`);
+    try {
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (response.ok) return;
+    } catch (_) {
+      // Core chưa listen.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('core did not become ready');
+}
+
+async function request(baseUrl, token, method, pathname, body) {
+  return fetch(`${baseUrl}${pathname}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+test('provider create and activation persist schema v2 state', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'runtime-test-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+
+  await waitUntilReady(baseUrl, token, child);
+  const createResponse = await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'openai-1',
+    name: 'OpenAI',
+    kind: 'openAiCompatible',
+    presetId: 'openai',
+    baseUrl: 'https://api.openai.com/v1',
+    modelId: 'gpt-4o-mini',
+    apiKey: 'must-not-persist',
+  });
+  assert.equal(createResponse.status, 201);
+
+  const activateResponse = await request(
+    baseUrl,
+    token,
+    'PATCH',
+    '/internal/providers/openai-1',
+    { active: true },
+  );
+  assert.equal(activateResponse.status, 200);
+
+  const providersResponse = await request(
+    baseUrl,
+    token,
+    'GET',
+    '/internal/providers',
+  );
+  assert.equal(providersResponse.status, 200);
+  assert.deepEqual(await providersResponse.json(), [{
+    id: 'openai-1',
+    name: 'OpenAI',
+    kind: 'openAiCompatible',
+    presetId: 'openai',
+    baseUrl: 'https://api.openai.com/v1',
+    modelId: 'gpt-4o-mini',
+    systemPrompt: '',
+    active: true,
+  }]);
+
+  const raw = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  const state = JSON.parse(raw);
+  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.connections[0].id, 'openai-1');
+  assert.equal(state.connections[0].providerId, 'openai');
+  assert.equal(state.activeRoute.connectionId, 'openai-1');
+  assert.doesNotMatch(raw, /must-not-persist/);
+});

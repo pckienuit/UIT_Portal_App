@@ -78,6 +78,11 @@ function createStateStore({ dataDir, now = () => new Date() }) {
         authMode: 'apiKey',
         modelId: provider.modelId,
         enabled: provider.enabled !== false,
+        mobileMetadata: {
+          kind: provider.kind || 'openAiCompatible',
+          baseUrl: provider.baseUrl,
+          systemPrompt: provider.systemPrompt || '',
+        },
         createdAt: provider.createdAt,
         updatedAt: provider.updatedAt,
       })),

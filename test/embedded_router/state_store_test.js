@@ -118,6 +118,11 @@ test('migrates legacy providers to connections without carrying api keys', () =>
   assert.equal(state.connections[0].providerId, 'openai');
   assert.equal(state.connections[0].displayName, 'OpenAI');
   assert.equal(state.connections[0].authMode, 'apiKey');
+  assert.deepEqual(state.connections[0].mobileMetadata, {
+    kind: 'openAiCompatible',
+    baseUrl: 'https://api.openai.com/v1',
+    systemPrompt: '',
+  });
   assert.deepEqual(state.activeRoute, {
     connectionId: 'legacy-openai',
     modelId: 'gpt-4o-mini',

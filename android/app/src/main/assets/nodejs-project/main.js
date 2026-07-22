@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { timingSafeEqual, randomUUID } = require('node:crypto');
+const { createStateStore } = require('./state_store');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -30,27 +31,64 @@ try {
     throw new Error('Router core requires a valid port and internal bearer');
   }
 
-  const DB_FILE = path.join(DATA_DIR, '9router_state.json');
+  const stateStore = createStateStore({ dataDir: DATA_DIR });
+  const runtimeSecrets = new Map();
 
-  function loadDb() {
-    try {
-      if (fs.existsSync(DB_FILE)) {
-        return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-      }
-    } catch (e) {
-      console.error('Failed to load DB, resetting', e);
-    }
+  function toLegacyDb(state) {
+    const activeConnectionId = state.activeRoute?.connectionId;
     return {
-      providers: [],
-      usage: [],
-      quota: {}
+      providers: state.connections.map((connection) => ({
+        id: connection.id,
+        name: connection.displayName,
+        kind: connection.mobileMetadata?.kind || 'openAiCompatible',
+        presetId: connection.providerId,
+        baseUrl: connection.mobileMetadata?.baseUrl || '',
+        modelId: connection.modelId,
+        systemPrompt: connection.mobileMetadata?.systemPrompt || '',
+        active: connection.id === activeConnectionId,
+        apiKey: runtimeSecrets.get(connection.id) || '',
+      })),
+      usage: state.usage,
+      quota: state.quota,
     };
   }
 
+  function toSchemaV2(db) {
+    const timestamp = new Date().toISOString();
+    const active = db.providers.find((provider) => provider.active);
+    return {
+      connections: db.providers.map((provider) => ({
+        id: provider.id,
+        providerId: provider.presetId || provider.id,
+        displayName: provider.name,
+        authMode: 'apiKey',
+        modelId: provider.modelId,
+        enabled: true,
+        mobileMetadata: {
+          kind: provider.kind || 'openAiCompatible',
+          baseUrl: provider.baseUrl,
+          systemPrompt: provider.systemPrompt || '',
+        },
+        createdAt: provider.createdAt || timestamp,
+        updatedAt: timestamp,
+      })),
+      activeRoute: active
+        ? { connectionId: active.id, modelId: active.modelId, local: false }
+        : null,
+      usage: db.usage,
+      quota: db.quota,
+    };
+  }
+
+  function loadDb() {
+    return toLegacyDb(stateStore.load());
+  }
+
   function saveDb(db) {
-    const tempFile = DB_FILE + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify(db, null, 2), 'utf8');
-    fs.renameSync(tempFile, DB_FILE);
+    for (const provider of db.providers) {
+      if (provider.apiKey) runtimeSecrets.set(provider.id, provider.apiKey);
+    }
+    stateStore.save(toSchemaV2(db));
   }
 
   function hasValidBearer(request) {
@@ -205,7 +243,7 @@ try {
     }
 
     if (request.method === 'GET' && url.pathname === '/internal/providers') {
-      return sendJson(response, 200, db.providers);
+      return sendJson(response, 200, db.providers.map(({ apiKey, ...provider }) => provider));
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/providers') {
@@ -223,6 +261,7 @@ try {
           id: data.id,
           name: data.name,
           kind: data.kind || 'openAiCompatible',
+          presetId: data.presetId || data.id,
           baseUrl: data.baseUrl,
           modelId: data.modelId,
           systemPrompt: data.systemPrompt || '',
@@ -273,6 +312,7 @@ try {
       }
 
       db.providers.splice(index, 1);
+      runtimeSecrets.delete(id);
       saveDb(db);
       return sendJson(response, 200, { success: true });
     }
