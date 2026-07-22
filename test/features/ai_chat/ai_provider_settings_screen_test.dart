@@ -202,6 +202,39 @@ void main() {
     },
   );
 
+  testWidgets('GitHub OAuth actions do not overflow at 320dp', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await RouterCatalog.load('''{"providers":[
+      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}
+    ]}''');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+        githubOAuthServiceProvider.overrideWithValue(
+          GithubOAuthService(clientId: 'test-client'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Đăng nhập GitHub'), findsOneWidget);
+    expect(find.text('Dùng qua 9Router'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('xAI uses native API-key editor instead of OAuth fallback', (
     tester,
   ) async {

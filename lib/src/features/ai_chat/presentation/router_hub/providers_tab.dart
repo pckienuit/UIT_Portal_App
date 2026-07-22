@@ -140,27 +140,39 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                   'Đăng nhập native bằng GitHub Device Flow hoặc dùng connection có sẵn qua 9Router.',
                 ),
                 const SizedBox(height: PortalSpacing.sm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (_) =>
-                              GithubOAuthSheet(definition: definition),
-                        ),
-                        child: const Text('Đăng nhập GitHub'),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final primary = FilledButton(
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) =>
+                            GithubOAuthSheet(definition: definition),
                       ),
-                    ),
-                    const SizedBox(width: PortalSpacing.sm),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _openGatewayEditor(definition),
-                        child: const Text('Dùng qua 9Router'),
-                      ),
-                    ),
-                  ],
+                      child: const Text('Đăng nhập GitHub'),
+                    );
+                    final fallback = OutlinedButton(
+                      onPressed: () => _openGatewayEditor(definition),
+                      child: const Text('Dùng qua 9Router'),
+                    );
+                    if (constraints.maxWidth < 360) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          primary,
+                          const SizedBox(height: PortalSpacing.sm),
+                          fallback,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: primary),
+                        const SizedBox(width: PortalSpacing.sm),
+                        Expanded(child: fallback),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
