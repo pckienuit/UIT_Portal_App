@@ -201,6 +201,40 @@ void main() {
       expect(find.text('Chưa hỗ trợ'), findsOneWidget);
     },
   );
+
+  testWidgets('xAI uses native API-key editor instead of OAuth fallback', (
+    tester,
+  ) async {
+    await RouterCatalog.load('''{"providers":[
+      {"id":"xai","name":"xAI (Grok)","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","defaultBaseUrl":"https://api.x.ai/v1","models":[{"id":"grok-4","name":"Grok 4"}]}
+    ]}''');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('xAI (Grok)'), findsOneWidget);
+    expect(find.text('Dùng qua 9Router'), findsNothing);
+    await tester.ensureVisible(find.text('xAI (Grok)'));
+    await tester.tap(find.text('xAI (Grok)'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Key'), findsOneWidget);
+    expect(find.text('https://api.x.ai/v1'), findsOneWidget);
+  });
 }
 
 class _StoppedRouterRuntimeService extends RouterRuntimeService {

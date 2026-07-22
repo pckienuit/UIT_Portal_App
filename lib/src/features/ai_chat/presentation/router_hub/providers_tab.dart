@@ -121,7 +121,8 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
         .where((config) => config.presetId == definition.id)
         .toList();
 
-    if (definition.category == RouterProviderCategory.oauth) {
+    if (definition.category == RouterProviderCategory.oauth &&
+        definition.androidAuth != RouterAndroidAuth.apiKey) {
       if (definition.id == 'github' && definition.mobileSupported) {
         return Card(
           margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
