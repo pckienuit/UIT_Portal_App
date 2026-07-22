@@ -374,17 +374,11 @@ try {
         return sendJson(response, 404, { error: 'Provider connection not found' });
       }
 
-      const snapshot = {
+      return sendJson(response, 501, {
+        status: 'unsupported',
         connectionId,
-        used: 12000,
-        total: 50000,
-        unit: 'tokens',
-        percentage: 24.0,
-        fetchedAt: new Date().toISOString()
-      };
-      db.quota[connectionId] = snapshot;
-      saveDb(db);
-      return sendJson(response, 200, { success: true, snapshot });
+        error: 'Quota is not available for this provider'
+      });
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/reset') {

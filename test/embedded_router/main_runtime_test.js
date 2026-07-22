@@ -107,3 +107,43 @@ test('provider create and activation persist schema v2 state', async (t) => {
   assert.equal(state.activeRoute.connectionId, 'openai-1');
   assert.doesNotMatch(raw, /must-not-persist/);
 });
+
+test('quota refresh is honest when provider has no quota adapter', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'quota-test-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'router-1',
+    name: '9Router',
+    kind: 'openAiCompatible',
+    presetId: 'custom',
+    baseUrl: 'http://127.0.0.1:20128/v1',
+    modelId: 'gemini-flash-3-hermes',
+    active: true,
+  })).status, 201);
+
+  const response = await request(
+    baseUrl,
+    token,
+    'POST',
+    '/internal/quota/router-1/refresh',
+  );
+  assert.equal(response.status, 501);
+  assert.deepEqual(await response.json(), {
+    status: 'unsupported',
+    connectionId: 'router-1',
+    error: 'Quota is not available for this provider',
+  });
+
+  const state = JSON.parse(
+    fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'),
+  );
+  assert.deepEqual(state.quota, {});
+});
