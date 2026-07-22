@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
+const { createSseUsageParser } = require('./sse_usage');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -177,6 +178,7 @@ try {
         const targetUrl = `${activeProvider.baseUrl}/chat/completions`;
 
         if (body.stream) {
+          body.stream_options = { ...(body.stream_options || {}), include_usage: true };
           const providerKey = customKey || activeProvider.apiKey;
           const upstreamResponse = await fetch(targetUrl, {
             method: 'POST',
@@ -187,6 +189,24 @@ try {
             body: JSON.stringify(body)
           });
 
+          if (!upstreamResponse.ok) {
+            const errorBody = Buffer.from(await upstreamResponse.arrayBuffer());
+            response.writeHead(upstreamResponse.status, {
+              'content-type': upstreamResponse.headers.get('content-type') || 'application/json',
+            });
+            response.end(errorBody);
+            db.usage.push({
+              id: randomUUID(), timestamp: new Date().toISOString(),
+              providerId: activeProvider.presetId || activeProvider.id,
+              connectionId: activeProvider.id, modelId: activeProvider.modelId,
+              status: 'error', promptTokens: 0, completionTokens: 0,
+              cachedTokens: 0, estimatedCost: 0.0,
+              latencyMs: Date.now() - startTime
+            });
+            saveDb(db);
+            return;
+          }
+
           response.writeHead(upstreamResponse.status, {
             'content-type': 'text/event-stream',
             'cache-control': 'no-cache',
@@ -195,14 +215,21 @@ try {
 
           const reader = upstreamResponse.body.getReader();
           const decoder = new TextDecoder();
+          const usageParser = createSseUsageParser();
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
-            response.write(chunk);
+            usageParser.push(chunk);
+            if (!response.write(value)) {
+              await new Promise((resolve) => response.once('drain', resolve));
+            }
           }
+          usageParser.push(decoder.decode());
           response.end();
+
+          const usage = usageParser.finish();
 
           db.usage.push({
             id: randomUUID(),
@@ -211,9 +238,9 @@ try {
             connectionId: activeProvider.id,
             modelId: activeProvider.modelId,
             status: upstreamResponse.ok ? 'success' : 'error',
-            promptTokens: 0,
-            completionTokens: 0,
-            cachedTokens: 0,
+            promptTokens: usage.promptTokens,
+            completionTokens: usage.completionTokens,
+            cachedTokens: usage.cachedTokens,
             estimatedCost: 0.0,
             latencyMs: Date.now() - startTime
           });

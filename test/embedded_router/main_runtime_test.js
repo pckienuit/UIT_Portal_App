@@ -233,3 +233,47 @@ test('OAuth auth mode persists as metadata while token remains runtime-only', as
   assert.equal(state.connections[0].authMode, 'oauth');
   assert.doesNotMatch(stateText, new RegExp(secret));
 });
+
+test('streaming request asks upstream for terminal usage', async (t) => {
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    const body = JSON.parse(raw);
+    assert.deepEqual(body.stream_options, { include_usage: true });
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.write('data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2}}\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'stream-usage-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const upstreamPort = upstream.address().port;
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'stream-provider',
+    name: 'Stream Provider',
+    baseUrl: `http://127.0.0.1:${upstreamPort}`,
+    modelId: 'stream-model',
+    active: true,
+  })).status, 201);
+
+  const streamed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'ignored',
+    stream: true,
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(streamed.status, 200);
+  await streamed.text();
+  const usageResponse = await request(baseUrl, token, 'GET', '/internal/usage/stats');
+  const entries = await usageResponse.json();
+  assert.equal(entries.at(-1).promptTokens, 7);
+  assert.equal(entries.at(-1).completionTokens, 2);
+});
