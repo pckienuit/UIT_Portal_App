@@ -10,14 +10,16 @@ void main() {
   // Mock các ngày động xoay quanh ngày chạy test thực tế (DateTime.now() = Chủ nhật)
   // để thuật toán tìm ngày có lịch gần nhất hoạt động chính xác và ổn định.
   final today = DateUtils.dateOnly(DateTime.now());
-  
+
   // Tuần hiện tại
   final mondayOfThisWeek = today.subtract(Duration(days: today.weekday - 1));
   final thursdayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 3));
   final fridayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 4));
   final saturdayOfThisWeek = mondayOfThisWeek.add(const Duration(days: 5));
-  final tuesdayOfNextWeek = mondayOfThisWeek.add(const Duration(days: 8)); // Thứ 3 tuần sau
-  
+  final tuesdayOfNextWeek = mondayOfThisWeek.add(
+    const Duration(days: 8),
+  ); // Thứ 3 tuần sau
+
   final thursdayStr = thursdayOfThisWeek.toIso8601String().substring(0, 10);
   final fridayStr = fridayOfThisWeek.toIso8601String().substring(0, 10);
   final saturdayStr = saturdayOfThisWeek.toIso8601String().substring(0, 10);
@@ -77,6 +79,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(-160, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(fridayOfThisWeek.day.toString()));
+    await tester.pumpAndSettle();
+
     expect(find.text('Kiến trúc máy tính'), findsOneWidget);
     expect(find.text('Nhập môn công nghệ phần mềm'), findsOneWidget);
     expect(find.text('Nhập môn lập trình'), findsNothing);
@@ -91,7 +101,7 @@ void main() {
       const Offset(160, 0),
     );
     await tester.pumpAndSettle();
-    
+
     await tester.tap(find.text(thursdayOfThisWeek.day.toString()));
     await tester.pumpAndSettle();
 
@@ -133,7 +143,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Do Saturday (cách 1 ngày) gần today hơn Tuesday tuần sau (cách 2 ngày), 
+    // Do Saturday (cách 1 ngày) gần today hơn Tuesday tuần sau (cách 2 ngày),
     // timeline sẽ chọn Week 1 của ngày Saturday làm mặc định.
     // Tap vào thứ 7 tuần này
     await tester.tap(find.text(saturdayOfThisWeek.day.toString()));
@@ -274,7 +284,7 @@ void main() {
       const Offset(200, 0),
     );
     await tester.pumpAndSettle();
-    
+
     await tester.tap(find.text(thursdayOfThisWeek.day.toString()));
     await tester.pumpAndSettle();
 
