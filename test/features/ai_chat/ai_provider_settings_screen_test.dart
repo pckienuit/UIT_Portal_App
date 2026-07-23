@@ -171,8 +171,8 @@ void main() {
     'GitHub OAuth is actionable while desktop-only OAuth stays unavailable',
     (tester) async {
       await RouterCatalog.load('''{"providers":[
-      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]},
-      {"id":"cline","name":"Cline","category":"oauth","hasOAuth":true,"mobileSupported":false,"unsupportedReason":"Requires browser extension","models":[]}
+      {"id":"github","name":"GitHub Copilot","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"transportKind":"githubCopilot","chatUrl":"https://api.githubcopilot.com/chat/completions","models":[{"id":"gpt-5.4","name":"GPT-5.4"}]},
+      {"id":"cline","name":"Cline","category":"oauth","disposition":"remove","hasOAuth":true,"mobileSupported":false,"unsupportedReason":"Requires browser extension","models":[]}
     ]}''');
       final container = ProviderContainer(
         overrides: [
@@ -197,8 +197,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Đăng nhập GitHub'), findsOneWidget);
-      expect(find.text('Dùng qua 9Router'), findsOneWidget);
-      expect(find.text('Chưa hỗ trợ'), findsOneWidget);
+      expect(RouterCatalog.byId('cline'), isNull);
     },
   );
 
@@ -208,7 +207,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await RouterCatalog.load('''{"providers":[
-      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}
+      {"id":"github","name":"GitHub Copilot","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"transportKind":"githubCopilot","chatUrl":"https://api.githubcopilot.com/chat/completions","models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}
     ]}''');
     final container = ProviderContainer(
       overrides: [
@@ -231,7 +230,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Đăng nhập GitHub'), findsOneWidget);
-    expect(find.text('Dùng qua 9Router'), findsOneWidget);
+    expect(find.text('Dùng qua 9Router'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -239,7 +238,7 @@ void main() {
     tester,
   ) async {
     await RouterCatalog.load('''{"providers":[
-      {"id":"xai","name":"xAI (Grok)","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","defaultBaseUrl":"https://api.x.ai/v1","models":[{"id":"grok-4","name":"Grok 4"}]}
+      {"id":"xai","name":"xAI (Grok)","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","transportKind":"openaiChat","chatUrl":"https://api.x.ai/v1/chat/completions","defaultBaseUrl":"https://api.x.ai/v1","models":[{"id":"grok-4","name":"Grok 4"}]}
     ]}''');
     final container = ProviderContainer(
       overrides: [
@@ -273,7 +272,7 @@ void main() {
     'ready device OAuth provider is actionable without GitHub hard-code',
     (tester) async {
       await RouterCatalog.load('''{"providers":[
-      {"id":"qwen","name":"Qwen Code","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"tokenRefresh":"refreshToken","defaultBaseUrl":"https://portal.qwen.ai/v1","models":[{"id":"qwen3-coder-plus","name":"Qwen3 Coder Plus"}]}
+      {"id":"future-device","name":"Future Device","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"tokenRefresh":"refreshToken","transportKind":"openaiChat","chatUrl":"https://example.test/chat/completions","defaultBaseUrl":"https://example.test","models":[{"id":"future-model","name":"Future Model"}]}
     ]}''');
       final container = ProviderContainer(
         overrides: [
@@ -293,14 +292,14 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Đăng nhập Qwen Code'), findsOneWidget);
+      expect(find.text('Đăng nhập Future Device'), findsOneWidget);
       expect(find.text('Dùng qua 9Router'), findsNothing);
     },
   );
 
   testWidgets('Gemini CLI native authorization is actionable', (tester) async {
     await RouterCatalog.load('''{"providers":[
-      {"id":"gemini-cli","name":"Gemini CLI","category":"free","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","gatewayFallback":true,"tokenRefresh":"refreshToken","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash"}]}
+      {"id":"gemini-cli","name":"Gemini CLI","category":"free","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","gatewayFallback":false,"tokenRefresh":"refreshToken","transportKind":"geminiCli","chatUrl":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash"}]}
     ]}''');
     final container = ProviderContainer(
       overrides: [
@@ -321,7 +320,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Đăng nhập Gemini CLI'), findsOneWidget);
-    expect(find.text('Dùng qua 9Router'), findsOneWidget);
+    expect(find.text('Dùng qua 9Router'), findsNothing);
   });
 }
 

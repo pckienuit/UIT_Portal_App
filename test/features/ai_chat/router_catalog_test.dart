@@ -27,12 +27,6 @@ void main() {
       isTrue,
     );
     expect(
-      RouterCatalog.providers.any(
-        (item) => item.category == RouterProviderCategory.apiKey,
-      ),
-      isTrue,
-    );
-    expect(
       RouterCatalog.providers.map((item) => item.id).toSet().length,
       RouterCatalog.providers.length,
     );
@@ -50,14 +44,11 @@ void main() {
     final github = RouterCatalog.byId('github')!;
     expect(github.androidAuth, RouterAndroidAuth.device);
     expect(github.nativeStatus, RouterNativeStatus.ready);
-    expect(github.gatewayFallback, isTrue);
+    expect(github.gatewayFallback, isFalse);
     expect(github.tokenRefresh, RouterTokenRefresh.exchange);
     expect(github.defaultBaseUrl, 'https://api.githubcopilot.com');
 
-    final xai = RouterCatalog.byId('xai')!;
-    expect(xai.androidAuth, RouterAndroidAuth.apiKey);
-    expect(xai.authModes, contains(RouterAuthMode.apiKey));
-    expect(xai.authModes, isNot(contains(RouterAuthMode.oauth)));
+    expect(RouterCatalog.byId('xai'), isNull);
 
     final unknown = RouterProviderDefinition.fromJson({
       'id': 'future-provider',
@@ -65,8 +56,12 @@ void main() {
       'category': 'oauth',
       'androidAuth': 'future-flow',
       'nativeStatus': 'future-status',
+      'transportKind': 'future-transport',
+      'mobileSupported': true,
     });
     expect(unknown.androidAuth, RouterAndroidAuth.unsupported);
     expect(unknown.nativeStatus, RouterNativeStatus.blocked);
+    expect(unknown.transportKind, RouterTransportKind.unsupported);
+    expect(unknown.mobileSupported, isFalse);
   });
 }

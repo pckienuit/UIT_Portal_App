@@ -1,16 +1,43 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
 const catalogPath = path.join(
   root,
   'android/app/src/main/assets/nodejs-project/provider_catalog.json',
 );
+const generatorPath = path.join(
+  root,
+  'tools/9router_mobile/sync-provider-catalog.mjs',
+);
+const supportPath = path.join(
+  root,
+  'tools/9router_mobile/provider-support.json',
+);
+const upstreamRoot = process.env.NINE_ROUTER_ROOT || 'D:/9router';
 
 function loadCatalog() {
   return JSON.parse(fs.readFileSync(catalogPath, 'utf8')).providers;
+}
+
+function runGenerator(support, output) {
+  return spawnSync(
+    process.execPath,
+    [
+      generatorPath,
+      '--upstream',
+      upstreamRoot,
+      '--support',
+      support,
+      '--output',
+      output,
+    ],
+    { cwd: root, encoding: 'utf8' },
+  );
 }
 
 test('generated provider catalog only contains supported LLM categories', () => {
@@ -21,23 +48,28 @@ test('generated provider catalog only contains supported LLM categories', () => 
   assert.ok(providers.every((provider) => allowed.has(provider.category)));
 });
 
-test('generated provider ids are unique and unsupported entries explain why', () => {
+test('generated catalog contains only explicitly actionable providers', () => {
   const providers = loadCatalog();
   const ids = providers.map((provider) => provider.id);
 
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(
-    providers
-      .filter((provider) => !provider.mobileSupported)
-      .every(
-        (provider) =>
-          typeof provider.unsupportedReason === 'string' &&
-          provider.unsupportedReason.trim().length > 0,
-      ),
+    providers.every((provider) =>
+      ['ready', 'customOnly'].includes(provider.disposition),
+    ),
+  );
+  assert.ok(providers.every((provider) => provider.mobileSupported === true));
+  assert.ok(providers.every((provider) => provider.androidAuth));
+  assert.ok(providers.every((provider) => provider.transportKind));
+  assert.ok(providers.every((provider) => provider.chatUrl));
+  assert.ok(
+    providers.every((provider) =>
+      provider.models.every((model) => !model.id.includes('embedding')),
+    ),
   );
 });
 
-test('Android auth capabilities distinguish native, gateway, and desktop flows', () => {
+test('generated catalog excludes candidate and removed providers', () => {
   const providers = new Map(loadCatalog().map((provider) => [provider.id, provider]));
 
   assert.deepEqual(
@@ -48,28 +80,24 @@ test('Android auth capabilities distinguish native, gateway, and desktop flows',
     },
     { androidAuth: 'device', nativeStatus: 'ready', tokenRefresh: 'exchange' },
   );
-  for (const id of ['antigravity', 'claude', 'codex']) {
-    assert.equal(providers.get(id).androidAuth, 'gateway');
-    assert.equal(providers.get(id).gatewayFallback, true);
-    assert.equal(providers.get(id).nativeStatus, 'blocked');
-    assert.equal(
-      providers.get(id).nativeBlockReason,
-      'public_client_registration_missing',
-    );
+  for (const id of ['antigravity', 'claude', 'codex', 'cursor', 'qwen', 'xai']) {
+    assert.equal(providers.has(id), false, id);
   }
-  assert.equal(providers.get('xai').androidAuth, 'apiKey');
-  assert.equal(providers.get('xai').nativeStatus, 'ready');
-  assert.equal(providers.get('cursor').androidAuth, 'unsupported');
-  assert.equal(providers.get('cursor').gatewayFallback, false);
 });
 
-test('every catalog provider has a conservative Android auth capability', () => {
-  const allowedAuth = new Set(['device', 'pkce', 'loopback', 'apiKey', 'gateway', 'unsupported']);
-  const allowedStatus = new Set(['ready', 'experimental', 'blocked']);
+test('generator fails closed when an upstream LLM provider is unclassified', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'uit-catalog-'));
+  const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));
+  delete support.apikey.deepseek;
+  const temporarySupport = path.join(directory, 'support.json');
+  const temporaryOutput = path.join(directory, 'catalog.json');
+  fs.writeFileSync(temporarySupport, JSON.stringify(support));
 
-  for (const provider of loadCatalog()) {
-    assert.ok(allowedAuth.has(provider.androidAuth), provider.id);
-    assert.ok(allowedStatus.has(provider.nativeStatus), provider.id);
-    assert.equal(typeof provider.gatewayFallback, 'boolean', provider.id);
+  try {
+    const result = runGenerator(temporarySupport, temporaryOutput);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unclassified provider: apikey\/deepseek/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
 });

@@ -1,55 +1,340 @@
 {
   "oauth": {
-    "antigravity": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
-    "claude": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
-    "cline": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
-    "clinepass": { "mobileSupported": false, "unsupportedReason": "Requires browser extension port extraction" },
-    "codebuddy-cn": { "mobileSupported": false, "unsupportedReason": "Desktop-only utility authentication" },
-    "codex": { "mobileSupported": true, "androidAuth": "gateway", "gatewayFallback": true, "nativeStatus": "blocked", "nativeBlockReason": "public_client_registration_missing" },
-    "cursor": { "mobileSupported": false, "unsupportedReason": "Requires local Cursor SQLite DB path parsing" },
-    "github": { "mobileSupported": true, "androidAuth": "device", "gatewayFallback": true, "nativeStatus": "ready", "tokenRefresh": "exchange", "defaultBaseUrl": "https://api.githubcopilot.com" },
-    "gitlab": { "mobileSupported": false, "unsupportedReason": "Requires desktop token flow" },
-    "grok-cli": { "mobileSupported": false, "unsupportedReason": "Requires local CLI configuration path access" },
-    "iflow": { "mobileSupported": false, "unsupportedReason": "Requires desktop system configuration" },
-    "kilocode": { "mobileSupported": false, "unsupportedReason": "Requires local CLI helper launch" },
-    "kimchi": { "mobileSupported": false, "unsupportedReason": "Requires browser automation helper" },
-    "kimi": { "mobileSupported": false, "unsupportedReason": "Requires desktop cookie extractor" },
-    "qwen": { "mobileSupported": false, "unsupportedReason": "OAuth tier ended upstream on 2026-04-15" },
-    "xai": { "mobileSupported": true, "androidAuth": "apiKey", "gatewayFallback": true, "nativeStatus": "ready", "defaultBaseUrl": "https://api.x.ai/v1" }
+    "antigravity": {
+      "disposition": "remove",
+      "reason": "Excluded from mobile release pending safe supported flow"
+    },
+    "claude": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "cline": {
+      "disposition": "remove",
+      "reason": "Requires browser extension port extraction"
+    },
+    "clinepass": {
+      "disposition": "remove",
+      "reason": "Requires browser extension port extraction"
+    },
+    "codebuddy-cn": {
+      "disposition": "candidate",
+      "reason": "Desktop-only utility authentication"
+    },
+    "codex": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "cursor": {
+      "disposition": "remove",
+      "reason": "Requires local Cursor SQLite DB path parsing"
+    },
+    "github": {
+      "disposition": "ready",
+      "androidAuth": "device",
+      "transportKind": "githubCopilot",
+      "chatUrl": "https://api.githubcopilot.com/chat/completions",
+      "modelsUrl": "https://api.githubcopilot.com/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "quotaAdapter": "githubCopilot",
+      "nativeStatus": "ready",
+      "tokenRefresh": "exchange",
+      "defaultBaseUrl": "https://api.githubcopilot.com"
+    },
+    "gitlab": {
+      "disposition": "candidate",
+      "reason": "Requires desktop token flow"
+    },
+    "grok-cli": {
+      "disposition": "candidate",
+      "reason": "Requires local CLI configuration path access"
+    },
+    "iflow": {
+      "disposition": "remove",
+      "reason": "Requires desktop system configuration"
+    },
+    "kilocode": {
+      "disposition": "candidate",
+      "reason": "Requires local CLI helper launch"
+    },
+    "kimchi": {
+      "disposition": "remove",
+      "reason": "Requires browser automation helper"
+    },
+    "kimi": {
+      "disposition": "candidate",
+      "reason": "Requires desktop cookie extractor"
+    },
+    "qwen": {
+      "disposition": "remove",
+      "reason": "OAuth tier ended upstream on 2026-04-15"
+    },
+    "xai": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    }
   },
   "free": {
-    "gemini-cli": { "mobileSupported": true, "androidAuth": "loopback", "gatewayFallback": true, "nativeStatus": "experimental", "tokenRefresh": "refreshToken", "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal" },
-    "kiro": { "mobileSupported": false, "unsupportedReason": "Requires local desktop daemon" },
-    "mimo-free": { "mobileSupported": false, "unsupportedReason": "Requires desktop environment variables" },
-    "opencode": { "mobileSupported": true },
-    "qoder": { "mobileSupported": false, "unsupportedReason": "Requires Google SSO token copy-paste flow" }
+    "gemini-cli": {
+      "disposition": "ready",
+      "androidAuth": "loopback",
+      "transportKind": "geminiCli",
+      "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "modelsUrl": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "quotaAdapter": "geminiCli",
+      "nativeStatus": "experimental",
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal"
+    },
+    "kiro": {
+      "disposition": "candidate",
+      "reason": "Requires local desktop daemon"
+    },
+    "mimo-free": {
+      "disposition": "candidate",
+      "reason": "Requires desktop environment variables"
+    },
+    "opencode": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "qoder": {
+      "disposition": "candidate",
+      "reason": "Requires Google SSO token copy-paste flow"
+    }
   },
   "freeTier": {
-    "byteplus-modelark": { "mobileSupported": true },
-    "cloudflare-ai": { "mobileSupported": true },
-    "coqui-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "edge-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "gemini": { "mobileSupported": true },
-    "google-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "local-device": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "nvidia": { "mobileSupported": true },
-    "ollama-cloud": { "mobileSupported": true },
-    "openrouter": { "mobileSupported": true },
-    "searxng": { "mobileSupported": false, "unsupportedReason": "Search-only provider excluded from Chat" },
-    "tortoise-tts": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "vertex": { "mobileSupported": true }
+    "byteplus": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "byteplus-modelark": {
+      "disposition": "remove",
+      "reason": "Not a supported mobile chat provider"
+    },
+    "cloudflare-ai": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "coqui-tts": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "edge-tts": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "gemini": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "google-tts": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "local-device": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "nvidia": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "ollama": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "ollama-cloud": {
+      "disposition": "remove",
+      "reason": "Not a supported mobile chat provider"
+    },
+    "openrouter": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "searxng": {
+      "disposition": "remove",
+      "reason": "Search-only provider excluded from Chat"
+    },
+    "tortoise-tts": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "vertex": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    }
   },
   "apikey": {
-    "deepseek": { "mobileSupported": true },
-    "groq": { "mobileSupported": true },
-    "mistral": { "mobileSupported": true },
-    "openai": { "mobileSupported": true },
-    "assemblyai": { "mobileSupported": false, "unsupportedReason": "Audio-only provider excluded from Chat" },
-    "aws-polly": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "cartesia": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "deepgram": { "mobileSupported": false, "unsupportedReason": "Audio-only provider excluded from Chat" },
-    "elevenlabs": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "inworld": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" },
-    "playht": { "mobileSupported": false, "unsupportedReason": "TTS-only provider excluded from Chat" }
+    "alicode": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "alicode-intl": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "alims-intl": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "anthropic": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "assemblyai": {
+      "disposition": "remove",
+      "reason": "Audio-only provider excluded from Chat"
+    },
+    "aws-polly": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "azure": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "blackbox": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "cartesia": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "cerebras": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "chutes": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "cohere": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "commandcode": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "deepgram": {
+      "disposition": "remove",
+      "reason": "Audio-only provider excluded from Chat"
+    },
+    "deepseek": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "elevenlabs": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "featherless": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "fireworks": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "glm": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "glm-cn": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "groq": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "hyperbolic": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "inworld": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "minimax": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "minimax-cn": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "mistral": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "mmf": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "nebius": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "ollama-local": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "openai": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "opencode-go": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "perplexity": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "perplexity-agent": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "playht": {
+      "disposition": "remove",
+      "reason": "TTS-only provider excluded from Chat"
+    },
+    "siliconflow": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "together": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "venice": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "vercel-ai-gateway": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "vertex-partner": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "volcengine-ark": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "xiaomi-mimo": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    },
+    "xiaomi-tokenplan": {
+      "disposition": "candidate",
+      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+    }
   }
 }

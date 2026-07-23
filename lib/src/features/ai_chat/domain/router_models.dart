@@ -10,6 +10,18 @@ enum RouterNativeStatus { ready, experimental, blocked }
 
 enum RouterTokenRefresh { exchange, refreshToken, none }
 
+enum RouterTransportKind {
+  openaiChat,
+  anthropicMessages,
+  geminiContent,
+  ollamaChat,
+  openaiResponses,
+  customOpenAi,
+  githubCopilot,
+  geminiCli,
+  unsupported,
+}
+
 class RouterModelDefinition {
   const RouterModelDefinition({required this.id, required this.name});
 
@@ -43,6 +55,8 @@ class RouterProviderDefinition {
     this.nativeStatus = RouterNativeStatus.blocked,
     this.nativeBlockReason,
     this.tokenRefresh = RouterTokenRefresh.none,
+    this.transportKind = RouterTransportKind.unsupported,
+    this.chatUrl,
   });
 
   final String id;
@@ -60,6 +74,8 @@ class RouterProviderDefinition {
   final RouterNativeStatus nativeStatus;
   final String? nativeBlockReason;
   final RouterTokenRefresh tokenRefresh;
+  final RouterTransportKind transportKind;
+  final String? chatUrl;
 
   factory RouterProviderDefinition.fromJson(Map<String, dynamic> json) {
     final catStr = json['category'] as String;
@@ -89,6 +105,22 @@ class RouterProviderDefinition {
       json['androidAuth'] as String?,
       RouterAndroidAuth.unsupported,
     );
+    final nativeStatus = _enumByName(
+      RouterNativeStatus.values,
+      json['nativeStatus'] as String?,
+      RouterNativeStatus.blocked,
+    );
+    final transportKind = _enumByName(
+      RouterTransportKind.values,
+      json['transportKind'] as String?,
+      RouterTransportKind.unsupported,
+    );
+    final chatUrl = Uri.tryParse(json['chatUrl'] as String? ?? '');
+    final hasSafeChatUrl =
+        chatUrl != null &&
+        chatUrl.scheme == 'https' &&
+        chatUrl.host.isNotEmpty &&
+        chatUrl.userInfo.isEmpty;
     final authModes = <RouterAuthMode>[];
     if (androidAuth == RouterAndroidAuth.apiKey ||
         category == RouterProviderCategory.apiKey ||
@@ -103,7 +135,12 @@ class RouterProviderDefinition {
       name: json['name'] as String,
       category: category,
       authModes: authModes,
-      mobileSupported: json['mobileSupported'] as bool? ?? true,
+      mobileSupported:
+          json['mobileSupported'] == true &&
+          androidAuth != RouterAndroidAuth.unsupported &&
+          nativeStatus != RouterNativeStatus.blocked &&
+          transportKind != RouterTransportKind.unsupported &&
+          hasSafeChatUrl,
       unsupportedReason: json['unsupportedReason'] as String?,
       quotaSupported: json['quotaSupported'] as bool? ?? false,
       models: modelsList,
@@ -111,17 +148,15 @@ class RouterProviderDefinition {
       defaultBaseUrl: json['defaultBaseUrl'] as String?,
       androidAuth: androidAuth,
       gatewayFallback: json['gatewayFallback'] as bool? ?? false,
-      nativeStatus: _enumByName(
-        RouterNativeStatus.values,
-        json['nativeStatus'] as String?,
-        RouterNativeStatus.blocked,
-      ),
+      nativeStatus: nativeStatus,
       nativeBlockReason: json['nativeBlockReason'] as String?,
       tokenRefresh: _enumByName(
         RouterTokenRefresh.values,
         json['tokenRefresh'] as String?,
         RouterTokenRefresh.none,
       ),
+      transportKind: transportKind,
+      chatUrl: json['chatUrl'] as String?,
     );
   }
 }

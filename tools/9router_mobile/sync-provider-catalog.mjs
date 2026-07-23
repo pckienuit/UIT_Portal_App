@@ -1,20 +1,60 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const upstreamArg = process.argv.indexOf('--upstream');
 const UPSTREAM_ROOT = upstreamArg >= 0
   ? process.argv[upstreamArg + 1]
   : process.env.NINE_ROUTER_ROOT || 'D:/9router';
 const REGISTRY_DIR = path.join(UPSTREAM_ROOT, 'open-sse/providers/registry');
-const SUPPORT_FILE = './tools/9router_mobile/provider-support.json';
-const OUTPUT_FILE = './android/app/src/main/assets/nodejs-project/provider_catalog.json';
+const supportArg = process.argv.indexOf('--support');
+const outputArg = process.argv.indexOf('--output');
+const SUPPORT_FILE = supportArg >= 0
+  ? process.argv[supportArg + 1]
+  : './tools/9router_mobile/provider-support.json';
+const OUTPUT_FILE = outputArg >= 0
+  ? process.argv[outputArg + 1]
+  : './android/app/src/main/assets/nodejs-project/provider_catalog.json';
 const CHECK_ONLY = process.argv.includes('--check');
+const LOCK_FILE = './tools/9router_mobile/upstream-lock.json';
 const SUPPORTED_CATEGORIES = new Set(['oauth', 'free', 'freeTier', 'apikey']);
+const DISPOSITIONS = new Set(['ready', 'candidate', 'remove', 'customOnly']);
+const ANDROID_AUTH = new Set(['device', 'loopback', 'pkce', 'apiKey']);
+const TRANSPORT_KINDS = new Set([
+  'openaiChat',
+  'anthropicMessages',
+  'geminiContent',
+  'ollamaChat',
+  'openaiResponses',
+  'customOpenAi',
+  'githubCopilot',
+  'geminiCli',
+]);
 
 function run() {
   if (!fs.existsSync(REGISTRY_DIR)) {
     console.error(`Upstream path not found: ${REGISTRY_DIR}`);
     process.exit(1);
+  }
+
+  const lock = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
+  const upstreamCommit = execFileSync(
+    'git',
+    ['-C', UPSTREAM_ROOT, 'rev-parse', 'HEAD'],
+    { encoding: 'utf8' },
+  ).trim();
+  if (upstreamCommit !== lock.commit) {
+    throw new Error(
+      `Upstream lock mismatch: expected ${lock.commit}, found ${upstreamCommit}`,
+    );
+  }
+  try {
+    execFileSync(
+      'git',
+      ['-C', UPSTREAM_ROOT, 'diff', '--quiet', 'HEAD', '--', 'open-sse/providers/registry'],
+    );
+  } catch {
+    throw new Error('Locked upstream provider registry has tracked modifications');
   }
 
   const support = JSON.parse(fs.readFileSync(SUPPORT_FILE, 'utf8'));
@@ -65,47 +105,54 @@ function run() {
       if (displayIconMatch) icon = displayIconMatch[1];
     }
 
-    // Resolve support status
-    let mobileSupported = false;
-    let unsupportedReason = 'Not yet classified or media-only';
-
-    if (support[category] && support[category][id]) {
-      const sup = support[category][id];
-      mobileSupported = sup.mobileSupported === true;
-      unsupportedReason = sup.mobileSupported ? null : (sup.unsupportedReason || 'Desktop-only flow');
-    } else {
-      // Default fallback for custom or unclassified key/free providers
-      if (category === 'apikey' || category === 'freeTier') {
-        mobileSupported = true; // Key-based generally supported unless marked false
-        unsupportedReason = null;
+    const providerSupport = support[category]?.[id];
+    if (!providerSupport) {
+      throw new Error(`Unclassified provider: ${category}/${id}`);
+    }
+    if (!DISPOSITIONS.has(providerSupport.disposition)) {
+      throw new Error(`Invalid disposition for ${category}/${id}`);
+    }
+    if (providerSupport.disposition === 'candidate' || providerSupport.disposition === 'remove') {
+      if (typeof providerSupport.reason !== 'string' || !providerSupport.reason.trim()) {
+        throw new Error(`Missing audit reason for ${category}/${id}`);
+      }
+      continue;
+    }
+    if (!ANDROID_AUTH.has(providerSupport.androidAuth)) {
+      throw new Error(`Invalid androidAuth for ${category}/${id}`);
+    }
+    if (!TRANSPORT_KINDS.has(providerSupport.transportKind)) {
+      throw new Error(`Invalid transportKind for ${category}/${id}`);
+    }
+    if (typeof providerSupport.chatUrl !== 'string' || !providerSupport.chatUrl.trim()) {
+      throw new Error(`Missing chatUrl for ${category}/${id}`);
+    }
+    const chatUrl = new URL(providerSupport.chatUrl);
+    if (chatUrl.protocol !== 'https:' || chatUrl.username || chatUrl.password) {
+      throw new Error(`Unsafe chatUrl for ${category}/${id}`);
+    }
+    for (const field of ['modelsUrl', 'defaultBaseUrl']) {
+      const value = providerSupport[field];
+      if (value == null) continue;
+      const url = new URL(value);
+      if (url.protocol !== 'https:' || url.username || url.password) {
+        throw new Error(`Unsafe ${field} for ${category}/${id}`);
       }
     }
 
-    const providerSupport = support[category]?.[id] || {};
-    const androidAuth = providerSupport.androidAuth || (
-      category === 'apikey' || category === 'freeTier'
-        ? 'apiKey'
-        : mobileSupported
-          ? 'gateway'
-          : 'unsupported'
-    );
-    const gatewayFallback = providerSupport.gatewayFallback ?? androidAuth === 'gateway';
-    const nativeStatus = providerSupport.nativeStatus || (
-      androidAuth === 'apiKey' ? 'ready' : 'blocked'
-    );
-
     // Collect capability flags
     const hasOAuth = content.includes('oauth:') || content.includes('hasOAuth');
-    const hasUsage = content.includes('usage: true') || content.includes('features:');
+
 
     // Parse models list
     const models = [];
     const modelsBlockMatch = content.match(/\bmodels\s*:\s*\[([\s\S]*?)\]\s*(?:,|\n|})/);
     if (modelsBlockMatch) {
       const modelsStr = modelsBlockMatch[1];
-      const modelRegex = /\{\s*id\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']/g;
+      const modelRegex = /\{\s*id\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']([^}]*)\}/g;
       let m;
       while ((m = modelRegex.exec(modelsStr)) !== null) {
+        if (/\bkind\s*:\s*["'](?!llm["'])/.test(m[3])) continue;
         models.push({ id: m[1], name: m[2] });
       }
       if (id === 'gemini-cli') {
@@ -127,16 +174,25 @@ function run() {
       category,
       color,
       icon,
-      mobileSupported,
-      unsupportedReason,
+      disposition: providerSupport.disposition,
+      mobileSupported: true,
+      unsupportedReason: null,
       hasOAuth,
-      quotaSupported: hasUsage,
-      androidAuth,
-      gatewayFallback,
-      nativeStatus,
+      quotaSupported: providerSupport.quotaAdapter != null,
+      quotaAdapter: providerSupport.quotaAdapter || null,
+      androidAuth: providerSupport.androidAuth,
+      gatewayFallback: false,
+      nativeStatus: providerSupport.nativeStatus || 'ready',
       nativeBlockReason: providerSupport.nativeBlockReason || null,
       tokenRefresh: providerSupport.tokenRefresh || 'none',
       defaultBaseUrl: providerSupport.defaultBaseUrl || null,
+      transportKind: providerSupport.transportKind,
+      chatUrl: providerSupport.chatUrl,
+      modelsUrl: providerSupport.modelsUrl || null,
+      authHeader: providerSupport.authHeader || null,
+      authScheme: providerSupport.authScheme || null,
+      requiredFields: providerSupport.requiredFields || [],
+      staticHeaders: providerSupport.staticHeaders || {},
       models,
     });
   }

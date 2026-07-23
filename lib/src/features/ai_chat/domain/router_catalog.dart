@@ -16,32 +16,48 @@ class RouterCatalog {
       _providers = list
           .cast<Map<String, dynamic>>()
           .where(
-            (item) => supportedCategories.contains(item['category'] as String?),
+            (item) =>
+                supportedCategories.contains(item['category'] as String?) &&
+                (item['disposition'] == 'ready' ||
+                    item['disposition'] == 'customOnly') &&
+                item['mobileSupported'] == true,
           )
           .map(RouterProviderDefinition.fromJson)
+          .where((item) => item.mobileSupported)
           .toList();
 
       // Inject local model
-      _providers.insert(0, const RouterProviderDefinition(
-        id: 'local_qwen',
-        name: 'Qwen 3.5 0.8B (Local)',
-        category: RouterProviderCategory.local,
-        authModes: [RouterAuthMode.none],
-        note: 'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
-        models: [
-          RouterModelDefinition(id: 'qwen-0.8b-local', name: 'Qwen 3.5 0.8B (Local)')
-        ]
-      ));
+      _providers.insert(
+        0,
+        const RouterProviderDefinition(
+          id: 'local_qwen',
+          name: 'Qwen 3.5 0.8B (Local)',
+          category: RouterProviderCategory.local,
+          authModes: [RouterAuthMode.none],
+          note:
+              'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
+          models: [
+            RouterModelDefinition(
+              id: 'qwen-0.8b-local',
+              name: 'Qwen 3.5 0.8B (Local)',
+            ),
+          ],
+        ),
+      );
 
       // Inject custom OpenAI
-      _providers.insert(1, const RouterProviderDefinition(
-        id: 'custom',
-        name: 'Tùy chỉnh (OpenAI Compatible)',
-        category: RouterProviderCategory.custom,
-        authModes: [RouterAuthMode.custom],
-        note: 'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
-        models: []
-      ));
+      _providers.insert(
+        1,
+        const RouterProviderDefinition(
+          id: 'custom',
+          name: 'Tùy chỉnh (OpenAI Compatible)',
+          category: RouterProviderCategory.custom,
+          authModes: [RouterAuthMode.custom],
+          note:
+              'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
+          models: [],
+        ),
+      );
     } catch (e) {
       // Fallback in case of failure
       _providers = [
@@ -50,19 +66,24 @@ class RouterCatalog {
           name: 'Qwen 3.5 0.8B (Local)',
           category: RouterProviderCategory.local,
           authModes: [RouterAuthMode.none],
-          note: 'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
+          note:
+              'Mô hình offline chạy trực tiếp bằng CPU thiết bị, không cần mạng.',
           models: [
-            RouterModelDefinition(id: 'qwen-0.8b-local', name: 'Qwen 3.5 0.8B (Local)')
-          ]
+            RouterModelDefinition(
+              id: 'qwen-0.8b-local',
+              name: 'Qwen 3.5 0.8B (Local)',
+            ),
+          ],
         ),
         const RouterProviderDefinition(
           id: 'custom',
           name: 'Tùy chỉnh (OpenAI Compatible)',
           category: RouterProviderCategory.custom,
           authModes: [RouterAuthMode.custom],
-          note: 'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
-          models: []
-        )
+          note:
+              'Kết nối mọi Server AI tương thích định dạng OpenAI Completions.',
+          models: [],
+        ),
       ];
     }
   }
