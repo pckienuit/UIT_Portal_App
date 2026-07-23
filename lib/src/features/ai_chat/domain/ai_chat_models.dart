@@ -4,6 +4,21 @@ enum AiMessageRole { system, user, assistant }
 
 enum AiMessageStatus { complete, streaming, failed, cancelled }
 
+class AiProviderModelDescriptor {
+  const AiProviderModelDescriptor({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  Map<String, String> toJson() => {'id': id, 'name': name};
+
+  factory AiProviderModelDescriptor.fromJson(Map<String, dynamic> json) =>
+      AiProviderModelDescriptor(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? json['id'] as String,
+      );
+}
+
 class AiProviderConfig {
   const AiProviderConfig({
     required this.id,
@@ -17,6 +32,12 @@ class AiProviderConfig {
     this.credentialKind,
     this.tokenExpiresAt,
     this.projectId,
+    this.transportKind,
+    this.chatUrl,
+    this.modelsUrl,
+    this.authHeader,
+    this.authScheme,
+    this.models = const [],
   });
 
   final String id;
@@ -30,6 +51,12 @@ class AiProviderConfig {
   final String? credentialKind;
   final DateTime? tokenExpiresAt;
   final String? projectId;
+  final String? transportKind;
+  final String? chatUrl;
+  final String? modelsUrl;
+  final String? authHeader;
+  final String? authScheme;
+  final List<AiProviderModelDescriptor> models;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -43,6 +70,12 @@ class AiProviderConfig {
     'credentialKind': credentialKind,
     'tokenExpiresAt': tokenExpiresAt?.toUtc().toIso8601String(),
     'projectId': projectId,
+    'transportKind': transportKind,
+    'chatUrl': chatUrl,
+    'modelsUrl': modelsUrl,
+    'authHeader': authHeader,
+    'authScheme': authScheme,
+    'models': models.map((model) => model.toJson()).toList(),
   };
 
   factory AiProviderConfig.fromJson(Map<String, dynamic> json) =>
@@ -60,6 +93,21 @@ class AiProviderConfig {
             ? null
             : DateTime.tryParse(json['tokenExpiresAt'] as String),
         projectId: json['projectId'] as String?,
+        transportKind: json['transportKind'] as String?,
+        chatUrl: json['chatUrl'] as String?,
+        modelsUrl: json['modelsUrl'] as String?,
+        authHeader: json['authHeader'] as String?,
+        authScheme: json['authScheme'] as String?,
+        models:
+            (json['models'] as List<dynamic>?)
+                ?.whereType<Map>()
+                .map(
+                  (model) => AiProviderModelDescriptor.fromJson(
+                    Map<String, dynamic>.from(model),
+                  ),
+                )
+                .toList(growable: false) ??
+            const [],
       );
 
   AiProviderConfig copyWith({
@@ -72,6 +120,12 @@ class AiProviderConfig {
     String? Function()? credentialKind,
     DateTime? Function()? tokenExpiresAt,
     String? Function()? projectId,
+    String? Function()? transportKind,
+    String? Function()? chatUrl,
+    String? Function()? modelsUrl,
+    String? Function()? authHeader,
+    String? Function()? authScheme,
+    List<AiProviderModelDescriptor>? models,
   }) {
     return AiProviderConfig(
       id: id,
@@ -89,6 +143,14 @@ class AiProviderConfig {
           ? tokenExpiresAt()
           : this.tokenExpiresAt,
       projectId: projectId != null ? projectId() : this.projectId,
+      transportKind: transportKind != null
+          ? transportKind()
+          : this.transportKind,
+      chatUrl: chatUrl != null ? chatUrl() : this.chatUrl,
+      modelsUrl: modelsUrl != null ? modelsUrl() : this.modelsUrl,
+      authHeader: authHeader != null ? authHeader() : this.authHeader,
+      authScheme: authScheme != null ? authScheme() : this.authScheme,
+      models: models ?? this.models,
     );
   }
 }

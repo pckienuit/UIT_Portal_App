@@ -206,6 +206,12 @@
     },
     "cerebras": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://api.cerebras.ai/v1/chat/completions",
+      "modelsUrl": "https://api.cerebras.ai/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "chutes": {
@@ -226,6 +232,12 @@
     },
     "deepseek": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://api.deepseek.com/chat/completions",
+      "modelsUrl": "https://api.deepseek.com/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "elevenlabs": {
@@ -250,6 +262,12 @@
     },
     "groq": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://api.groq.com/openai/v1/chat/completions",
+      "modelsUrl": "https://api.groq.com/openai/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "hyperbolic": {
@@ -270,6 +288,12 @@
     },
     "mistral": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://api.mistral.ai/v1/chat/completions",
+      "modelsUrl": "https://api.mistral.ai/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "mmf": {
@@ -286,6 +310,11 @@
     },
     "openai": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://api.openai.com/v1/chat/completions",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "opencode-go": {

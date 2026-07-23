@@ -1,3 +1,5 @@
+import 'ai_chat_models.dart';
+
 enum AiProviderTier { freeQuota, officialApi, custom }
 
 class AiProviderPreset {
@@ -9,6 +11,12 @@ class AiProviderPreset {
     this.defaultModelId = '',
     this.requiresBaseUrl = false,
     this.note,
+    this.transportKind,
+    this.chatUrl,
+    this.modelsUrl,
+    this.authHeader,
+    this.authScheme,
+    this.models = const [],
   });
 
   final String id;
@@ -18,6 +26,12 @@ class AiProviderPreset {
   final String defaultModelId;
   final bool requiresBaseUrl;
   final String? note;
+  final String? transportKind;
+  final String? chatUrl;
+  final String? modelsUrl;
+  final String? authHeader;
+  final String? authScheme;
+  final List<AiProviderModelDescriptor> models;
 }
 
 class AiProviderCatalog {

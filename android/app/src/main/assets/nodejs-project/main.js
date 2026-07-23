@@ -69,6 +69,24 @@ try {
         ...(connection.mobileMetadata?.projectId
           ? { projectId: connection.mobileMetadata.projectId }
           : {}),
+        ...(connection.mobileMetadata?.transportKind
+          ? { transportKind: connection.mobileMetadata.transportKind }
+          : {}),
+        ...(connection.mobileMetadata?.chatUrl
+          ? { chatUrl: connection.mobileMetadata.chatUrl }
+          : {}),
+        ...(connection.mobileMetadata?.modelsUrl
+          ? { modelsUrl: connection.mobileMetadata.modelsUrl }
+          : {}),
+        ...(connection.mobileMetadata?.authHeader
+          ? { authHeader: connection.mobileMetadata.authHeader }
+          : {}),
+        ...(connection.mobileMetadata?.authScheme !== undefined
+          ? { authScheme: connection.mobileMetadata.authScheme }
+          : {}),
+        ...(connection.mobileMetadata?.models?.length
+          ? { models: connection.mobileMetadata.models }
+          : {}),
         authMode: connection.authMode || 'apiKey',
         active: connection.id === activeConnectionId,
         apiKey: runtimeSecrets.get(connection.id)?.runtimeToken || '',
@@ -94,6 +112,12 @@ try {
           baseUrl: provider.baseUrl,
           systemPrompt: provider.systemPrompt || '',
           projectId: provider.projectId || '',
+          transportKind: provider.transportKind,
+          chatUrl: provider.chatUrl,
+          modelsUrl: provider.modelsUrl,
+          authHeader: provider.authHeader,
+          authScheme: provider.authScheme,
+          models: Array.isArray(provider.models) ? provider.models : [],
         },
         createdAt: provider.createdAt || timestamp,
         updatedAt: timestamp,
@@ -150,6 +174,33 @@ try {
   function sendJson(response, statusCode, data) {
     response.writeHead(statusCode, { 'content-type': 'application/json' });
     response.end(JSON.stringify(data));
+  }
+
+  function sendSanitizedUpstreamError(response, upstreamResponse, _errorBody, provider) {
+    // Upstream-controlled error fields may echo credentials. Log metadata only.
+    logToFile(
+      `Upstream ${provider.presetId || provider.id} HTTP ${upstreamResponse.status}`,
+      'ERROR',
+    );
+    return sendJson(response, upstreamResponse.status, { error: 'upstream_request_failed' });
+  }
+
+  function providerAuthHeaders(provider) {
+    if (!provider.apiKey) return {};
+    const authHeader = provider.authHeader || 'Authorization';
+    const authScheme = provider.authScheme === undefined || provider.authScheme === null
+      ? 'Bearer'
+      : provider.authScheme;
+    return { [authHeader]: authScheme ? `${authScheme} ${provider.apiKey}` : provider.apiKey };
+  }
+
+  function configuredModels(provider) {
+    const models = Array.isArray(provider.models) ? provider.models : [];
+    const ids = models
+      .map((model) => typeof model === 'string' ? model : model?.id)
+      .filter((id) => typeof id === 'string' && id.trim());
+    if (!ids.length && provider.modelId) ids.push(provider.modelId);
+    return ids.map((id) => ({ id, object: 'model', owned_by: provider.id }));
   }
 
   const server = http.createServer(async (request, response) => {
@@ -220,10 +271,23 @@ try {
           return sendJson(response, 502, { error: 'upstream_models_unavailable' });
         }
       }
+      if (activeProvider.modelsUrl) {
+        try {
+          const upstream = await fetch(activeProvider.modelsUrl, {
+            headers: { accept: 'application/json', ...providerAuthHeaders(activeProvider) },
+          });
+          if (upstream.ok) {
+            const payload = await upstream.json();
+            if (Array.isArray(payload?.data) && payload.data.every(
+              (model) => model && typeof model.id === 'string' && model.id.trim(),
+            )) {
+              return sendJson(response, 200, { data: payload.data });
+            }
+          }
+        } catch (_) {}
+      }
       return sendJson(response, 200, {
-        data: [
-          { id: activeProvider.modelId, object: 'model', owned_by: activeProvider.id }
-        ]
+        data: configuredModels(activeProvider),
       });
     }
 
@@ -268,53 +332,35 @@ try {
         }
 
         const customKey = request.headers['x-provider-key'];
-        if (customKey) {
-          headers['authorization'] = `Bearer ${customKey}`;
-        } else if (activeProvider.apiKey) {
-          headers['authorization'] = `Bearer ${activeProvider.apiKey}`;
+        const providerKey = customKey || activeProvider.apiKey;
+        if (providerKey) {
+          const authHeader = activeProvider.authHeader || 'Authorization';
+          const authScheme = activeProvider.authScheme === undefined || activeProvider.authScheme === null
+            ? 'Bearer'
+            : activeProvider.authScheme;
+          headers[authHeader] = authScheme ? `${authScheme} ${providerKey}` : providerKey;
         }
 
         const startTime = Date.now();
         const targetUrl = isGeminiCli
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
-          : `${activeProvider.baseUrl}/chat/completions`;
+          : activeProvider.transportKind === 'openaiChat' && activeProvider.chatUrl
+            ? activeProvider.chatUrl
+            : `${activeProvider.baseUrl}/chat/completions`;
 
         if (requestedStream) {
           if (!isGeminiCli) {
             body.stream_options = { ...(body.stream_options || {}), include_usage: true };
           }
-          const providerKey = customKey || activeProvider.apiKey;
           const upstreamResponse = await fetch(targetUrl, {
             method: 'POST',
-            headers: {
-              ...headers,
-              ...(providerKey ? { authorization: `Bearer ${providerKey}` } : {})
-            },
+            headers,
             body: JSON.stringify(body)
           });
 
           if (!upstreamResponse.ok) {
             const errorBody = Buffer.from(await upstreamResponse.arrayBuffer());
-            try {
-              const parsedError = JSON.parse(errorBody.toString('utf8'));
-              const detail = parsedError.error || parsedError;
-              const safeMessage = String(detail.message || '')
-                .split(/\s+/)
-                .join(' ')
-                .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
-                .slice(0, 300);
-              logToFile(
-                `Upstream ${activeProvider.presetId || activeProvider.id} HTTP ${upstreamResponse.status}: ` +
-                JSON.stringify({ code: detail.code, type: detail.type, message: safeMessage }),
-                'ERROR',
-              );
-            } catch (_) {
-              logToFile(`Upstream ${activeProvider.presetId || activeProvider.id} HTTP ${upstreamResponse.status}`, 'ERROR');
-            }
-            response.writeHead(upstreamResponse.status, {
-              'content-type': upstreamResponse.headers.get('content-type') || 'application/json',
-            });
-            response.end(errorBody);
+            sendSanitizedUpstreamError(response, upstreamResponse, errorBody, activeProvider);
             db.usage.push({
               id: randomUUID(), timestamp: new Date().toISOString(),
               providerId: activeProvider.presetId || activeProvider.id,
@@ -409,8 +455,17 @@ try {
             body: JSON.stringify(body)
           });
 
-          const upstreamData = await upstreamResponse.json();
-          const resData = isGeminiCli && upstreamResponse.ok
+          const upstreamBody = Buffer.from(await upstreamResponse.arrayBuffer());
+          if (!upstreamResponse.ok) {
+            return sendSanitizedUpstreamError(
+              response,
+              upstreamResponse,
+              upstreamBody,
+              activeProvider,
+            );
+          }
+          const upstreamData = JSON.parse(upstreamBody.toString('utf8'));
+          const resData = isGeminiCli
             ? geminiResponseToOpenAi(upstreamData, activeProvider.modelId)
             : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
@@ -432,12 +487,11 @@ try {
           return;
         }
       } catch (e) {
-        const safeMessage = String(e?.message || e)
-          .split(/\s+/)
-          .join(' ')
-          .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
-          .slice(0, 300);
-        logToFile(`Chat routing failed: ${safeMessage}`, 'ERROR');
+        // Error messages can embed upstream bodies or credentials. Log class only.
+        const errorName = typeof e?.name === 'string' && /^[A-Za-z]+Error$/.test(e.name)
+          ? e.name
+          : 'Error';
+        logToFile(`Chat routing failed: ${errorName}`, 'ERROR');
         if (response.destroyed || response.writableEnded) return;
         if (response.headersSent) {
           response.destroy();
@@ -472,6 +526,12 @@ try {
           systemPrompt: data.systemPrompt || '',
           authMode: data.authMode || 'apiKey',
           projectId: data.projectId || '',
+          transportKind: data.transportKind,
+          chatUrl: data.chatUrl,
+          modelsUrl: data.modelsUrl,
+          authHeader: data.authHeader,
+          authScheme: data.authScheme,
+          models: Array.isArray(data.models) ? data.models : [],
           active: !!data.active,
           apiKey: data.apiKey || '',
           sourceToken: data.sourceToken || ''
@@ -498,6 +558,12 @@ try {
         if (data.modelId !== undefined) provider.modelId = data.modelId;
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
         if (data.projectId !== undefined) provider.projectId = data.projectId;
+        if (data.transportKind !== undefined) provider.transportKind = data.transportKind;
+        if (data.chatUrl !== undefined) provider.chatUrl = data.chatUrl;
+        if (data.modelsUrl !== undefined) provider.modelsUrl = data.modelsUrl;
+        if (data.authHeader !== undefined) provider.authHeader = data.authHeader;
+        if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
+        if (data.models !== undefined) provider.models = Array.isArray(data.models) ? data.models : [];
         if (data.apiKey !== undefined) provider.apiKey = data.apiKey;
         if (data.sourceToken !== undefined) provider.sourceToken = data.sourceToken;
         if (data.active !== undefined) {

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 
 class _QuotaAdapter implements HttpClientAdapter {
@@ -31,6 +32,32 @@ class _QuotaAdapter implements HttpClientAdapter {
 }
 
 void main() {
+  test('provider config serializes runtime descriptor models for PATCH', () {
+    final config = AiProviderConfig(
+      id: 'deepseek-1',
+      name: 'DeepSeek',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://api.deepseek.com',
+      modelId: 'deepseek-chat',
+      transportKind: 'openaiChat',
+      chatUrl: 'https://api.deepseek.com/chat/completions',
+      modelsUrl: 'https://api.deepseek.com/models',
+      authHeader: 'Authorization',
+      authScheme: 'Bearer',
+      models: const [
+        AiProviderModelDescriptor(id: 'deepseek-chat', name: 'DeepSeek Chat'),
+      ],
+    );
+
+    expect(config.toJson()['models'], [
+      {'id': 'deepseek-chat', 'name': 'DeepSeek Chat'},
+    ]);
+    expect(
+      AiProviderConfig.fromJson(config.toJson()).models.single.id,
+      'deepseek-chat',
+    );
+  });
+
   test(
     'quota client targets connection and parses typed non-2xx body',
     () async {

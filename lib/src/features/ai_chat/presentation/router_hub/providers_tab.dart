@@ -351,6 +351,17 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
           definition.models.firstOrNull?.id ?? legacy?.defaultModelId ?? '',
       requiresBaseUrl: definition.id == 'custom',
       note: definition.note ?? legacy?.note,
+      transportKind: definition.transportKind.name,
+      chatUrl: definition.chatUrl,
+      modelsUrl: definition.modelsUrl,
+      authHeader: definition.authHeader,
+      authScheme: definition.authScheme,
+      models: definition.models
+          .map(
+            (model) =>
+                AiProviderModelDescriptor(id: model.id, name: model.name),
+          )
+          .toList(growable: false),
     );
   }
 

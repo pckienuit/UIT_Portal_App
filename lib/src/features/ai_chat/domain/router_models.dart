@@ -61,6 +61,7 @@ class RouterQuotaEntry {
       }
       return value;
     }
+
     return RouterQuotaEntry(
       id: id,
       label: label,
@@ -104,7 +105,8 @@ class RouterQuotaSnapshot {
       _ => throw const FormatException('Unknown quota status'),
     };
     final rawBuckets = json['entries'];
-    if ((status == RouterQuotaStatus.fresh || status == RouterQuotaStatus.stale) &&
+    if ((status == RouterQuotaStatus.fresh ||
+            status == RouterQuotaStatus.stale) &&
         rawBuckets is! List) {
       throw const FormatException('Malformed quota entries');
     }
@@ -124,10 +126,12 @@ class RouterQuotaSnapshot {
       fetchedAt: fetchedAt?.toUtc(),
       entries: rawBuckets is List
           ? rawBuckets
-              .map((item) => RouterQuotaEntry.fromJson(
+                .map(
+                  (item) => RouterQuotaEntry.fromJson(
                     Map<String, dynamic>.from(item as Map),
-                  ))
-              .toList(growable: false)
+                  ),
+                )
+                .toList(growable: false)
           : const [],
       message: (json['message'] ?? json['error']) as String?,
     );
@@ -181,6 +185,9 @@ class RouterProviderDefinition {
     this.tokenRefresh = RouterTokenRefresh.none,
     this.transportKind = RouterTransportKind.unsupported,
     this.chatUrl,
+    this.modelsUrl,
+    this.authHeader,
+    this.authScheme,
   });
 
   final String id;
@@ -200,6 +207,9 @@ class RouterProviderDefinition {
   final RouterTokenRefresh tokenRefresh;
   final RouterTransportKind transportKind;
   final String? chatUrl;
+  final String? modelsUrl;
+  final String? authHeader;
+  final String? authScheme;
 
   factory RouterProviderDefinition.fromJson(Map<String, dynamic> json) {
     final catStr = json['category'] as String;
@@ -281,6 +291,9 @@ class RouterProviderDefinition {
       ),
       transportKind: transportKind,
       chatUrl: json['chatUrl'] as String?,
+      modelsUrl: json['modelsUrl'] as String?,
+      authHeader: json['authHeader'] as String?,
+      authScheme: json['authScheme'] as String?,
     );
   }
 }

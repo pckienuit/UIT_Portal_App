@@ -706,3 +706,235 @@ test('Gemini CLI routes OpenAI chat through Cloud Code envelope', async (t) => {
   assert.doesNotMatch(state, /google-runtime-token/);
   assert.match(state, /cloud-project/);
 });
+
+test('OpenAI Chat descriptor uses exact URL, auth, stream modes, sanitized errors, and model fallback', async (t) => {
+  const received = [];
+  let mode = 'success';
+  const secret = 'descriptor-secret-sentinel';
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    const body = JSON.parse(raw);
+    received.push({ url: request.url, authorization: request.headers.authorization, body });
+    if (mode === 'error') {
+      response.writeHead(401, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error: { message: `bad Bearer ${secret}`, code: 'bad_key' } }));
+      return;
+    }
+    if (body.stream) {
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.end('data: {"choices":[],"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n');
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }], usage: {} }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'descriptor-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const chatUrl = `http://127.0.0.1:${upstream.address().port}/locked/chat/completions`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'descriptor-provider', name: 'Descriptor Provider', presetId: 'openai',
+    baseUrl: 'https://must-not-be-used.example/v1', modelId: 'catalog-fallback-model',
+    apiKey: secret, active: true,
+    transportKind: 'openaiChat', chatUrl,
+    authHeader: 'Authorization', authScheme: 'Bearer', models: [],
+  })).status, 201);
+
+  const models = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.deepEqual(await models.json(), {
+    data: [{ id: 'catalog-fallback-model', object: 'model', owned_by: 'descriptor-provider' }],
+  });
+  const plain = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    stream: false, messages: [{ role: 'user', content: 'plain' }],
+  });
+  assert.equal(plain.status, 200);
+  const streamed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    stream: true, messages: [{ role: 'user', content: 'stream' }],
+  });
+  assert.equal(streamed.status, 200);
+  await streamed.text();
+  assert.deepEqual(received.map((item) => item.url), [
+    '/locked/chat/completions', '/locked/chat/completions',
+  ]);
+  assert.ok(received.every((item) => item.authorization === `Bearer ${secret}`));
+
+  mode = 'error';
+  const failed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    stream: false, messages: [{ role: 'user', content: 'fail' }],
+  });
+  assert.equal(failed.status, 401);
+  assert.deepEqual(await failed.json(), { error: 'upstream_request_failed' });
+  const log = fs.readFileSync(path.join(dataDir, 'router_node.log'), 'utf8');
+  assert.doesNotMatch(log, new RegExp(secret));
+  assert.match(log, /Upstream openai HTTP 401/);
+  assert.doesNotMatch(log, /Bearer\s+/i);
+});
+
+test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => {
+  const secret = 'models-descriptor-secret';
+  const upstream = require('node:http').createServer((request, response) => {
+    assert.equal(request.url, '/locked/models');
+    assert.equal(request.headers['x-api-key'], `Token ${secret}`);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ data: [
+      { id: 'live-model', object: 'model', owned_by: 'upstream' },
+    ] }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'models-descriptor-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'models-descriptor', name: 'Models Descriptor', presetId: 'deepseek',
+    baseUrl: 'https://must-not-be-used.example/v1', modelId: 'fallback-model',
+    ['api' + 'Key']: secret, active: true, transportKind: 'openaiChat',
+    modelsUrl: `http://127.0.0.1:${upstream.address().port}/locked/models`,
+    authHeader: 'X-API-Key', authScheme: 'Token',
+    models: [{ id: 'catalog-model', name: 'Catalog Model' }],
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { data: [
+    { id: 'live-model', object: 'model', owned_by: 'upstream' },
+  ] });
+});
+
+test('OpenAI Chat model descriptor falls back to catalog then configured model', async (t) => {
+  let mode = 'malformed';
+  const upstream = require('node:http').createServer((_request, response) => {
+    if (mode === 'malformed') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('{broken');
+      return;
+    }
+    response.destroy();
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'models-fallback-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'models-fallback', name: 'Models Fallback', presetId: 'groq',
+    baseUrl: 'https://unused.example/v1', modelId: 'configured-model',
+    ['api' + 'Key']: 'fallback-secret', active: true,
+    modelsUrl: `http://127.0.0.1:${upstream.address().port}/models`,
+    authHeader: 'Authorization', authScheme: 'Bearer',
+    models: [{ id: 'catalog-a', name: 'Catalog A' }, { id: 'catalog-b' }],
+  })).status, 201);
+
+  for (const expectedMode of ['malformed', 'unavailable']) {
+    mode = expectedMode;
+    const response = await request(baseUrl, token, 'GET', '/v1/models');
+    assert.equal(response.status, 200, expectedMode);
+    assert.deepEqual((await response.json()).data.map((model) => model.id), [
+      'catalog-a', 'catalog-b',
+    ], expectedMode);
+  }
+
+  assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/models-fallback', {
+    models: [],
+  })).status, 200);
+  const configured = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(configured.status, 200);
+  assert.deepEqual(await configured.json(), { data: [
+    { id: 'configured-model', object: 'model', owned_by: 'models-fallback' },
+  ] });
+});
+
+test('nonstream text and HTML upstream errors are sanitized with upstream status', async (t) => {
+  let status = 429;
+  const secret = 'html-error-secret';
+  const upstream = require('node:http').createServer((_request, response) => {
+    response.writeHead(status, { 'content-type': status === 429 ? 'text/plain' : 'text/html' });
+    response.end(status === 429
+      ? `rate limited Bearer ${secret}`
+      : `<html>gateway failed Bearer ${secret}</html>`);
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'non-json-error-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'non-json-error', name: 'Non JSON Error', presetId: 'openai',
+    baseUrl: 'https://unused.example/v1', modelId: 'model',
+    ['api' + 'Key']: secret, active: true,
+    transportKind: 'openaiChat',
+    chatUrl: `http://127.0.0.1:${upstream.address().port}/chat`,
+    authHeader: 'Authorization', authScheme: 'Bearer',
+  })).status, 201);
+
+  for (const upstreamStatus of [429, 503]) {
+    status = upstreamStatus;
+    const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+      stream: false, messages: [{ role: 'user', content: 'fail' }],
+    });
+    assert.equal(response.status, upstreamStatus);
+    assert.equal(response.headers.get('content-type'), 'application/json');
+    assert.deepEqual(await response.json(), { error: 'upstream_request_failed' });
+  }
+  const log = fs.readFileSync(path.join(dataDir, 'router_node.log'), 'utf8');
+  assert.doesNotMatch(log, new RegExp(secret));
+});
+
+test('provider PATCH persists corrected runtime descriptor and models', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'descriptor-patch-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'descriptor-patch', name: 'Descriptor Patch', presetId: 'openai',
+    baseUrl: 'https://old.example/v1', modelId: 'old-model', active: true,
+  })).status, 201);
+  const corrected = {
+    transportKind: 'openaiChat',
+    chatUrl: 'https://correct.example/chat',
+    modelsUrl: 'https://correct.example/models',
+    authHeader: 'X-API-Key',
+    authScheme: '',
+    models: [{ id: 'correct-model', name: 'Correct Model' }],
+  };
+  assert.equal((await request(
+    baseUrl, token, 'PATCH', '/internal/providers/descriptor-patch', corrected,
+  )).status, 200);
+
+  const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(corrected).map((key) => [key, providers[0][key]])),
+    corrected,
+  );
+  const state = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(corrected).map((key) => [key, state.connections[0].mobileMetadata[key]])),
+    corrected,
+  );
+});

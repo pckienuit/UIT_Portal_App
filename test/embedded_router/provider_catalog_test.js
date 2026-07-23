@@ -85,6 +85,28 @@ test('generated catalog excludes candidate and removed providers', () => {
   }
 });
 
+test('straightforward OpenAI Chat candidates lock exact upstream descriptors', () => {
+  const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));
+  const expected = {
+    openai: ['https://api.openai.com/v1/chat/completions', null],
+    deepseek: ['https://api.deepseek.com/chat/completions', 'https://api.deepseek.com/models'],
+    groq: ['https://api.groq.com/openai/v1/chat/completions', 'https://api.groq.com/openai/v1/models'],
+    mistral: ['https://api.mistral.ai/v1/chat/completions', 'https://api.mistral.ai/v1/models'],
+    cerebras: ['https://api.cerebras.ai/v1/chat/completions', 'https://api.cerebras.ai/v1/models'],
+  };
+
+  for (const [id, [chatUrl, modelsUrl]] of Object.entries(expected)) {
+    const provider = support.apikey[id];
+    assert.equal(provider.disposition, 'candidate', id);
+    assert.equal(provider.transportKind, 'openaiChat', id);
+    assert.equal(provider.chatUrl, chatUrl, id);
+    assert.equal(provider.modelsUrl ?? null, modelsUrl, id);
+    assert.equal(provider.authHeader, 'Authorization', id);
+    assert.equal(provider.authScheme, 'Bearer', id);
+    assert.doesNotMatch(provider.chatUrl, /\{[^}]+\}/, id);
+  }
+});
+
 test('generator fails closed when an upstream LLM provider is unclassified', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'uit-catalog-'));
   const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));

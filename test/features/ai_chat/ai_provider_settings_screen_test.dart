@@ -309,6 +309,51 @@ void main() {
   });
 
   testWidgets(
+    'known endpoint is locked while custom Base URL remains editable',
+    (tester) async {
+      await RouterCatalog.load('''{"providers":[
+      {"id":"openai","name":"OpenAI","category":"apikey","disposition":"ready","mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","transportKind":"openaiChat","chatUrl":"https://api.openai.com/v1/chat/completions","defaultBaseUrl":"https://api.openai.com/v1","models":[{"id":"gpt-4o-mini","name":"GPT-4o Mini"}]}
+    ]}''');
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          routerRuntimeServiceProvider.overrideWith(
+            _StoppedRouterRuntimeService.new,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AiProviderSettingsScreen()),
+        ),
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(find.text('OpenAI'));
+      await tester.tap(find.text('OpenAI'));
+      await tester.pumpAndSettle();
+      var baseUrl = tester.widget<TextFormField>(
+        find.widgetWithText(TextFormField, 'Base URL'),
+      );
+      expect(baseUrl.controller?.text, 'https://api.openai.com/v1');
+      expect(baseUrl.enabled, isFalse);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Tùy chỉnh (OpenAI Compatible)'));
+      await tester.tap(find.text('Tùy chỉnh (OpenAI Compatible)'));
+      await tester.pumpAndSettle();
+      baseUrl = tester.widget<TextFormField>(
+        find.widgetWithText(TextFormField, 'Base URL'),
+      );
+      expect(baseUrl.enabled, isTrue);
+    },
+  );
+
+  testWidgets(
     'ready device OAuth provider is actionable without GitHub hard-code',
     (tester) async {
       await RouterCatalog.load('''{"providers":[

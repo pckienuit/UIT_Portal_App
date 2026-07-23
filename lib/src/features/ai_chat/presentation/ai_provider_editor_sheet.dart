@@ -10,17 +10,14 @@ import '../data/ai_provider_repository.dart';
 import '../data/ai_backend_factory.dart';
 
 class AiProviderEditorSheet extends ConsumerStatefulWidget {
-  const AiProviderEditorSheet({
-    super.key,
-    required this.preset,
-    this.config,
-  });
+  const AiProviderEditorSheet({super.key, required this.preset, this.config});
 
   final AiProviderPreset preset;
   final AiProviderConfig? config;
 
   @override
-  ConsumerState<AiProviderEditorSheet> createState() => _AiProviderEditorSheetState();
+  ConsumerState<AiProviderEditorSheet> createState() =>
+      _AiProviderEditorSheetState();
 }
 
 class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
@@ -40,10 +37,13 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     super.initState();
     _nameController.text = widget.config?.name ?? widget.preset.name;
     _baseUrlController.text = widget.config?.baseUrl ?? widget.preset.baseUrl;
-    _modelIdController.text = widget.config?.modelId ?? widget.preset.defaultModelId;
-    
+    _modelIdController.text =
+        widget.config?.modelId ?? widget.preset.defaultModelId;
+
     if (widget.config != null) {
-      ref.read(aiProviderRepositoryProvider).getApiKey(widget.config!.id).then((key) {
+      ref.read(aiProviderRepositoryProvider).getApiKey(widget.config!.id).then((
+        key,
+      ) {
         if (mounted && key != null) {
           _apiKeyController.text = key;
         }
@@ -69,7 +69,9 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     });
 
     final key = _apiKeyController.text.trim();
-    final baseUrl = AiProviderValidator.normalizeBaseUrl(_baseUrlController.text);
+    final baseUrl = AiProviderValidator.normalizeBaseUrl(
+      _baseUrlController.text,
+    );
     final modelId = _modelIdController.text.trim();
 
     final config = AiProviderConfig(
@@ -85,16 +87,16 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
 
     try {
       await repo.saveProvider(config, apiKey: key);
-      
+
       final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
       final backend = await factory.buildBackend(config);
-      
+
       if (backend != null) {
         final result = await backend.testConnection();
         setState(() {
           _testSuccess = result.success;
-          _testResult = result.success 
-              ? 'Kết nối thành công!' 
+          _testResult = result.success
+              ? 'Kết nối thành công!'
               : (result.errorMessage ?? 'Kết nối thất bại.');
         });
         await backend.dispose();
@@ -120,9 +122,13 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final id = widget.config?.id ?? 'provider-${widget.preset.id}-${DateTime.now().millisecondsSinceEpoch}';
-    final baseUrl = AiProviderValidator.normalizeBaseUrl(_baseUrlController.text);
-    
+    final id =
+        widget.config?.id ??
+        'provider-${widget.preset.id}-${DateTime.now().millisecondsSinceEpoch}';
+    final baseUrl = AiProviderValidator.normalizeBaseUrl(
+      _baseUrlController.text,
+    );
+
     final config = AiProviderConfig(
       id: id,
       name: _nameController.text.trim(),
@@ -131,6 +137,12 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       modelId: _modelIdController.text.trim(),
       presetId: widget.preset.id,
       systemPrompt: widget.config?.systemPrompt,
+      transportKind: widget.preset.transportKind,
+      chatUrl: widget.preset.chatUrl,
+      modelsUrl: widget.preset.modelsUrl,
+      authHeader: widget.preset.authHeader,
+      authScheme: widget.preset.authScheme,
+      models: widget.preset.models,
     );
 
     final key = _apiKeyController.text.trim();
@@ -145,23 +157,26 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     }
   }
 
-  Future<void> _testHealthInBackground(AiProviderConfig config, String apiKey) async {
+  Future<void> _testHealthInBackground(
+    AiProviderConfig config,
+    String apiKey,
+  ) async {
     final notifier = ref.read(aiProviderControllerProvider.notifier);
     notifier.updateProviderHealth(config.id, AiProviderHealth.checking);
-    
+
     try {
       final secureStorage = ref.read(secureStorageProvider);
       final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
       final backend = await factory.buildBackend(config);
-      
+
       if (backend != null) {
         final result = await backend.testConnection();
         notifier.updateProviderHealth(
-          config.id, 
+          config.id,
           result.success ? AiProviderHealth.connected : AiProviderHealth.failed,
           errorMessage: result.errorMessage,
         );
-        
+
         if (result.success) {
           final models = await backend.listModels();
           if (models.isNotEmpty) {
@@ -170,10 +185,18 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
         }
         await backend.dispose();
       } else {
-        notifier.updateProviderHealth(config.id, AiProviderHealth.failed, errorMessage: 'Không thể tạo backend');
+        notifier.updateProviderHealth(
+          config.id,
+          AiProviderHealth.failed,
+          errorMessage: 'Không thể tạo backend',
+        );
       }
     } catch (e) {
-      notifier.updateProviderHealth(config.id, AiProviderHealth.failed, errorMessage: e.toString());
+      notifier.updateProviderHealth(
+        config.id,
+        AiProviderHealth.failed,
+        errorMessage: e.toString(),
+      );
     }
   }
 
@@ -197,9 +220,15 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.config == null ? 'Thêm ${widget.preset.name}' : 'Sửa ${widget.preset.name}',
-                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        widget.config == null
+                            ? 'Thêm ${widget.preset.name}'
+                            : 'Sửa ${widget.preset.name}',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -231,9 +260,14 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                           labelText: 'Base URL',
                           hintText: 'https://api.openai.com/v1',
                         ),
-                        enabled: widget.preset.id == 'custom' || widget.preset.requiresBaseUrl,
+                        enabled:
+                            widget.preset.id == 'custom' ||
+                            widget.preset.requiresBaseUrl,
                         validator: (value) {
-                          final err = AiProviderValidator.validateBaseUrl(value ?? '', debugMode: true);
+                          final err = AiProviderValidator.validateBaseUrl(
+                            value ?? '',
+                            debugMode: true,
+                          );
                           return err;
                         },
                       ),
@@ -242,17 +276,24 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                         controller: _apiKeyController,
                         decoration: InputDecoration(
                           labelText: 'API Key',
-                          hintText: widget.config != null ? '••••••••' : 'Nhập API key...',
+                          hintText: widget.config != null
+                              ? '••••••••'
+                              : 'Nhập API key...',
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureApiKey ? Icons.visibility : Icons.visibility_off,
+                              _obscureApiKey
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
                             ),
-                            onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                            onPressed: () => setState(
+                              () => _obscureApiKey = !_obscureApiKey,
+                            ),
                           ),
                         ),
                         obscureText: _obscureApiKey,
                         validator: (value) {
-                          if (widget.config == null && (value == null || value.trim().isEmpty)) {
+                          if (widget.config == null &&
+                              (value == null || value.trim().isEmpty)) {
                             return 'API Key không được để trống';
                           }
                           return null;
@@ -280,13 +321,17 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                   Padding(
                     padding: EdgeInsets.only(bottom: PortalSpacing.md),
                     child: Card(
-                      color: _testSuccess ? Colors.green.shade50 : Colors.red.shade50,
+                      color: _testSuccess
+                          ? Colors.green.shade50
+                          : Colors.red.shade50,
                       child: Padding(
                         padding: EdgeInsets.all(PortalSpacing.sm),
                         child: Text(
                           _testResult!,
                           style: TextStyle(
-                            color: _testSuccess ? Colors.green.shade900 : Colors.red.shade900,
+                            color: _testSuccess
+                                ? Colors.green.shade900
+                                : Colors.red.shade900,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
@@ -303,7 +348,9 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text('Thử kết nối'),
                       ),
