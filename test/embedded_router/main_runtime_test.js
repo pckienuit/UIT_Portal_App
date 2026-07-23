@@ -150,6 +150,44 @@ test('quota refresh is honest when provider has no quota adapter', async (t) => 
 });
 
 
+test('provider delete removes persisted quota snapshot', async (t) => {
+  const dataDir = tempDir();
+  fs.writeFileSync(path.join(dataDir, '9router_state.json'), JSON.stringify({
+    schemaVersion: 2,
+    connections: [{
+      id: 'quota-provider',
+      providerId: 'openai',
+      displayName: 'Quota Provider',
+      authMode: 'apiKey',
+      modelId: 'model',
+      enabled: true,
+      mobileMetadata: { baseUrl: 'https://example.test/v1' },
+    }],
+    activeRoute: null,
+    usage: [],
+    quota: { 'quota-provider': { used: 10, total: 100 } },
+  }));
+  const port = await freePort();
+  const token = 'delete-quota-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  assert.equal((await request(
+    baseUrl,
+    token,
+    'DELETE',
+    '/internal/providers/quota-provider',
+  )).status, 200);
+  const state = JSON.parse(
+    fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'),
+  );
+  assert.deepEqual(state.quota, {});
+});
+
 test('edit delete and reset preserve schema v2 semantics', async (t) => {
   const dataDir = tempDir();
   const port = await freePort();

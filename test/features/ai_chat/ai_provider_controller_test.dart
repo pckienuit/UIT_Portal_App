@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,7 @@ import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_backend_factory.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
+import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
 
 void main() {
@@ -61,11 +64,16 @@ void main() {
 
   late SharedPreferences prefs;
   late _FakeSecureStorage fakeSecureStorage;
+  late Directory historyDirectory;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     fakeSecureStorage = _FakeSecureStorage();
+    historyDirectory = await Directory.systemTemp.createTemp(
+      'provider-controller',
+    );
+    addTearDown(() => historyDirectory.delete(recursive: true));
   });
 
   test(
@@ -75,6 +83,7 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
         ],
       );
       addTearDown(container.dispose);
@@ -137,10 +146,136 @@ void main() {
       expect(state.activeProviderId, isNull);
     },
   );
+
+  test('delete retries local cleanup without deleting Core twice', () async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"p1","name":"Provider 1","kind":"openAiCompatible","baseUrl":"https://example.test/v1","modelId":"m1","presetId":"openai"}]',
+    );
+    fakeSecureStorage
+      .._storage['ai_provider_key_p1'] = 'test-secret'
+      ..failNextDelete = true;
+    final admin = _FakeRouterAdminClient();
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        routerRuntimeServiceProvider.overrideWith(
+          _ReadyRouterRuntimeService.new,
+        ),
+        routerAdminClientProvider.overrideWithValue(admin),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(aiProviderControllerProvider.notifier);
+
+    await expectLater(
+      controller.deleteProvider('p1'),
+      throwsA(isA<StateError>()),
+    );
+    await controller.deleteProvider('p1');
+
+    expect(admin.deletedIds, ['p1']);
+    expect(container.read(aiProviderControllerProvider).providers, isEmpty);
+  });
+
+  test('delete surfaces fallback activation failure', () async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"p1","name":"One","kind":"openAiCompatible","baseUrl":"https://one.test/v1","modelId":"m1"},{"id":"p2","name":"Two","kind":"openAiCompatible","baseUrl":"https://two.test/v1","modelId":"m2"}]',
+    );
+    await prefs.setString('ai_active_provider_id_v1', 'p1');
+    final admin = _FakeRouterAdminClient(setActiveResult: false);
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        routerRuntimeServiceProvider.overrideWith(
+          _ReadyRouterRuntimeService.new,
+        ),
+        routerAdminClientProvider.overrideWithValue(admin),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await expectLater(
+      container
+          .read(aiProviderControllerProvider.notifier)
+          .deleteProvider('p1'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Không thể chuyển provider dự phòng an toàn. Vui lòng thử lại.',
+        ),
+      ),
+    );
+
+    admin.setActiveResult = true;
+    await container
+        .read(aiProviderControllerProvider.notifier)
+        .deleteProvider('p1');
+    expect(admin.activatedIds, ['p2', 'p2']);
+  });
+
+  test('delete invokes controller-level generation stop callback', () async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"p1","name":"One","kind":"openAiCompatible","baseUrl":"https://one.test/v1","modelId":"m1"}]',
+    );
+    final stopped = <String>[];
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        providerDeletionStopCallbackProvider.overrideWithValue(stopped.add),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(aiProviderControllerProvider.notifier)
+        .deleteProvider('p1');
+
+    expect(stopped, ['p1']);
+  });
+}
+
+class _ReadyRouterRuntimeService extends RouterRuntimeService {
+  @override
+  RouterStatus build() => const RouterStatus(
+    state: RouterState.ready,
+    baseUrl: 'http://127.0.0.1:1',
+    bearer: 'test-bearer',
+  );
+}
+
+class _FakeRouterAdminClient extends Fake implements RouterAdminClient {
+  _FakeRouterAdminClient({this.setActiveResult = true});
+
+  bool setActiveResult;
+  final List<String> deletedIds = [];
+  final List<String> activatedIds = [];
+
+  @override
+  Future<bool> deleteProvider(String id) async {
+    deletedIds.add(id);
+    return true;
+  }
+
+  @override
+  Future<bool> setActiveProvider(String id) async {
+    activatedIds.add(id);
+    return setActiveResult;
+  }
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
   final Map<String, String> _storage = {};
+  bool failNextDelete = false;
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
@@ -158,6 +293,10 @@ class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
       final key = invocation.namedArguments[#key] as String;
       return Future<String?>.value(_storage[key]);
     } else if (name.contains('delete')) {
+      if (failNextDelete) {
+        failNextDelete = false;
+        throw StateError('simulated local cleanup failure');
+      }
       final key = invocation.namedArguments[#key] as String;
       _storage.remove(key);
       return Future<void>.value();

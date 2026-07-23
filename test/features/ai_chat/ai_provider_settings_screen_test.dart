@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -351,9 +353,105 @@ void main() {
     expect(find.text('Đăng nhập Gemini CLI'), findsOneWidget);
     expect(find.text('Dùng qua 9Router'), findsNothing);
   });
+
+  testWidgets('connected OAuth shows logout and switch account instead of login', (
+    tester,
+  ) async {
+    await RouterCatalog.load(
+      '''{"providers":[{"id":"github","name":"GitHub Copilot","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"transportKind":"githubCopilot","chatUrl":"https://api.githubcopilot.com/chat/completions","models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}]}''',
+    );
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"provider-github","name":"GitHub Copilot","kind":"openAiCompatible","baseUrl":"https://api.githubcopilot.com","modelId":"gpt-5.4","presetId":"github","authMode":"oauth"}]',
+    );
+    await prefs.setString('ai_active_provider_id_v1', 'provider-github');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Đăng nhập GitHub'), findsNothing);
+    expect(find.text('Đã đăng nhập'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsOneWidget);
+    expect(find.text('Đổi tài khoản'), findsOneWidget);
+    expect(find.text('Model: gpt-5.4'), findsOneWidget);
+  });
+
+  testWidgets('API-key deletion confirms, labels action, and bounds failure', (
+    tester,
+  ) async {
+    await RouterCatalog.load(
+      '''{"providers":[{"id":"openai","name":"OpenAI","category":"apikey","disposition":"ready","mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","transportKind":"openaiChat","chatUrl":"https://api.openai.com/v1/chat/completions","defaultBaseUrl":"https://api.openai.com/v1","models":[{"id":"gpt-test","name":"Test"}]}]}''',
+    );
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"provider-openai","name":"OpenAI","kind":"openAiCompatible","baseUrl":"https://api.openai.com/v1","modelId":"gpt-test","presetId":"openai","authMode":"apiKey"}]',
+    );
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(_FailingDeleteSecureStorage()),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.ensureVisible(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Xóa API key'), findsOneWidget);
+    await tester.tap(find.text('Xóa API key'));
+    await tester.pumpAndSettle();
+    expect(find.text('Xóa API key?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Xóa API key'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Không thể xóa API key an toàn. Vui lòng thử lại.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _StoppedRouterRuntimeService extends RouterRuntimeService {
   @override
   RouterStatus build() => const RouterStatus(state: RouterState.stopped);
+}
+
+class _FailingDeleteSecureStorage extends Fake implements FlutterSecureStorage {
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.memberName.toString().contains('delete')) {
+      throw StateError('simulated delete failure');
+    }
+    if (invocation.memberName.toString().contains('read')) {
+      return Future<String?>.value(null);
+    }
+    return super.noSuchMethod(invocation);
+  }
 }

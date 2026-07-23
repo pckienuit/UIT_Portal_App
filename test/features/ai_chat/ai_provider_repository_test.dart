@@ -185,6 +185,50 @@ void main() {
     expect(await repository.getApiKey(config.id), 'copilot-runtime');
     expect(await repository.getOAuthSourceToken(config.id), 'github-source');
   });
+
+  test(
+    'delete removes runtime and source OAuth tokens but preserves other provider',
+    () async {
+      const target = AiProviderConfig(
+        id: 'provider-github',
+        name: 'GitHub',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test',
+        modelId: 'm',
+        presetId: 'github',
+        authMode: 'oauth',
+      );
+      const keep = AiProviderConfig(
+        id: 'provider-gemini-cli',
+        name: 'Gemini',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test',
+        modelId: 'm',
+        presetId: 'gemini-cli',
+        authMode: 'oauth',
+      );
+      await repository.saveProvider(
+        target,
+        oauthAccessToken: 'runtime-target',
+        oauthSourceToken: 'source-target',
+      );
+      await repository.saveProvider(
+        keep,
+        oauthAccessToken: 'runtime-keep',
+        oauthSourceToken: 'source-keep',
+      );
+      await repository.setActiveProviderId(target.id);
+
+      await repository.deleteProvider(target.id);
+
+      expect(await repository.getApiKey(target.id), isNull);
+      expect(await repository.getOAuthSourceToken(target.id), isNull);
+      expect(repository.getActiveProviderId(), isNull);
+      expect(repository.listProviders().single.id, keep.id);
+      expect(await repository.getApiKey(keep.id), 'runtime-keep');
+      expect(await repository.getOAuthSourceToken(keep.id), 'source-keep');
+    },
+  );
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {

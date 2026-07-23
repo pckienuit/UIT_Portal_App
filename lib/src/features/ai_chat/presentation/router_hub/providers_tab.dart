@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/foundations/portal_spacing.dart';
 import '../../application/ai_provider_controller.dart';
+
 import '../../data/local_model_catalog.dart';
 import '../../domain/ai_chat_models.dart';
 import '../../domain/ai_provider_catalog.dart';
@@ -12,6 +13,7 @@ import '../ai_model_download_section.dart';
 import '../ai_provider_editor_sheet.dart';
 import '../widgets/ai_provider_card.dart';
 import 'github_oauth_sheet.dart';
+import 'router_metrics_tabs.dart';
 
 class RouterProvidersTab extends ConsumerStatefulWidget {
   const RouterProvidersTab({super.key});
@@ -124,6 +126,10 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
 
     if (definition.authModes.contains(RouterAuthMode.oauth) &&
         definition.androidAuth != RouterAndroidAuth.apiKey) {
+      final config = configs.firstOrNull;
+      if (config != null) {
+        return _buildConnectedOAuth(definition, config, notifier, state);
+      }
       if ((definition.androidAuth == RouterAndroidAuth.device ||
               definition.androidAuth == RouterAndroidAuth.loopback ||
               definition.androidAuth == RouterAndroidAuth.pkce) &&
@@ -182,8 +188,9 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
               isActive: state.activeProviderId == config.id,
               onConnect: () => _openEditor(preset),
               onEdit: () => _openEditor(preset, config: config),
-              onDelete: () => notifier.deleteProvider(config.id),
+              onDelete: () => _deleteApiKey(notifier, config.id),
               onSelect: () => notifier.selectActiveProvider(config.id),
+              deleteLabel: 'Xóa API key',
             ),
           AiProviderCard(
             preset: preset,
@@ -204,8 +211,128 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       isActive: config != null && state.activeProviderId == config.id,
       onConnect: () => _openEditor(preset),
       onEdit: () => _openEditor(preset, config: config),
-      onDelete: () => notifier.deleteProvider(config!.id),
+      onDelete: () => _deleteApiKey(notifier, config!.id),
       onSelect: () => notifier.selectActiveProvider(config!.id),
+      deleteLabel: 'Xóa API key',
+    );
+  }
+
+  Future<void> _deleteApiKey(AiProviderController notifier, String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa API key?'),
+        content: const Text(
+          'API key cục bộ và hội thoại của provider này sẽ bị xóa.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Xóa API key'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await notifier.deleteProvider(id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể xóa API key an toàn. Vui lòng thử lại.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildConnectedOAuth(
+    RouterProviderDefinition definition,
+    AiProviderConfig config,
+    AiProviderController notifier,
+    AiProviderState state,
+  ) {
+    Future<bool> removeConnection() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Đăng xuất provider?'),
+          content: const Text(
+            'Credential cục bộ và hội thoại của provider này sẽ bị xóa. Tài khoản tại nhà cung cấp không bị xóa.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Đăng xuất'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return false;
+      try {
+        await notifier.deleteProvider(config.id);
+        ref.invalidate(routerQuotaProvider);
+        return true;
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể đăng xuất an toàn. Vui lòng thử lại.'),
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
+      child: Padding(
+        padding: const EdgeInsets.all(PortalSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              definition.name,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const Text('Đã đăng nhập'),
+            Text('Model: ${config.modelId}'),
+            if (state.activeProviderId == config.id) const Text('Đang dùng'),
+            Wrap(
+              spacing: PortalSpacing.sm,
+              children: [
+                TextButton(
+                  onPressed: removeConnection,
+                  child: const Text('Đăng xuất'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    if (await removeConnection() && mounted) {
+                      await showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) =>
+                            GithubOAuthSheet(definition: definition),
+                      );
+                    }
+                  },
+                  child: const Text('Đổi tài khoản'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

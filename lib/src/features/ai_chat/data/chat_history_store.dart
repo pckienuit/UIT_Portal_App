@@ -7,7 +7,7 @@ class ChatHistoryStore {
   ChatHistoryStore({required this.directory});
 
   final Directory directory;
-  
+
   static const int maxConversations = 20;
   static const int maxMessages = 100;
   static const String _fileName = 'conversations.json';
@@ -21,11 +21,18 @@ class ChatHistoryStore {
       final content = await file.readAsString(encoding: utf8);
       final data = jsonDecode(content) as Map<String, dynamic>;
       final list = data['conversations'] as List<dynamic>? ?? [];
-      return list.map((e) => AiConversation.fromJson(e as Map<String, dynamic>)).toList();
+      return list
+          .map((e) => AiConversation.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       // Backup corrupted file
       try {
-        final corruptFile = File(p.join(directory.path, '.corrupt-${DateTime.now().millisecondsSinceEpoch}-$_fileName'));
+        final corruptFile = File(
+          p.join(
+            directory.path,
+            '.corrupt-${DateTime.now().millisecondsSinceEpoch}-$_fileName',
+          ),
+        );
         if (await file.exists()) {
           await file.rename(corruptFile.path);
         }
@@ -36,7 +43,7 @@ class ChatHistoryStore {
 
   Future<void> writeHistory(List<AiConversation> history) async {
     final processed = history.map((c) {
-      final messages = c.messages.length > maxMessages 
+      final messages = c.messages.length > maxMessages
           ? c.messages.sublist(c.messages.length - maxMessages)
           : c.messages;
       return AiConversation(
@@ -62,7 +69,7 @@ class ChatHistoryStore {
     await directory.create(recursive: true);
     final tempFile = File(p.join(directory.path, '$_fileName.tmp'));
     await tempFile.writeAsString(jsonEncode(data), encoding: utf8, flush: true);
-    
+
     // Atomic rename
     await tempFile.rename(_file.path);
   }
@@ -72,5 +79,14 @@ class ChatHistoryStore {
     if (await file.exists()) {
       await file.delete();
     }
+  }
+
+  Future<void> deleteForProvider(String providerId) async {
+    final history = await readHistory();
+    await writeHistory(
+      history
+          .where((conversation) => conversation.providerId != providerId)
+          .toList(),
+    );
   }
 }

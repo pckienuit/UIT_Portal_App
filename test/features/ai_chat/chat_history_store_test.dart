@@ -70,14 +70,17 @@ void main() {
     await store.writeHistory(historyList);
 
     final history = await store.readHistory();
-    
+
     // Giới hạn 20 conversation lớn nhất (theo updatedAt mới nhất, tức i = 10 đến 29)
     expect(history.length, ChatHistoryStore.maxConversations);
     expect(history.first.id, 'c-29'); // Mới nhất
 
     // Giới hạn 100 messages mỗi conversation
     expect(history.first.messages.length, ChatHistoryStore.maxMessages);
-    expect(history.first.messages.first.content, 'Msg 20'); // Cũ nhất bị loại (120 - 100 = index 20)
+    expect(
+      history.first.messages.first.content,
+      'Msg 20',
+    ); // Cũ nhất bị loại (120 - 100 = index 20)
   });
 
   test('recovers from corrupted JSON and saves backup', () async {
@@ -91,5 +94,24 @@ void main() {
     final list = tempDir.listSync();
     final backupFound = list.any((e) => e.path.contains('.corrupt-'));
     expect(backupFound, isTrue);
+  });
+
+  test('deletes only conversations scoped to one provider', () async {
+    AiConversation conversation(String id, String providerId) => AiConversation(
+      id: id,
+      title: id,
+      providerId: providerId,
+      modelId: 'model',
+      messages: const [],
+      updatedAt: DateTime(2026),
+    );
+    await store.writeHistory([
+      conversation('target', 'provider-github'),
+      conversation('keep', 'provider-gemini-cli'),
+    ]);
+
+    await store.deleteForProvider('provider-github');
+
+    expect((await store.readHistory()).map((item) => item.id), ['keep']);
   });
 }

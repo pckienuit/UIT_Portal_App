@@ -15,6 +15,7 @@ class AiProviderCard extends ConsumerWidget {
     required this.onDelete,
     required this.onSelect,
     required this.isActive,
+    this.deleteLabel = 'Xóa',
   });
 
   final AiProviderPreset preset;
@@ -24,6 +25,7 @@ class AiProviderCard extends ConsumerWidget {
   final VoidCallback onDelete;
   final VoidCallback onSelect;
   final bool isActive;
+  final String deleteLabel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,9 +47,7 @@ class AiProviderCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isActive 
-              ? colorScheme.primary 
-              : colorScheme.outlineVariant,
+          color: isActive ? colorScheme.primary : colorScheme.outlineVariant,
           width: isActive ? 2.0 : 1.0,
         ),
       ),
@@ -64,12 +64,14 @@ class AiProviderCard extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: isActive 
-                        ? colorScheme.primaryContainer 
+                    backgroundColor: isActive
+                        ? colorScheme.primaryContainer
                         : colorScheme.surfaceContainerHighest,
                     child: Icon(
                       _getIconForPreset(preset.id),
-                      color: isActive ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      color: isActive
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: PortalSpacing.md),
@@ -93,7 +95,10 @@ class AiProviderCard extends ConsumerWidget {
                             if (isActive) ...[
                               const SizedBox(width: PortalSpacing.xs),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(6),
@@ -113,14 +118,18 @@ class AiProviderCard extends ConsumerWidget {
                         if (hasConfig) ...[
                           Text(
                             'Model: ${config!.modelId}',
-                            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: PortalSpacing.xxs),
                           _buildHealthBadge(context, health, error),
                         ] else ...[
                           Text(
                             preset.note ?? '',
-                            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ],
@@ -146,13 +155,20 @@ class AiProviderCard extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                              SizedBox(width: PortalSpacing.sm),
-                              Text('Xóa', style: TextStyle(color: Colors.red)),
+                              const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: PortalSpacing.sm),
+                              Text(
+                                deleteLabel,
+                                style: const TextStyle(color: Colors.red),
+                              ),
                             ],
                           ),
                         ),
@@ -198,9 +214,13 @@ class AiProviderCard extends ConsumerWidget {
     }
   }
 
-  Widget _buildHealthBadge(BuildContext context, AiProviderHealth health, String? error) {
+  Widget _buildHealthBadge(
+    BuildContext context,
+    AiProviderHealth health,
+    String? error,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     Color color;
     String label;
     IconData icon;

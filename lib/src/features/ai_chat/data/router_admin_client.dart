@@ -122,7 +122,6 @@ class RouterAdminClient {
   // Xóa provider connection
   Future<bool> deleteProvider(String id) async {
     try {
-      await secureStorage.delete(key: '$_kSecretPrefix$id');
       final res = await _dio.delete('/internal/providers/$id');
       return res.statusCode == 200;
     } catch (e) {

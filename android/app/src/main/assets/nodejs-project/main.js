@@ -510,6 +510,7 @@ try {
 
       db.providers.splice(index, 1);
       runtimeSecrets.delete(id);
+      delete db.quota[id];
       saveDb(db);
       return sendJson(response, 200, { success: true });
     }
