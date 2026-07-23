@@ -3,29 +3,29 @@ import 'package:uit_portal_app/src/features/ai_chat/domain/ai_provider_catalog.d
 
 void main() {
   group('AiProviderCatalog tests', () {
-    test('Presets contain expected catalog items', () {
-      expect(AiProviderCatalog.presets.length, 10);
-      
+    test('presets exclude the desktop 9Router connection', () {
+      expect(AiProviderCatalog.presets.length, 9);
+
       final ids = AiProviderCatalog.presets.map((e) => e.id).toList();
-      expect(ids, containsAll([
-        '9router',
-        'openrouter',
-        'gemini',
-        'groq',
-        'nvidia',
-        'cerebras',
-        'openai',
-        'deepseek',
-        'mistral',
-        'custom',
-      ]));
+      expect(
+        ids,
+        containsAll([
+          'openrouter',
+          'gemini',
+          'groq',
+          'nvidia',
+          'cerebras',
+          'openai',
+          'deepseek',
+          'mistral',
+          'custom',
+        ]),
+      );
+      expect(ids, isNot(contains('9router')));
     });
 
     test('byId resolves correct preset', () {
-      final p = AiProviderCatalog.byId('9router');
-      expect(p, isNotNull);
-      expect(p!.name, '9Router');
-      expect(p.tier, AiProviderTier.gateway);
+      expect(AiProviderCatalog.byId('9router'), isNull);
 
       final p2 = AiProviderCatalog.byId('gemini');
       expect(p2!.tier, AiProviderTier.freeQuota);

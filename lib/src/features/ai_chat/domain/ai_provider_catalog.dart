@@ -1,9 +1,4 @@
-enum AiProviderTier {
-  gateway,
-  freeQuota,
-  officialApi,
-  custom,
-}
+enum AiProviderTier { freeQuota, officialApi, custom }
 
 class AiProviderPreset {
   const AiProviderPreset({
@@ -30,17 +25,9 @@ class AiProviderCatalog {
 
   static const List<AiProviderPreset> presets = [
     AiProviderPreset(
-      id: '9router',
-      name: '9Router',
-      tier: AiProviderTier.gateway,
-      baseUrl: '',
-      requiresBaseUrl: true,
-      note: 'Dịch vụ định tuyến AI tối ưu hóa chi phí và hiệu năng.',
-    ),
-    AiProviderPreset(
       id: 'openrouter',
       name: 'OpenRouter',
-      tier: AiProviderTier.gateway,
+      tier: AiProviderTier.officialApi,
       baseUrl: 'https://openrouter.ai/api/v1',
       note: 'Kết nối hàng trăm mô hình ngôn ngữ lớn qua một cổng duy nhất.',
     ),
@@ -64,7 +51,8 @@ class AiProviderCatalog {
       name: 'NVIDIA NIM',
       tier: AiProviderTier.freeQuota,
       baseUrl: 'https://integrate.api.nvidia.com/v1',
-      note: 'Môi trường phát triển và thử nghiệm các mô hình hàng đầu từ NVIDIA.',
+      note:
+          'Môi trường phát triển và thử nghiệm các mô hình hàng đầu từ NVIDIA.',
     ),
     AiProviderPreset(
       id: 'cerebras',

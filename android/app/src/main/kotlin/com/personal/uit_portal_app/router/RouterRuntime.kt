@@ -31,7 +31,7 @@ class RouterRuntime(private val context: Context) {
                         status = runCatching { startAndWait() }
                             .getOrElse {
                                 Status.Failed(
-                                    it.message ?: "Không thể khởi động 9Router nội bộ",
+                                    it.message ?: "Không thể khởi động Core AI nội bộ",
                                 )
                             }
                         onComplete(status)
@@ -60,7 +60,7 @@ class RouterRuntime(private val context: Context) {
                 ),
             )
         }.apply {
-            name = "embedded-9router-node"
+            name = "embedded-ai-core-node"
             isDaemon = true
             start()
         }
@@ -70,7 +70,7 @@ class RouterRuntime(private val context: Context) {
             if (isHealthy(baseUrl, bearer)) return Status.Ready(baseUrl, bearer)
             Thread.sleep(100)
         }
-        throw IllegalStateException("9Router nội bộ không phản hồi health check")
+        throw IllegalStateException("Core AI nội bộ không phản hồi health check")
     }
 
     private fun awaitReady(): Status {
@@ -79,7 +79,7 @@ class RouterRuntime(private val context: Context) {
             if (current !is Status.Starting) return current
             Thread.sleep(100)
         }
-        return Status.Failed("9Router nội bộ khởi động quá lâu")
+        return Status.Failed("Core AI nội bộ khởi động quá lâu")
     }
 
     private fun isHealthy(baseUrl: String, bearer: String): Boolean {
@@ -106,7 +106,7 @@ class RouterRuntime(private val context: Context) {
         destination.deleteRecursively()
         copyAssetTree("nodejs-project", destination)
         check(preferences.edit().putLong("apk_update_time", apkUpdateTime).commit()) {
-            "Không thể lưu phiên bản 9Router asset"
+            "Không thể lưu phiên bản Core AI asset"
         }
     }
 

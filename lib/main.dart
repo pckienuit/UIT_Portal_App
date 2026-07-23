@@ -26,7 +26,7 @@ void main() async {
   final authController = AuthController();
   await authController.restoreSession();
 
-  // Load 9Router catalog from assets
+  // Load Core AI nội bộ catalog from assets
   try {
     final catalogStr = await rootBundle.loadString(
       'android/app/src/main/assets/nodejs-project/provider_catalog.json',
@@ -37,7 +37,7 @@ void main() async {
     await RouterCatalog.load('{"providers":[]}');
   }
 
-  // Khởi chạy 9Router nội bộ qua MethodChannel JNI
+  // Khởi chạy Core AI nội bộ qua MethodChannel JNI
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
@@ -50,7 +50,7 @@ void main() async {
       .ensureStarted()
       .then((status) async {
         debugPrint(
-          '9Router runtime initialization status: ${status.state}. BaseUrl: ${status.baseUrl}',
+          'Core AI nội bộ initialization status: ${status.state}. BaseUrl: ${status.baseUrl}',
         );
         if (status.state == RouterState.ready) {
           // Đồng bộ các connection hiện có vào core
@@ -90,15 +90,15 @@ void main() async {
               await client.setActiveProvider(activeId);
             }
             debugPrint(
-              'Synchronized ${coreProviders.length} provider connections with Node core.',
+              'Synchronized ${coreProviders.length} provider connections with Core AI nội bộ.',
             );
           } catch (e) {
-            debugPrint('Failed to sync connections with Node core: $e');
+            debugPrint('Failed to sync connections with Core AI nội bộ: $e');
           }
         }
       })
       .catchError((err) {
-        debugPrint('Failed to initialize 9Router: $err');
+        debugPrint('Failed to initialize Core AI nội bộ: $err');
       });
 
   runApp(

@@ -78,7 +78,7 @@ class AiProviderController extends Notifier<AiProviderState> {
       oauthSourceToken: oauthSourceToken,
     );
 
-    // Đồng bộ sang embedded 9Router core
+    // Đồng bộ sang Core AI nội bộ
     try {
       final client = ref.read(routerAdminClientProvider);
       await client.saveProvider(config, apiKey: oauthAccessToken ?? apiKey);
@@ -104,7 +104,7 @@ class AiProviderController extends Notifier<AiProviderState> {
   Future<void> deleteProvider(String id) async {
     await _repository.deleteProvider(id);
 
-    // Đồng bộ xóa sang embedded 9Router core
+    // Đồng bộ xóa sang Core AI nội bộ
     try {
       final client = ref.read(routerAdminClientProvider);
       await client.deleteProvider(id);

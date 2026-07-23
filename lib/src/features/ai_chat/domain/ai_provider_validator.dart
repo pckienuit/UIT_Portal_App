@@ -33,15 +33,16 @@ class AiProviderValidator {
         if (!debugMode) {
           return 'Base URL bắt buộc sử dụng HTTPS ở chế độ release';
         }
-        
+
         final host = uri.host.toLowerCase();
-        final isLocal = host == 'localhost' ||
-            host == '127.0.0.1' ||
-            host == '10.0.2.2' ||
-            host.startsWith('192.168.') ||
-            host.startsWith('10.') ||
-            host.startsWith('172.');
-            
+        final isLocal =
+            host != '10.0.2.2' &&
+            (host == 'localhost' ||
+                host == '127.0.0.1' ||
+                host.startsWith('192.168.') ||
+                host.startsWith('10.') ||
+                host.startsWith('172.'));
+
         if (!isLocal) {
           return 'HTTP chỉ được phép sử dụng cho localhost hoặc IP mạng LAN ở chế độ debug';
         }

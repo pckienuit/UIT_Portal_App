@@ -37,6 +37,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
         .where(
           (definition) =>
               definition.id != 'local_qwen' &&
+              _isAvailable(definition) &&
               definition.name.toLowerCase().contains(query),
         )
         .toList();
@@ -140,10 +141,8 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: PortalSpacing.xs),
-                Text(
-                  definition.gatewayFallback
-                      ? 'Đăng nhập native hoặc dùng connection có sẵn qua 9Router.'
-                      : 'Đăng nhập native. Credential chỉ lưu trong vùng bảo mật của app.',
+                const Text(
+                  'Đăng nhập native. Credential chỉ lưu trong vùng bảo mật của app.',
                 ),
                 const SizedBox(height: PortalSpacing.sm),
                 LayoutBuilder(
@@ -161,28 +160,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                             : 'Đăng nhập ${definition.name}',
                       ),
                     );
-                    if (!definition.gatewayFallback) return primary;
-                    final fallback = OutlinedButton(
-                      onPressed: () => _openGatewayEditor(definition),
-                      child: const Text('Dùng qua 9Router'),
-                    );
-                    if (constraints.maxWidth < 360) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          primary,
-                          const SizedBox(height: PortalSpacing.sm),
-                          fallback,
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: primary),
-                        const SizedBox(width: PortalSpacing.sm),
-                        Expanded(child: fallback),
-                      ],
-                    );
+                    return primary;
                   },
                 ),
               ],
@@ -190,28 +168,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
           ),
         );
       }
-      if (definition.mobileSupported) {
-        return Card(
-          margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
-          child: ListTile(
-            leading: const Icon(Icons.hub_outlined),
-            title: Text(definition.name),
-            subtitle: const Text(
-              'OAuth native riêng chưa ổn định. Có thể dùng credential đang đăng nhập trên 9Router.',
-            ),
-            trailing: TextButton(
-              onPressed: () => _openGatewayEditor(definition),
-              child: const Text('Dùng qua 9Router'),
-            ),
-          ),
-        );
-      }
-      return _UnavailableProviderCard(
-        definition: definition,
-        reason: definition.mobileSupported
-            ? 'OAuth Android chưa được triển khai.'
-            : (definition.unsupportedReason ?? 'Không hỗ trợ trên Android.'),
-      );
+      return const SizedBox.shrink();
     }
 
     final preset = _toPreset(definition);
@@ -241,13 +198,6 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
     }
 
     final config = configs.firstOrNull;
-    if (preset.baseUrl.isEmpty && config == null) {
-      return _UnavailableProviderCard(
-        definition: definition,
-        reason: 'Adapter kết nối mobile chưa sẵn sàng.',
-      );
-    }
-
     return AiProviderCard(
       preset: preset,
       config: config,
@@ -285,18 +235,17 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
     );
   }
 
-  void _openGatewayEditor(RouterProviderDefinition definition) {
-    final modelId = definition.models.firstOrNull?.id ?? '';
-    _openEditor(
-      AiProviderPreset(
-        id: definition.id,
-        name: '${definition.name} qua 9Router',
-        tier: AiProviderTier.gateway,
-        baseUrl: 'http://10.0.2.2:20128/v1',
-        defaultModelId: '${definition.id}/$modelId',
-        note: 'Dùng credential đã đăng nhập trên 9Router desktop.',
-      ),
-    );
+  bool _isAvailable(RouterProviderDefinition definition) {
+    if (definition.authModes.contains(RouterAuthMode.oauth) &&
+        definition.androidAuth != RouterAndroidAuth.apiKey) {
+      return (definition.androidAuth == RouterAndroidAuth.device ||
+              definition.androidAuth == RouterAndroidAuth.loopback ||
+              definition.androidAuth == RouterAndroidAuth.pkce) &&
+          definition.nativeStatus != RouterNativeStatus.blocked;
+    }
+    if (definition.id == 'custom') return true;
+    final preset = AiProviderCatalog.byId(definition.id);
+    return (definition.defaultBaseUrl ?? preset?.baseUrl ?? '').isNotEmpty;
   }
 }
 
@@ -315,34 +264,4 @@ class _SectionTitle extends StatelessWidget {
       ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     ),
   );
-}
-
-class _UnavailableProviderCard extends StatelessWidget {
-  const _UnavailableProviderCard({
-    required this.definition,
-    required this.reason,
-  });
-
-  final RouterProviderDefinition definition;
-  final String reason;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
-      child: ListTile(
-        enabled: false,
-        leading: const Icon(Icons.cloud_off_outlined),
-        title: Text(definition.name),
-        subtitle: Text(reason),
-        trailing: Text(
-          'Chưa hỗ trợ',
-          style: Theme.of(
-            context,
-          ).textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant),
-        ),
-      ),
-    );
-  }
 }

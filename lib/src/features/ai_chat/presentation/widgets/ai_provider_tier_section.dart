@@ -41,8 +41,6 @@ class AiProviderTierSection extends StatelessWidget {
 
   String _getTierTitle(AiProviderTier tier) {
     switch (tier) {
-      case AiProviderTier.gateway:
-        return 'GATEWAY TRUNG GIAN';
       case AiProviderTier.freeQuota:
         return 'CÓ FREE QUOTA THỬ NGHIỆM';
       case AiProviderTier.officialApi:

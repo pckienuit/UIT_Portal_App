@@ -201,6 +201,35 @@ void main() {
     },
   );
 
+  testWidgets('does not render unavailable provider cards', (tester) async {
+    await RouterCatalog.load('''{"providers":[
+      {"id":"future-oauth","name":"Future OAuth","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"none","nativeStatus":"blocked","models":[]},
+      {"id":"future-api","name":"Future API","category":"apikey","disposition":"ready","mobileSupported":true,"models":[]}
+    ]}''');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Future OAuth'), findsNothing);
+    expect(find.text('Future API'), findsNothing);
+    expect(find.text('Chưa hỗ trợ'), findsNothing);
+  });
+
   testWidgets('GitHub OAuth actions do not overflow at 320dp', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;

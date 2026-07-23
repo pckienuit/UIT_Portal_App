@@ -14,45 +14,105 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     secureStorage = _FakeSecureStorage();
-    repository = AiProviderRepository(prefs: prefs, secureStorage: secureStorage);
+    repository = AiProviderRepository(
+      prefs: prefs,
+      secureStorage: secureStorage,
+    );
   });
 
-  group('9Router Lite Security and Hardening tests', () {
-    test('API keys are strictly stored in FlutterSecureStorage and not exposed in SharedPreferences logs/JSON', () async {
-      final config = AiProviderConfig(
-        id: 'prov-secret',
-        name: 'Private Provider',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://api.openai.com/v1',
-        modelId: 'gpt-4o',
-      );
+  group('Core AI security and hardening tests', () {
+    test(
+      'API keys are strictly stored in FlutterSecureStorage and not exposed in SharedPreferences logs/JSON',
+      () async {
+        final config = AiProviderConfig(
+          id: 'prov-secret',
+          name: 'Private Provider',
+          kind: AiBackendKind.openAiCompatible,
+          baseUrl: 'https://api.openai.com/v1',
+          modelId: 'gpt-4o',
+        );
 
-      await repository.saveProvider(config, apiKey: 'sk-9router-secret-key-123456');
+        await repository.saveProvider(
+          config,
+          apiKey: 'sk-9router-secret-key-123456',
+        );
 
-      // Key must be in SecureStorage
-      final secureKey = await repository.getApiKey('prov-secret');
-      expect(secureKey, 'sk-9router-secret-key-123456');
+        // Key must be in SecureStorage
+        final secureKey = await repository.getApiKey('prov-secret');
+        expect(secureKey, 'sk-9router-secret-key-123456');
 
-      // Key MUST NOT be anywhere in SharedPreferences JSON
-      final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
-      expect(rawPrefs, isNot(contains('sk-9router-secret-key-123456')));
-    });
+        // Key MUST NOT be anywhere in SharedPreferences JSON
+        final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
+        expect(rawPrefs, isNot(contains('sk-9router-secret-key-123456')));
+      },
+    );
 
-    test('Validator strictly rejects HTTP loopback/remote endpoint in release mode', () {
-      // Reject remote HTTP URLs
-      expect(AiProviderValidator.validateBaseUrl('http://api.openai.com/v1', debugMode: false), isNotNull);
-      expect(AiProviderValidator.validateBaseUrl('http://api.openai.com/v1', debugMode: true), isNotNull);
+    test(
+      'Validator strictly rejects HTTP loopback/remote endpoint in release mode',
+      () {
+        // Reject remote HTTP URLs
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://api.openai.com/v1',
+            debugMode: false,
+          ),
+          isNotNull,
+        );
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://api.openai.com/v1',
+            debugMode: true,
+          ),
+          isNotNull,
+        );
 
-      // Allow loopback/LAN http ONLY in debug
-      expect(AiProviderValidator.validateBaseUrl('http://localhost/v1', debugMode: true), isNull);
-      expect(AiProviderValidator.validateBaseUrl('http://127.0.0.1/v1', debugMode: true), isNull);
-      expect(AiProviderValidator.validateBaseUrl('http://10.0.2.2/v1', debugMode: true), isNull);
-      expect(AiProviderValidator.validateBaseUrl('http://192.168.1.50/v1', debugMode: true), isNull);
+        // Allow loopback/LAN http ONLY in debug
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://localhost/v1',
+            debugMode: true,
+          ),
+          isNull,
+        );
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://127.0.0.1/v1',
+            debugMode: true,
+          ),
+          isNull,
+        );
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://10.0.2.2/v1',
+            debugMode: true,
+          ),
+          isNotNull,
+        );
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://192.168.1.50/v1',
+            debugMode: true,
+          ),
+          isNull,
+        );
 
-      // Reject loopback http in release
-      expect(AiProviderValidator.validateBaseUrl('http://localhost/v1', debugMode: false), isNotNull);
-      expect(AiProviderValidator.validateBaseUrl('http://127.0.0.1/v1', debugMode: false), isNotNull);
-    });
+        // Reject loopback http in release
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://localhost/v1',
+            debugMode: false,
+          ),
+          isNotNull,
+        );
+        expect(
+          AiProviderValidator.validateBaseUrl(
+            'http://127.0.0.1/v1',
+            debugMode: false,
+          ),
+          isNotNull,
+        );
+      },
+    );
 
     test('Clear all wipes secure keys', () async {
       final config = AiProviderConfig(

@@ -11,11 +11,15 @@ class OpenAiCompatibleBackend implements AiChatBackend {
     required this.modelId,
     required this.apiKey,
     Dio? dio,
-  }) : _dio = dio ?? Dio(BaseOptions(
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 120),
-          sendTimeout: const Duration(seconds: 15),
-        ));
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 120),
+               sendTimeout: const Duration(seconds: 15),
+             ),
+           );
 
   final String baseUrl;
   final String modelId;
@@ -29,20 +33,28 @@ class OpenAiCompatibleBackend implements AiChatBackend {
       final endpoint = AiProviderValidator.endpoint(baseUrl, 'models');
       final response = await _dio.getUri(
         endpoint,
-        options: Options(headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Accept': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $apiKey',
+            'Accept': 'application/json',
+          },
+        ),
       );
-      if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
+      if (response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 300) {
         return const AiConnectionResult(success: true);
       }
       return AiConnectionResult(
         success: false,
-        errorMessage: 'Lỗi máy chủ phản hồi mã trạng thái: ${response.statusCode}',
+        errorMessage:
+            'Lỗi máy chủ phản hồi mã trạng thái: ${response.statusCode}',
       );
     } catch (e) {
-      return AiConnectionResult(success: false, errorMessage: _handleDioError(e));
+      return AiConnectionResult(
+        success: false,
+        errorMessage: _handleDioError(e),
+      );
     }
   }
 
@@ -52,42 +64,48 @@ class OpenAiCompatibleBackend implements AiChatBackend {
       final endpoint = AiProviderValidator.endpoint(baseUrl, 'models');
       final response = await _dio.getUri(
         endpoint,
-        options: Options(headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Accept': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $apiKey',
+            'Accept': 'application/json',
+          },
+        ),
       );
-      
+
       final data = response.data;
       if (data is Map<String, dynamic> && data['data'] is List) {
         final list = data['data'] as List;
-        return list.map((e) {
-          if (e is! Map<String, dynamic>) return const AiModelOption(id: '', name: '');
-          
-          final id = e['id']?.toString() ?? '';
-          final name = e['name']?.toString() ?? id;
-          final owner = e['owned_by']?.toString();
-          
-          // Parse capabilities nếu có (đặc thù của 9Router metadata)
-          AiModelCapabilities caps = const AiModelCapabilities();
-          final capData = e['capabilities'];
-          if (capData is Map<String, dynamic>) {
-            caps = AiModelCapabilities(
-              vision: capData['vision'] == true,
-              reasoning: capData['reasoning'] == true,
-              tools: capData['tools'] == true,
-              contextWindow: capData['contextWindow'] as int?,
-              maxOutput: capData['maxOutput'] as int?,
-            );
-          }
+        return list
+            .map((e) {
+              if (e is! Map<String, dynamic>)
+                return const AiModelOption(id: '', name: '');
 
-          return AiModelOption(
-            id: id,
-            name: name,
-            owner: owner,
-            capabilities: caps,
-          );
-        }).where((e) => e.id.isNotEmpty).toList();
+              final id = e['id']?.toString() ?? '';
+              final name = e['name']?.toString() ?? id;
+              final owner = e['owned_by']?.toString();
+
+              // Parse capabilities nếu server trả metadata mở rộng.
+              AiModelCapabilities caps = const AiModelCapabilities();
+              final capData = e['capabilities'];
+              if (capData is Map<String, dynamic>) {
+                caps = AiModelCapabilities(
+                  vision: capData['vision'] == true,
+                  reasoning: capData['reasoning'] == true,
+                  tools: capData['tools'] == true,
+                  contextWindow: capData['contextWindow'] as int?,
+                  maxOutput: capData['maxOutput'] as int?,
+                );
+              }
+
+              return AiModelOption(
+                id: id,
+                name: name,
+                owner: owner,
+                capabilities: caps,
+              );
+            })
+            .where((e) => e.id.isNotEmpty)
+            .toList();
       }
       return [];
     } catch (_) {
@@ -106,10 +124,12 @@ class OpenAiCompatibleBackend implements AiChatBackend {
 
     final messagesPayload = [
       {'role': 'system', 'content': systemPrompt},
-      ...request.messages.map((m) => {
-            'role': m.role.toString().split('.').last,
-            'content': m.content,
-          }),
+      ...request.messages.map(
+        (m) => {
+          'role': m.role.toString().split('.').last,
+          'content': m.content,
+        },
+      ),
     ];
 
     final body = {
@@ -120,7 +140,10 @@ class OpenAiCompatibleBackend implements AiChatBackend {
 
     Future<void> run() async {
       try {
-        final endpoint = AiProviderValidator.endpoint(baseUrl, 'chat/completions');
+        final endpoint = AiProviderValidator.endpoint(
+          baseUrl,
+          'chat/completions',
+        );
         final response = await _dio.postUri<ResponseBody>(
           endpoint,
           data: body,
@@ -136,16 +159,18 @@ class OpenAiCompatibleBackend implements AiChatBackend {
         );
 
         if (response.statusCode != 200) {
-          controller.add(AiStreamEvent(
-            type: AiStreamEventType.error,
-            errorMessage: 'Lỗi HTTP ${response.statusCode}',
-          ));
+          controller.add(
+            AiStreamEvent(
+              type: AiStreamEventType.error,
+              errorMessage: 'Lỗi HTTP ${response.statusCode}',
+            ),
+          );
           await controller.close();
           return;
         }
 
         final stream = const SseDecoder().bind(response.data!.stream);
-        
+
         await for (final event in stream) {
           if (event.data == '[DONE]') {
             controller.add(const AiStreamEvent(type: AiStreamEventType.done));
@@ -159,24 +184,31 @@ class OpenAiCompatibleBackend implements AiChatBackend {
               final delta = choices.first['delta'] as Map<String, dynamic>?;
               final content = delta?['content']?.toString();
               if (content != null && content.isNotEmpty) {
-                controller.add(AiStreamEvent(type: AiStreamEventType.chunk, content: content));
+                controller.add(
+                  AiStreamEvent(
+                    type: AiStreamEventType.chunk,
+                    content: content,
+                  ),
+                );
               }
             }
           } catch (_) {
             // Event rác hoặc format khác OpenAI
           }
         }
-        
+
         await controller.close();
       } catch (e) {
         if (!controller.isClosed) {
           if (e is DioException && CancelToken.isCancel(e)) {
             // Bị hủy
           } else {
-            controller.add(AiStreamEvent(
-              type: AiStreamEventType.error,
-              errorMessage: _handleDioError(e),
-            ));
+            controller.add(
+              AiStreamEvent(
+                type: AiStreamEventType.error,
+                errorMessage: _handleDioError(e),
+              ),
+            );
           }
           await controller.close();
         }
@@ -199,7 +231,8 @@ class OpenAiCompatibleBackend implements AiChatBackend {
 
   String _handleDioError(dynamic e) {
     if (e is DioException) {
-      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
         return 'Hết thời gian chờ kết nối máy chủ AI. Vui lòng thử lại.';
       }
       if (e.response != null) {

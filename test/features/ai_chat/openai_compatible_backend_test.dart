@@ -25,7 +25,10 @@ void main() {
     });
 
     test('testConnection maps 401 error', () async {
-      final adapter = _StaticAdapter(statusCode: 401, responseBody: '{"error": "Unauthorized"}');
+      final adapter = _StaticAdapter(
+        statusCode: 401,
+        responseBody: '{"error": "Unauthorized"}',
+      );
       final dio = Dio()..httpClientAdapter = adapter;
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
@@ -36,13 +39,17 @@ void main() {
 
       final result = await backend.testConnection();
       expect(result.success, isFalse);
-      expect(result.errorMessage, 'API Key không hợp lệ hoặc không có quyền truy cập.');
+      expect(
+        result.errorMessage,
+        'API Key không hợp lệ hoặc không có quyền truy cập.',
+      );
     });
 
     test('listModels parses standard OpenAI response format', () async {
       final adapter = _StaticAdapter(
         statusCode: 200,
-        responseBody: '{"object":"list","data":[{"id":"m1","name":"Model 1"},{"id":"m2"}]}',
+        responseBody:
+            '{"object":"list","data":[{"id":"m1","name":"Model 1"},{"id":"m2"}]}',
       );
       final dio = Dio()..httpClientAdapter = adapter;
       final backend = OpenAiCompatibleBackend(
@@ -61,7 +68,7 @@ void main() {
       expect(models[1].id, 'm2');
     });
 
-    test('listModels parses 9Router capability metadata format', () async {
+    test('listModels parses extended capability metadata', () async {
       final adapter = _StaticAdapter(
         statusCode: 200,
         responseBody: '''
@@ -112,7 +119,7 @@ void main() {
       ].join();
       final adapter = _StaticAdapter(statusCode: 200, responseBody: sseContent);
       final dio = Dio()..httpClientAdapter = adapter;
-      
+
       final backend = OpenAiCompatibleBackend(
         baseUrl: 'http://localhost/v1',
         modelId: 'gpt-4o',
@@ -130,7 +137,7 @@ void main() {
             content: 'Hi',
             createdAt: DateTime.now(),
             status: AiMessageStatus.complete,
-          )
+          ),
         ],
       );
 
@@ -157,13 +164,17 @@ class _StaticAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    return ResponseBody.fromString(responseBody, statusCode, headers: {
-      Headers.contentTypeHeader: [
-        options.path.endsWith('/chat/completions') 
-            ? 'text/event-stream' 
-            : 'application/json'
-      ],
-    });
+    return ResponseBody.fromString(
+      responseBody,
+      statusCode,
+      headers: {
+        Headers.contentTypeHeader: [
+          options.path.endsWith('/chat/completions')
+              ? 'text/event-stream'
+              : 'application/json',
+        ],
+      },
+    );
   }
 
   @override

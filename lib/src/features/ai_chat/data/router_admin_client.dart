@@ -215,7 +215,7 @@ class RouterAdminClient {
     return null;
   }
 
-  // Reset toàn bộ dữ liệu 9Router (providers, usage, quota)
+  // Reset toàn bộ dữ liệu Core AI nội bộ (providers, usage, quota)
   Future<bool> resetData() async {
     try {
       // 1. Clear API keys trong secure storage
