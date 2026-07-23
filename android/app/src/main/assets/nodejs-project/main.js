@@ -4,6 +4,12 @@ const path = require('node:path');
 const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
 const { createSseUsageParser } = require('./sse_usage');
+const { waitForDrainOrClose } = require('./stream_backpressure');
+const {
+  openAiToGeminiCli,
+  geminiResponseToOpenAi,
+  createGeminiSseTranslator,
+} = require('./gemini_cli_adapter');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -25,7 +31,7 @@ function logToFile(msg, level = 'INFO') {
 console.log = (...args) => logToFile(args.join(' '), 'INFO');
 console.error = (...args) => logToFile(args.join(' '), 'ERROR');
 
-logToFile('Node.js Mobile runtime initialized with args: ' + process.argv.join(', '));
+logToFile(`Node.js Mobile runtime initialized on port ${port}`);
 
 try {
   if (!Number.isInteger(port) || port < 1 || port > 65535 || !token) {
@@ -46,6 +52,9 @@ try {
         baseUrl: connection.mobileMetadata?.baseUrl || '',
         modelId: connection.modelId,
         systemPrompt: connection.mobileMetadata?.systemPrompt || '',
+        ...(connection.mobileMetadata?.projectId
+          ? { projectId: connection.mobileMetadata.projectId }
+          : {}),
         authMode: connection.authMode || 'apiKey',
         active: connection.id === activeConnectionId,
         apiKey: runtimeSecrets.get(connection.id) || '',
@@ -70,6 +79,7 @@ try {
           kind: provider.kind || 'openAiCompatible',
           baseUrl: provider.baseUrl,
           systemPrompt: provider.systemPrompt || '',
+          projectId: provider.projectId || '',
         },
         createdAt: provider.createdAt || timestamp,
         updatedAt: timestamp,
@@ -142,9 +152,62 @@ try {
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/models') {
-      const activeProvider = db.providers.find(p => p.active);
+      const requestedConnectionId = url.searchParams.get('connectionId');
+      const activeProvider =
+        (requestedConnectionId && db.providers.find(p => p.id === requestedConnectionId)) ||
+        db.providers.find(p => p.active) ||
+        db.providers[0];
       if (!activeProvider) {
         return sendJson(response, 200, { data: [] });
+      }
+      if (activeProvider.presetId === 'gemini-cli' && activeProvider.apiKey && activeProvider.projectId) {
+        try {
+          const upstream = await fetch(`${activeProvider.baseUrl}:retrieveUserQuota`, {
+            method: 'POST',
+            headers: {
+              'authorization': `Bearer ${activeProvider.apiKey}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ project: activeProvider.projectId }),
+          });
+          if (!upstream.ok) {
+            return sendJson(response, 502, { error: 'upstream_models_unavailable' });
+          }
+          const payload = await upstream.json();
+          const ids = [...new Set(
+            (Array.isArray(payload.buckets) ? payload.buckets : [])
+              .map((bucket) => bucket?.modelId)
+              .filter((id) => typeof id === 'string' && id.length > 0),
+          )];
+          return sendJson(response, 200, {
+            data: ids.map((id) => ({ id, object: 'model', owned_by: 'gemini-cli' })),
+          });
+        } catch {
+          return sendJson(response, 502, { error: 'upstream_models_unavailable' });
+        }
+      }
+      if (activeProvider.presetId === 'github' && activeProvider.apiKey) {
+        try {
+          const upstream = await fetch(`${activeProvider.baseUrl}/models`, {
+            headers: {
+              'authorization': `Bearer ${activeProvider.apiKey}`,
+              'accept': 'application/json',
+              'copilot-integration-id': 'vscode-chat',
+              'editor-version': 'vscode/1.110.0',
+              'editor-plugin-version': 'copilot-chat/0.38.0',
+              'user-agent': 'GitHubCopilotChat/0.38.0',
+              'x-github-api-version': '2025-04-01',
+            },
+          });
+          const payload = Buffer.from(await upstream.arrayBuffer());
+          response.writeHead(upstream.status, {
+            'content-type': upstream.headers.get('content-type') || 'application/json',
+          });
+          response.end(payload);
+          return;
+        } catch {
+          return sendJson(response, 502, { error: 'upstream_models_unavailable' });
+        }
       }
       return sendJson(response, 200, {
         data: [
@@ -155,17 +218,43 @@ try {
 
     if (request.method === 'POST' && url.pathname === '/v1/chat/completions') {
       try {
-        const activeProvider = db.providers.find(p => p.active);
+        const activeProvider = db.providers.find(p => p.active) || db.providers[0];
         if (!activeProvider) {
           return sendJson(response, 400, { error: 'No active provider connection configured' });
         }
 
-        const body = await parseJsonBody(request);
+        let body = await parseJsonBody(request);
+        const requestedStream = body.stream === true;
         body.model = activeProvider.modelId;
+        const isGeminiCli = activeProvider.presetId === 'gemini-cli';
 
         const headers = {
           'content-type': 'application/json',
         };
+        if (isGeminiCli) {
+          Object.assign(headers, {
+            'accept': requestedStream ? 'text/event-stream' : 'application/json',
+            'user-agent': `GeminiCLI/0.34.0/${activeProvider.modelId} (android; arm64)`,
+            'x-goog-api-client': 'google-genai-sdk/1.41.0 gl-node/v22.19.0',
+          });
+          body = openAiToGeminiCli(body, activeProvider.modelId, activeProvider.projectId);
+        }
+
+        if (activeProvider.presetId === 'github') {
+          Object.assign(headers, {
+            'accept': requestedStream ? 'text/event-stream' : 'application/json',
+            'copilot-integration-id': 'vscode-chat',
+            'editor-version': 'vscode/1.110.0',
+            'editor-plugin-version': 'copilot-chat/0.38.0',
+            'user-agent': 'GitHubCopilotChat/0.38.0',
+            'openai-intent': 'conversation-panel',
+            'x-github-api-version': '2025-04-01',
+            'x-request-id': randomUUID(),
+            'x-vscode-user-agent-library-version': 'electron-fetch',
+            'x-initiator': 'user',
+            'anthropic-version': '2023-06-01',
+          });
+        }
 
         const customKey = request.headers['x-provider-key'];
         if (customKey) {
@@ -175,10 +264,14 @@ try {
         }
 
         const startTime = Date.now();
-        const targetUrl = `${activeProvider.baseUrl}/chat/completions`;
+        const targetUrl = isGeminiCli
+          ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
+          : `${activeProvider.baseUrl}/chat/completions`;
 
-        if (body.stream) {
-          body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+        if (requestedStream) {
+          if (!isGeminiCli) {
+            body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+          }
           const providerKey = customKey || activeProvider.apiKey;
           const upstreamResponse = await fetch(targetUrl, {
             method: 'POST',
@@ -191,6 +284,22 @@ try {
 
           if (!upstreamResponse.ok) {
             const errorBody = Buffer.from(await upstreamResponse.arrayBuffer());
+            try {
+              const parsedError = JSON.parse(errorBody.toString('utf8'));
+              const detail = parsedError.error || parsedError;
+              const safeMessage = String(detail.message || '')
+                .split(/\s+/)
+                .join(' ')
+                .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+                .slice(0, 300);
+              logToFile(
+                `Upstream ${activeProvider.presetId || activeProvider.id} HTTP ${upstreamResponse.status}: ` +
+                JSON.stringify({ code: detail.code, type: detail.type, message: safeMessage }),
+                'ERROR',
+              );
+            } catch (_) {
+              logToFile(`Upstream ${activeProvider.presetId || activeProvider.id} HTTP ${upstreamResponse.status}`, 'ERROR');
+            }
             response.writeHead(upstreamResponse.status, {
               'content-type': upstreamResponse.headers.get('content-type') || 'application/json',
             });
@@ -216,20 +325,56 @@ try {
           const reader = upstreamResponse.body.getReader();
           const decoder = new TextDecoder();
           const usageParser = createSseUsageParser();
+          const geminiTranslator = isGeminiCli
+            ? createGeminiSseTranslator(activeProvider.modelId)
+            : null;
+          let downstreamOpen = true;
+          const closeDownstream = () => {
+            downstreamOpen = false;
+            reader.cancel().catch(() => {});
+          };
+          response.once('close', closeDownstream);
+          response.once('error', closeDownstream);
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            usageParser.push(chunk);
-            if (!response.write(value)) {
-              await new Promise((resolve) => response.once('drain', resolve));
+          try {
+            while (downstreamOpen) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              if (geminiTranslator) {
+                for (const translated of geminiTranslator.push(chunk)) {
+                  if (!response.write(translated)) {
+                    downstreamOpen = await waitForDrainOrClose(response);
+                    if (!downstreamOpen) break;
+                  }
+                }
+              } else {
+                usageParser.push(chunk);
+                if (!response.write(value)) {
+                  downstreamOpen = await waitForDrainOrClose(response);
+                }
+              }
             }
+          } finally {
+            response.removeListener('close', closeDownstream);
+            response.removeListener('error', closeDownstream);
+            if (!downstreamOpen) await reader.cancel().catch(() => {});
           }
-          usageParser.push(decoder.decode());
+          if (!downstreamOpen) return;
+          let usage;
+          if (geminiTranslator) {
+            const terminal = geminiTranslator.finish();
+            for (const translated of terminal.output) response.write(translated);
+            usage = {
+              promptTokens: terminal.usage.prompt_tokens,
+              completionTokens: terminal.usage.completion_tokens,
+              cachedTokens: 0,
+            };
+          } else {
+            usageParser.push(decoder.decode());
+            usage = usageParser.finish();
+          }
           response.end();
-
-          const usage = usageParser.finish();
 
           db.usage.push({
             id: randomUUID(),
@@ -253,7 +398,10 @@ try {
             body: JSON.stringify(body)
           });
 
-          const resData = await upstreamResponse.json();
+          const upstreamData = await upstreamResponse.json();
+          const resData = isGeminiCli && upstreamResponse.ok
+            ? geminiResponseToOpenAi(upstreamData, activeProvider.modelId)
+            : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
           if (upstreamResponse.ok) {
@@ -273,7 +421,18 @@ try {
           return;
         }
       } catch (e) {
-        return sendJson(response, 500, { error: e.message });
+        const safeMessage = String(e?.message || e)
+          .split(/\s+/)
+          .join(' ')
+          .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+          .slice(0, 300);
+        logToFile(`Chat routing failed: ${safeMessage}`, 'ERROR');
+        if (response.destroyed || response.writableEnded) return;
+        if (response.headersSent) {
+          response.destroy();
+          return;
+        }
+        return sendJson(response, 500, { error: 'chat_routing_failed' });
       }
     }
 
@@ -301,6 +460,7 @@ try {
           modelId: data.modelId,
           systemPrompt: data.systemPrompt || '',
           authMode: data.authMode || 'apiKey',
+          projectId: data.projectId || '',
           active: !!data.active,
           apiKey: data.apiKey || ''
         });
@@ -325,6 +485,7 @@ try {
         if (data.baseUrl !== undefined) provider.baseUrl = data.baseUrl;
         if (data.modelId !== undefined) provider.modelId = data.modelId;
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
+        if (data.projectId !== undefined) provider.projectId = data.projectId;
         if (data.apiKey !== undefined) provider.apiKey = data.apiKey;
         if (data.active !== undefined) {
           provider.active = !!data.active;

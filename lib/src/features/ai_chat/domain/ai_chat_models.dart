@@ -16,6 +16,7 @@ class AiProviderConfig {
     this.authMode = 'apiKey',
     this.credentialKind,
     this.tokenExpiresAt,
+    this.projectId,
   });
 
   final String id;
@@ -28,6 +29,7 @@ class AiProviderConfig {
   final String authMode;
   final String? credentialKind;
   final DateTime? tokenExpiresAt;
+  final String? projectId;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -40,6 +42,7 @@ class AiProviderConfig {
     'authMode': authMode,
     'credentialKind': credentialKind,
     'tokenExpiresAt': tokenExpiresAt?.toUtc().toIso8601String(),
+    'projectId': projectId,
   };
 
   factory AiProviderConfig.fromJson(Map<String, dynamic> json) =>
@@ -56,6 +59,7 @@ class AiProviderConfig {
         tokenExpiresAt: json['tokenExpiresAt'] == null
             ? null
             : DateTime.tryParse(json['tokenExpiresAt'] as String),
+        projectId: json['projectId'] as String?,
       );
 
   AiProviderConfig copyWith({
@@ -67,6 +71,7 @@ class AiProviderConfig {
     String? authMode,
     String? Function()? credentialKind,
     DateTime? Function()? tokenExpiresAt,
+    String? Function()? projectId,
   }) {
     return AiProviderConfig(
       id: id,
@@ -83,6 +88,7 @@ class AiProviderConfig {
       tokenExpiresAt: tokenExpiresAt != null
           ? tokenExpiresAt()
           : this.tokenExpiresAt,
+      projectId: projectId != null ? projectId() : this.projectId,
     );
   }
 }

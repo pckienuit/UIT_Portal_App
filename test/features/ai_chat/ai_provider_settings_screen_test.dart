@@ -171,7 +171,7 @@ void main() {
     'GitHub OAuth is actionable while desktop-only OAuth stays unavailable',
     (tester) async {
       await RouterCatalog.load('''{"providers":[
-      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]},
+      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]},
       {"id":"cline","name":"Cline","category":"oauth","hasOAuth":true,"mobileSupported":false,"unsupportedReason":"Requires browser extension","models":[]}
     ]}''');
       final container = ProviderContainer(
@@ -208,7 +208,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await RouterCatalog.load('''{"providers":[
-      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}
+      {"id":"github","name":"GitHub Copilot","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":true,"models":[{"id":"gpt-5.4","name":"GPT-5.4"}]}
     ]}''');
     final container = ProviderContainer(
       overrides: [
@@ -267,6 +267,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('API Key'), findsOneWidget);
     expect(find.text('https://api.x.ai/v1'), findsOneWidget);
+  });
+
+  testWidgets(
+    'ready device OAuth provider is actionable without GitHub hard-code',
+    (tester) async {
+      await RouterCatalog.load('''{"providers":[
+      {"id":"qwen","name":"Qwen Code","category":"oauth","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"tokenRefresh":"refreshToken","defaultBaseUrl":"https://portal.qwen.ai/v1","models":[{"id":"qwen3-coder-plus","name":"Qwen3 Coder Plus"}]}
+    ]}''');
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          routerRuntimeServiceProvider.overrideWith(
+            _StoppedRouterRuntimeService.new,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AiProviderSettingsScreen()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Đăng nhập Qwen Code'), findsOneWidget);
+      expect(find.text('Dùng qua 9Router'), findsNothing);
+    },
+  );
+
+  testWidgets('Gemini CLI native authorization is actionable', (tester) async {
+    await RouterCatalog.load('''{"providers":[
+      {"id":"gemini-cli","name":"Gemini CLI","category":"free","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","gatewayFallback":true,"tokenRefresh":"refreshToken","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash"}]}
+    ]}''');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Đăng nhập Gemini CLI'), findsOneWidget);
+    expect(find.text('Dùng qua 9Router'), findsOneWidget);
   });
 }
 

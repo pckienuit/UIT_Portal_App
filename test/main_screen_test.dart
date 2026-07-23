@@ -56,6 +56,47 @@ void main() {
     expect(MediaQuery.textScalerOf(routeContentContext).scale(10), 20);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('hides bottom navigation while keyboard is open', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = GoRouter(
+      initialLocation: '/ai-chat',
+      routes: [
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, shell) =>
+              MainScreen(navigationShell: shell),
+          branches: [
+            _branch('/', 'Home'),
+            _branch('/schedule', 'Schedule'),
+            _branch('/ai-chat', 'AI Chat'),
+            _branch('/profile-tab', 'Profile'),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp.router(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(viewInsets: const EdgeInsets.only(bottom: 300)),
+          child: child!,
+        ),
+        routerConfig: router,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('AI Chat'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 StatefulShellBranch _branch(String path, String label) {

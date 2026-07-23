@@ -8,6 +8,8 @@ data class DeviceOAuthProvider(
     val deviceCodeUrl: URI,
     val tokenUrl: URI,
     val scope: String,
+    val usesPkce: Boolean = false,
+    val refreshUrl: URI? = null,
 ) {
     constructor(
         id: String,
@@ -15,12 +17,16 @@ data class DeviceOAuthProvider(
         deviceCodeUrl: String,
         tokenUrl: String,
         scope: String,
+        usesPkce: Boolean = false,
+        refreshUrl: String? = null,
     ) : this(
         id = id,
         clientId = clientId,
         deviceCodeUrl = requireHttps(deviceCodeUrl),
         tokenUrl = requireHttps(tokenUrl),
         scope = scope,
+        usesPkce = usesPkce,
+        refreshUrl = refreshUrl?.let(::requireHttps),
     )
 
     init {
@@ -29,6 +35,7 @@ data class DeviceOAuthProvider(
         require(scope.isNotBlank()) { "OAuth scope is required" }
         require(deviceCodeUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
         require(tokenUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
+        require(refreshUrl == null || refreshUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
     }
 }
 
@@ -38,6 +45,34 @@ private fun requireHttps(value: String): URI = URI(value).also {
 
 private fun URI.isHttpsEndpoint(): Boolean =
     scheme == "https" && !host.isNullOrBlank() && isAbsolute
+
+data class AuthorizationOAuthProvider(
+    val id: String,
+    val clientId: String,
+    val clientSecret: String?,
+    val authorizeUrl: URI,
+    val tokenUrl: URI,
+    val scope: String,
+) {
+    init {
+        require(id.isNotBlank()) { "Provider id is required" }
+        require(clientId.isNotBlank()) { "OAuth client id is required" }
+        require(clientSecret == null || clientSecret.isNotBlank()) { "OAuth client secret is invalid" }
+        require(scope.isNotBlank()) { "OAuth scope is required" }
+        require(authorizeUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
+        require(tokenUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
+    }
+}
+
+data class NativeAuthorizationFlow(
+    val flowId: String,
+    val authorizationUri: URI,
+) {
+    fun toMap(): Map<String, Any> = mapOf(
+        "flowId" to flowId,
+        "authorizationUri" to authorizationUri.toString(),
+    )
+}
 
 data class NativeDeviceFlow(
     val flowId: String,
@@ -61,6 +96,7 @@ data class NativeOAuthCredential(
     val refreshToken: String?,
     val expiresAt: String?,
     val scope: String?,
+    val projectId: String? = null,
 ) {
     init {
         require(accessToken.isNotBlank()) { "OAuth access token is required" }
@@ -71,5 +107,6 @@ data class NativeOAuthCredential(
         "refreshToken" to refreshToken,
         "expiresAt" to expiresAt,
         "scope" to scope,
+        "projectId" to projectId,
     )
 }

@@ -102,10 +102,12 @@ class GithubOAuthService {
       'https://api.github.com/copilot_internal/v2/token',
       options: Options(
         headers: {
-          'Authorization': 'Bearer $githubAccessToken',
+          'Authorization': 'token $githubAccessToken',
           'Accept': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'UITPortalMobile/1.0',
+          'X-GitHub-Api-Version': '2025-04-01',
+          'User-Agent': 'GitHubCopilotChat/0.38.0',
+          'Editor-Version': 'vscode/1.110.0',
+          'Editor-Plugin-Version': 'copilot-chat/0.38.0',
         },
       ),
     );

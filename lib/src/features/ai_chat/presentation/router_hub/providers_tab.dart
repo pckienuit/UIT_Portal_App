@@ -121,9 +121,13 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
         .where((config) => config.presetId == definition.id)
         .toList();
 
-    if (definition.category == RouterProviderCategory.oauth &&
+    if (definition.authModes.contains(RouterAuthMode.oauth) &&
         definition.androidAuth != RouterAndroidAuth.apiKey) {
-      if (definition.id == 'github' && definition.mobileSupported) {
+      if ((definition.androidAuth == RouterAndroidAuth.device ||
+              definition.androidAuth == RouterAndroidAuth.loopback ||
+              definition.androidAuth == RouterAndroidAuth.pkce) &&
+          definition.nativeStatus != RouterNativeStatus.blocked &&
+          definition.mobileSupported) {
         return Card(
           margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
           child: Padding(
@@ -136,8 +140,10 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: PortalSpacing.xs),
-                const Text(
-                  'Đăng nhập native bằng GitHub Device Flow hoặc dùng connection có sẵn qua 9Router.',
+                Text(
+                  definition.gatewayFallback
+                      ? 'Đăng nhập native hoặc dùng connection có sẵn qua 9Router.'
+                      : 'Đăng nhập native. Credential chỉ lưu trong vùng bảo mật của app.',
                 ),
                 const SizedBox(height: PortalSpacing.sm),
                 LayoutBuilder(
@@ -149,8 +155,13 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                         builder: (_) =>
                             GithubOAuthSheet(definition: definition),
                       ),
-                      child: const Text('Đăng nhập GitHub'),
+                      child: Text(
+                        definition.id == 'github'
+                            ? 'Đăng nhập GitHub'
+                            : 'Đăng nhập ${definition.name}',
+                      ),
                     );
+                    if (!definition.gatewayFallback) return primary;
                     final fallback = OutlinedButton(
                       onPressed: () => _openGatewayEditor(definition),
                       child: const Text('Dùng qua 9Router'),

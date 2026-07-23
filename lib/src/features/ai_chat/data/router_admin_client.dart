@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../application/router_runtime_service.dart';
+import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_provider_repository.dart';
 
@@ -48,6 +49,29 @@ class RouterAdminClient {
       debugPrint('Failed to list providers from core: $e');
     }
     return [];
+  }
+
+  Future<List<AiModelOption>> listModels(String connectionId) async {
+    final res = await _dio.get(
+      '/v1/models',
+      queryParameters: {'connectionId': connectionId},
+    );
+    final data = res.data;
+    if (res.statusCode != 200 || data is! Map || data['data'] is! List) {
+      throw StateError('Danh sách mô hình không hợp lệ');
+    }
+    return (data['data'] as List)
+        .whereType<Map>()
+        .map((item) {
+          final id = item['id']?.toString() ?? '';
+          return AiModelOption(
+            id: id,
+            name: item['name']?.toString() ?? id,
+            owner: item['owned_by']?.toString(),
+          );
+        })
+        .where((model) => model.id.isNotEmpty)
+        .toList(growable: false);
   }
 
   // Thêm / Cập nhật provider connection
@@ -215,3 +239,8 @@ final routerAdminClientProvider = Provider<RouterAdminClient>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);
   return RouterAdminClient(ref: ref, secureStorage: secureStorage);
 });
+
+final routerModelCatalogProvider = FutureProvider.autoDispose
+    .family<List<AiModelOption>, String>((ref, connectionId) {
+      return ref.watch(routerAdminClientProvider).listModels(connectionId);
+    });

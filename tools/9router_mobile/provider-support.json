@@ -14,11 +14,11 @@
     "kilocode": { "mobileSupported": false, "unsupportedReason": "Requires local CLI helper launch" },
     "kimchi": { "mobileSupported": false, "unsupportedReason": "Requires browser automation helper" },
     "kimi": { "mobileSupported": false, "unsupportedReason": "Requires desktop cookie extractor" },
-    "qwen": { "mobileSupported": false, "unsupportedReason": "Requires desktop IDE connection" },
+    "qwen": { "mobileSupported": false, "unsupportedReason": "OAuth tier ended upstream on 2026-04-15" },
     "xai": { "mobileSupported": true, "androidAuth": "apiKey", "gatewayFallback": true, "nativeStatus": "ready", "defaultBaseUrl": "https://api.x.ai/v1" }
   },
   "free": {
-    "gemini-cli": { "mobileSupported": false, "unsupportedReason": "Requires desktop CLI configuration" },
+    "gemini-cli": { "mobileSupported": true, "androidAuth": "loopback", "gatewayFallback": true, "nativeStatus": "experimental", "tokenRefresh": "refreshToken", "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal" },
     "kiro": { "mobileSupported": false, "unsupportedReason": "Requires local desktop daemon" },
     "mimo-free": { "mobileSupported": false, "unsupportedReason": "Requires desktop environment variables" },
     "opencode": { "mobileSupported": true },

@@ -9,6 +9,12 @@ import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_provider_controller.dart';
 
+List<AiChatMessage> completedMessagesForRequest(
+  Iterable<AiChatMessage> messages,
+) => messages
+    .where((message) => message.status == AiMessageStatus.complete)
+    .toList();
+
 class AiChatState {
   AiChatState({
     this.activeProvider,
@@ -32,8 +38,12 @@ class AiChatState {
     String? Function()? errorMessage,
   }) {
     return AiChatState(
-      activeProvider: activeProvider != null ? activeProvider() : this.activeProvider,
-      activeConversation: activeConversation != null ? activeConversation() : this.activeConversation,
+      activeProvider: activeProvider != null
+          ? activeProvider()
+          : this.activeProvider,
+      activeConversation: activeConversation != null
+          ? activeConversation()
+          : this.activeConversation,
       conversations: conversations ?? this.conversations,
       isGenerating: isGenerating ?? this.isGenerating,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
@@ -67,7 +77,7 @@ class AiChatController extends Notifier<AiChatState> {
         _streamSub = null;
         await _activeBackend?.dispose();
         _activeBackend = null;
-        
+
         if (!ref.mounted) return;
         final store = await ref.read(chatHistoryStoreProvider.future);
         if (!ref.mounted) return;
@@ -81,13 +91,21 @@ class AiChatController extends Notifier<AiChatState> {
 
   AiChatState _init() {
     final providerState = ref.read(aiProviderControllerProvider);
-    
+
     ref.read(chatHistoryStoreProvider.future).then((store) async {
       final history = await store.readHistory();
       if (ref.mounted) {
+        final activeProvider = state.activeProvider;
         state = state.copyWith(
           conversations: history,
-          activeConversation: () => history.isNotEmpty ? history.first : state.activeConversation,
+          activeConversation: () => activeProvider == null
+              ? null
+              : history.cast<AiConversation?>().firstWhere(
+                  (conversation) =>
+                      conversation != null &&
+                      _matchesProvider(conversation, activeProvider),
+                  orElse: () => null,
+                ),
         );
       }
     });
@@ -97,9 +115,7 @@ class AiChatController extends Notifier<AiChatState> {
       _loadBackend(activeConfig);
     }
 
-    return AiChatState(
-      activeProvider: activeConfig,
-    );
+    return AiChatState(activeProvider: activeConfig);
   }
 
   AiProviderConfig? _getActiveConfig(AiProviderState providerState) {
@@ -112,10 +128,20 @@ class AiChatController extends Notifier<AiChatState> {
     }
   }
 
-  Future<void> _handleActiveProviderChanged(AiProviderState providerState) async {
+  Future<void> _handleActiveProviderChanged(
+    AiProviderState providerState,
+  ) async {
     final activeConfig = _getActiveConfig(providerState);
     state = state.copyWith(
       activeProvider: () => activeConfig,
+      activeConversation: () => activeConfig == null
+          ? null
+          : state.conversations.cast<AiConversation?>().firstWhere(
+              (conversation) =>
+                  conversation != null &&
+                  _matchesProvider(conversation, activeConfig),
+              orElse: () => null,
+            ),
       errorMessage: () => null,
     );
     if (activeConfig != null) {
@@ -129,7 +155,7 @@ class AiChatController extends Notifier<AiChatState> {
   Future<void> _loadBackend(AiProviderConfig config) async {
     await _activeBackend?.dispose();
     _activeBackend = null;
-    
+
     final secureStorage = ref.read(secureStorageProvider);
     final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
     _activeBackend = await factory.buildBackend(config);
@@ -137,12 +163,14 @@ class AiChatController extends Notifier<AiChatState> {
 
   Future<void> switchProvider(AiProviderConfig config) async {
     await ref.read(aiProviderControllerProvider.notifier).saveProvider(config);
-    await ref.read(aiProviderControllerProvider.notifier).selectActiveProvider(config.id);
+    await ref
+        .read(aiProviderControllerProvider.notifier)
+        .selectActiveProvider(config.id);
   }
 
   Future<void> startNewConversation() async {
     if (state.activeProvider == null) return;
-    
+
     final newConv = AiConversation(
       id: 'conv-${DateTime.now().microsecondsSinceEpoch}',
       title: 'Hội thoại mới',
@@ -152,7 +180,8 @@ class AiChatController extends Notifier<AiChatState> {
       updatedAt: DateTime.now(),
     );
 
-    final List<AiConversation> list = List.from(state.conversations)..insert(0, newConv);
+    final List<AiConversation> list = List.from(state.conversations)
+      ..insert(0, newConv);
     state = state.copyWith(
       conversations: list,
       activeConversation: () => newConv,
@@ -174,8 +203,9 @@ class AiChatController extends Notifier<AiChatState> {
   }
 
   Future<void> deleteConversation(String id) async {
-    final list = List<AiConversation>.from(state.conversations)..removeWhere((e) => e.id == id);
-    
+    final list = List<AiConversation>.from(state.conversations)
+      ..removeWhere((e) => e.id == id);
+
     AiConversation? newActive;
     if (state.activeConversation?.id == id) {
       newActive = list.isNotEmpty ? list.first : null;
@@ -193,15 +223,21 @@ class AiChatController extends Notifier<AiChatState> {
     await store.writeHistory(list);
   }
 
-  Future<void> sendMessage(String text, {AiPortalContextSnapshot? contextSnapshot}) async {
+  Future<void> sendMessage(
+    String text, {
+    AiPortalContextSnapshot? contextSnapshot,
+  }) async {
     if (state.isGenerating || text.trim().isEmpty) return;
     if (state.activeProvider == null || _activeBackend == null) {
-      state = state.copyWith(errorMessage: () => 'Chưa cấu hình mô hình trợ lý AI.');
+      state = state.copyWith(
+        errorMessage: () => 'Chưa cấu hình mô hình trợ lý AI.',
+      );
       return;
     }
 
     var currentConv = state.activeConversation;
-    if (currentConv == null) {
+    if (currentConv == null ||
+        !_matchesProvider(currentConv, state.activeProvider!)) {
       await startNewConversation();
       currentConv = state.activeConversation;
     }
@@ -215,17 +251,19 @@ class AiChatController extends Notifier<AiChatState> {
       status: AiMessageStatus.complete,
     );
 
-    final updatedMessages = List<AiChatMessage>.from(currentConv.messages)..add(userMsg);
-    
-    final title = currentConv.messages.isEmpty 
+    final updatedMessages = List<AiChatMessage>.from(currentConv.messages)
+      ..add(userMsg);
+    final requestMessages = completedMessagesForRequest(updatedMessages);
+
+    final title = currentConv.messages.isEmpty
         ? (text.length > 48 ? '${text.substring(0, 48)}...' : text)
         : currentConv.title;
 
     var updatedConvo = AiConversation(
       id: currentConv.id,
       title: title,
-      providerId: currentConv.providerId,
-      modelId: currentConv.modelId,
+      providerId: state.activeProvider!.id,
+      modelId: state.activeProvider!.modelId,
       messages: updatedMessages,
       updatedAt: DateTime.now(),
     );
@@ -235,78 +273,125 @@ class AiChatController extends Notifier<AiChatState> {
 
     final assistantMsgId = 'msg-ast-${DateTime.now().microsecondsSinceEpoch}';
     var assistantContent = '';
+    updatedConvo = AiConversation(
+      id: updatedConvo.id,
+      title: updatedConvo.title,
+      providerId: updatedConvo.providerId,
+      modelId: updatedConvo.modelId,
+      messages: [
+        ...updatedMessages,
+        AiChatMessage(
+          id: assistantMsgId,
+          role: AiMessageRole.assistant,
+          content: '',
+          createdAt: DateTime.now(),
+          status: AiMessageStatus.streaming,
+        ),
+      ],
+      updatedAt: DateTime.now(),
+    );
+    _updateConversationInList(updatedConvo);
 
     final req = AiChatRequest(
       config: state.activeProvider!,
       apiKey: '',
-      messages: updatedMessages,
+      messages: requestMessages,
       context: contextSnapshot,
     );
 
-    _streamSub = _activeBackend!.streamChat(req).listen(
-      (event) {
-        if (!ref.mounted) return;
-        if (event.type == AiStreamEventType.chunk && event.content != null) {
-          assistantContent += event.content!;
-          
-          final astMsg = AiChatMessage(
-            id: assistantMsgId,
-            role: AiMessageRole.assistant,
-            content: assistantContent,
-            createdAt: DateTime.now(),
-            status: AiMessageStatus.streaming,
-          );
+    _streamSub = _activeBackend!
+        .streamChat(req)
+        .listen(
+          (event) {
+            if (!ref.mounted) return;
+            if (event.type == AiStreamEventType.chunk &&
+                event.content != null) {
+              assistantContent += event.content!;
 
-          final messagesWithStream = List<AiChatMessage>.from(updatedMessages)..add(astMsg);
-          updatedConvo = AiConversation(
-            id: updatedConvo.id,
-            title: updatedConvo.title,
-            providerId: updatedConvo.providerId,
-            modelId: updatedConvo.modelId,
-            messages: messagesWithStream,
-            updatedAt: DateTime.now(),
-          );
-          _updateConversationInList(updatedConvo);
-        } else if (event.type == AiStreamEventType.done) {
-          _finalizeActiveConversation(assistantMsgId, assistantContent, AiMessageStatus.complete);
-        } else if (event.type == AiStreamEventType.error) {
-          state = state.copyWith(errorMessage: () => event.errorMessage);
-          _finalizeActiveConversation(
-            assistantMsgId, 
-            assistantContent.isEmpty ? (event.errorMessage ?? 'Có lỗi xảy ra.') : assistantContent, 
-            AiMessageStatus.failed
-          );
-        }
-      },
-      onError: (err) {
-        if (!ref.mounted) return;
-        state = state.copyWith(errorMessage: () => err.toString());
-        _finalizeActiveConversation(assistantMsgId, assistantContent, AiMessageStatus.failed);
-      },
-      onDone: () {
-        if (!ref.mounted) return;
-        if (state.isGenerating) {
-          _finalizeActiveConversation(assistantMsgId, assistantContent, AiMessageStatus.complete);
-        }
-      },
-    );
+              final astMsg = AiChatMessage(
+                id: assistantMsgId,
+                role: AiMessageRole.assistant,
+                content: assistantContent,
+                createdAt: DateTime.now(),
+                status: AiMessageStatus.streaming,
+              );
+
+              final messagesWithStream = List<AiChatMessage>.from(
+                updatedMessages,
+              )..add(astMsg);
+              updatedConvo = AiConversation(
+                id: updatedConvo.id,
+                title: updatedConvo.title,
+                providerId: updatedConvo.providerId,
+                modelId: updatedConvo.modelId,
+                messages: messagesWithStream,
+                updatedAt: DateTime.now(),
+              );
+              _updateConversationInList(updatedConvo);
+            } else if (event.type == AiStreamEventType.done) {
+              _finalizeActiveConversation(
+                assistantMsgId,
+                assistantContent,
+                AiMessageStatus.complete,
+              );
+            } else if (event.type == AiStreamEventType.error) {
+              state = state.copyWith(errorMessage: () => event.errorMessage);
+              _finalizeActiveConversation(
+                assistantMsgId,
+                assistantContent.isEmpty
+                    ? (event.errorMessage ?? 'Có lỗi xảy ra.')
+                    : assistantContent,
+                AiMessageStatus.failed,
+              );
+            }
+          },
+          onError: (err) {
+            if (!ref.mounted) return;
+            state = state.copyWith(errorMessage: () => err.toString());
+            _finalizeActiveConversation(
+              assistantMsgId,
+              assistantContent,
+              AiMessageStatus.failed,
+            );
+          },
+          onDone: () {
+            if (!ref.mounted) return;
+            if (state.isGenerating) {
+              _finalizeActiveConversation(
+                assistantMsgId,
+                assistantContent,
+                AiMessageStatus.complete,
+              );
+            }
+          },
+        );
   }
 
   void stopGeneration() {
     _streamSub?.cancel();
     _streamSub = null;
     _activeBackend?.cancel();
-    
-    if (state.activeConversation != null && state.activeConversation!.messages.isNotEmpty) {
+
+    if (state.activeConversation != null &&
+        state.activeConversation!.messages.isNotEmpty) {
       final lastMsg = state.activeConversation!.messages.last;
-      if (lastMsg.role == AiMessageRole.assistant && lastMsg.status == AiMessageStatus.streaming) {
-        _finalizeActiveConversation(lastMsg.id, lastMsg.content, AiMessageStatus.cancelled);
+      if (lastMsg.role == AiMessageRole.assistant &&
+          lastMsg.status == AiMessageStatus.streaming) {
+        _finalizeActiveConversation(
+          lastMsg.id,
+          lastMsg.content,
+          AiMessageStatus.cancelled,
+        );
       }
     }
     state = state.copyWith(isGenerating: false);
   }
 
-  void _finalizeActiveConversation(String msgId, String content, AiMessageStatus finalStatus) {
+  void _finalizeActiveConversation(
+    String msgId,
+    String content,
+    AiMessageStatus finalStatus,
+  ) {
     _streamSub?.cancel();
     _streamSub = null;
 
@@ -355,20 +440,30 @@ class AiChatController extends Notifier<AiChatState> {
 
     state = state.copyWith(
       conversations: list,
-      activeConversation: () => convo.id == state.activeConversation?.id ? convo : state.activeConversation,
+      activeConversation: () => convo.id == state.activeConversation?.id
+          ? convo
+          : state.activeConversation,
     );
   }
+
+  bool _matchesProvider(
+    AiConversation conversation,
+    AiProviderConfig provider,
+  ) =>
+      conversation.providerId == provider.id &&
+      conversation.modelId == provider.modelId;
 
   Future<void> clearAllData() async {
     stopGeneration();
     state = AiChatState();
-    
+
     final store = await ref.read(chatHistoryStoreProvider.future);
     await store.clearAll();
     await ref.read(aiProviderRepositoryProvider).clearAll();
   }
 }
 
-final aiChatControllerProvider = NotifierProvider<AiChatController, AiChatState>(() {
-  return AiChatController();
-});
+final aiChatControllerProvider =
+    NotifierProvider<AiChatController, AiChatState>(() {
+      return AiChatController();
+    });

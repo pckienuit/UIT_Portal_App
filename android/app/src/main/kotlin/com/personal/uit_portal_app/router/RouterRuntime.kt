@@ -20,21 +20,22 @@ class RouterRuntime(private val context: Context) {
         data class Failed(val message: String) : Status
     }
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-
-    @Volatile
-    private var status: Status = Status.Stopped
-
     fun ensureStarted(onComplete: (Status) -> Unit) {
-        when (val current = status) {
-            is Status.Ready, is Status.Failed -> onComplete(current)
-            Status.Starting -> executor.execute { onComplete(awaitReady()) }
-            Status.Stopped -> {
-                status = Status.Starting
-                executor.execute {
-                    status = runCatching { startAndWait() }
-                        .getOrElse { Status.Failed(it.message ?: "Không thể khởi động 9Router nội bộ") }
-                    onComplete(status)
+        synchronized(processLock) {
+            when (val current = status) {
+                is Status.Ready, is Status.Failed -> onComplete(current)
+                Status.Starting -> executor.execute { onComplete(awaitReady()) }
+                Status.Stopped -> {
+                    status = Status.Starting
+                    executor.execute {
+                        status = runCatching { startAndWait() }
+                            .getOrElse {
+                                Status.Failed(
+                                    it.message ?: "Không thể khởi động 9Router nội bộ",
+                                )
+                            }
+                        onComplete(status)
+                    }
                 }
             }
         }
@@ -65,7 +66,7 @@ class RouterRuntime(private val context: Context) {
         }
 
         val baseUrl = "http://${RouterRuntimeConfig.IPV4_LOOPBACK}:$port"
-        repeat(50) {
+        repeat(200) {
             if (isHealthy(baseUrl, bearer)) return Status.Ready(baseUrl, bearer)
             Thread.sleep(100)
         }
@@ -73,7 +74,7 @@ class RouterRuntime(private val context: Context) {
     }
 
     private fun awaitReady(): Status {
-        repeat(50) {
+        repeat(200) {
             val current = status
             if (current !is Status.Starting) return current
             Thread.sleep(100)
@@ -132,6 +133,12 @@ class RouterRuntime(private val context: Context) {
     private external fun startNodeWithArguments(arguments: Array<String>): Int
 
     companion object {
+        private val processLock = Any()
+        private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+
+        @Volatile
+        private var status: Status = Status.Stopped
+
         init {
             System.loadLibrary("node")
             System.loadLibrary("router_node_bridge")

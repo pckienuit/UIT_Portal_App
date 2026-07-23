@@ -4,7 +4,7 @@ enum RouterAuthMode { none, apiKey, oauth, custom }
 
 enum RouterConnectionHealth { unchecked, checking, connected, failed, disabled }
 
-enum RouterAndroidAuth { device, pkce, apiKey, gateway, unsupported }
+enum RouterAndroidAuth { device, loopback, pkce, apiKey, gateway, unsupported }
 
 enum RouterNativeStatus { ready, experimental, blocked }
 

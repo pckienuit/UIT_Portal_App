@@ -42,12 +42,14 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   void _sendMessage() {
-    final text = _textController.text.trim();
+    final text = commitComposerText(_textController);
     if (text.isEmpty) return;
 
     if (_shareContextConsented) {
       final snapshot = const AiPortalContextBuilder().buildSnapshot(ref);
-      ref.read(aiChatControllerProvider.notifier).sendMessage(text, contextSnapshot: snapshot);
+      ref
+          .read(aiChatControllerProvider.notifier)
+          .sendMessage(text, contextSnapshot: snapshot);
     } else {
       ref.read(aiChatControllerProvider.notifier).sendMessage(text);
     }
@@ -85,7 +87,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
 
     // Auto scroll khi có tin nhắn mới hoặc đang stream
     ref.listen(aiChatControllerProvider, (prev, next) {
-      if (prev?.activeConversation?.messages.length != next.activeConversation?.messages.length ||
+      if (prev?.activeConversation?.messages.length !=
+              next.activeConversation?.messages.length ||
           (next.isGenerating && _scrollController.hasClients)) {
         _scrollToBottom();
       }
@@ -119,7 +122,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.35, // reduced from 0.4
+                  maxWidth:
+                      MediaQuery.of(context).size.width *
+                      0.35, // reduced from 0.4
                 ),
                 child: ActionChip(
                   label: Text(
@@ -141,7 +146,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             tooltip: 'Cấu hình AI',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AiProviderSettingsScreen()),
+              MaterialPageRoute(
+                builder: (_) => const AiProviderSettingsScreen(),
+              ),
             ),
           ),
         ],
@@ -153,8 +160,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               child: !hasProvider
                   ? _buildNoProviderState(context)
                   : conversation == null || conversation.messages.isEmpty
-                      ? _buildEmptyState(context)
-                      : _buildChatList(context, conversation, state),
+                  ? _buildEmptyState(context)
+                  : _buildChatList(context, conversation, state),
             ),
             if (hasProvider) _buildComposer(context, state),
           ],
@@ -178,19 +185,25 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             const SizedBox(height: PortalSpacing.lg),
             Text(
               'Cấu hình Trợ lý AI',
-              style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: PortalSpacing.xs),
             Text(
               'Trợ lý AI hỗ trợ bạn giải quyết các thắc mắc về lịch học, học phí và điểm số chạy ngay trên máy hoặc kết nối qua API.',
-              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: PortalSpacing.xl),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AiProviderSettingsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const AiProviderSettingsScreen(),
+                ),
               ),
               icon: const Icon(Icons.settings),
               label: const Text('Cấu hình ngay'),
@@ -220,7 +233,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             const SizedBox(height: PortalSpacing.md),
             Text(
               'Tôi có thể giúp gì cho bạn?',
-              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: PortalSpacing.lg),
             for (final suggestion in suggestions) ...[
@@ -241,7 +256,11 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildChatList(BuildContext context, AiConversation conversation, AiChatState state) {
+  Widget _buildChatList(
+    BuildContext context,
+    AiConversation conversation,
+    AiChatState state,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -270,7 +289,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: PortalSpacing.md),
                 child: Row(
-                  mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  mainAxisAlignment: isUser
+                      ? MainAxisAlignment.end
+                      : MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (!isUser) ...[
@@ -294,28 +315,30 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                             )
                           : Container(
                               constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.8,
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.8,
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: PortalSpacing.xs),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: PortalSpacing.xs,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   SelectionArea(
-                                    child: MarkdownBody(
-                                      data: msg.content,
-                                      shrinkWrap: true,
-                                    ),
+                                    child:
+                                        msg.status ==
+                                                AiMessageStatus.streaming &&
+                                            msg.content.isEmpty
+                                        ? const AiThinkingIndicator()
+                                        : MarkdownBody(
+                                            data: msg.content,
+                                            shrinkWrap: true,
+                                          ),
                                   ),
-                                  if (msg.status == AiMessageStatus.streaming)
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: PortalSpacing.xxs),
-                                      child: SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                    ),
+                                  if (msg.status == AiMessageStatus.streaming &&
+                                      msg.content.isNotEmpty)
+                                    const AiStreamingCursor(),
                                 ],
                               ),
                             ),
@@ -334,8 +357,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + PortalSpacing.sm,
+      padding: const EdgeInsets.only(
+        bottom: PortalSpacing.sm,
         left: PortalSpacing.md,
         right: PortalSpacing.md,
       ),
@@ -382,9 +405,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                   maxLines: 5,
                   minLines: 1,
                   keyboardType: TextInputType.multiline,
-                  onSubmitted: (val) {
-                    _sendMessage();
-                  },
+                  textInputAction: TextInputAction.newline,
+                  autocorrect: true,
+                  enableSuggestions: true,
                 ),
               ),
               const SizedBox(width: PortalSpacing.xs),
@@ -434,7 +457,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                       itemCount: state.conversations.length,
                       itemBuilder: (context, index) {
                         final conv = state.conversations[index];
-                        final isActive = conv.id == state.activeConversation?.id;
+                        final isActive =
+                            conv.id == state.activeConversation?.id;
 
                         return ListTile(
                           title: Text(
@@ -442,12 +466,16 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isActive
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           leading: Icon(
                             Icons.chat_bubble_outline,
-                            color: isActive ? Theme.of(context).colorScheme.primary : null,
+                            color: isActive
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_outline),
@@ -472,6 +500,126 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           },
         );
       },
+    );
+  }
+}
+
+@visibleForTesting
+String commitComposerText(TextEditingController controller) {
+  final editingValue = controller.value;
+  if (editingValue.composing.isValid && !editingValue.composing.isCollapsed) {
+    controller.value = editingValue.copyWith(composing: TextRange.empty);
+  }
+  return editingValue.text.trim();
+}
+
+class AiThinkingIndicator extends StatefulWidget {
+  const AiThinkingIndicator({super.key});
+
+  @override
+  State<AiThinkingIndicator> createState() => _AiThinkingIndicatorState();
+}
+
+class _AiThinkingIndicatorState extends State<AiThinkingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Semantics(
+      label: 'Đang suy nghĩ',
+      liveRegion: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Đang suy nghĩ', style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(width: PortalSpacing.xs),
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (index) {
+                final phase = (_controller.value * 3 - index) % 3;
+                final activity = (1 - (phase - 1).abs())
+                    .clamp(0.25, 1.0)
+                    .toDouble();
+                return Transform.translate(
+                  offset: Offset(0, -2 * activity),
+                  child: Opacity(
+                    opacity: activity,
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AiStreamingCursor extends StatefulWidget {
+  const AiStreamingCursor({super.key});
+
+  @override
+  State<AiStreamingCursor> createState() => _AiStreamingCursorState();
+}
+
+class _AiStreamingCursorState extends State<AiStreamingCursor>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+      lowerBound: 0.25,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 2,
+        height: 16,
+        margin: const EdgeInsets.only(top: PortalSpacing.xxs),
+        color: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 }

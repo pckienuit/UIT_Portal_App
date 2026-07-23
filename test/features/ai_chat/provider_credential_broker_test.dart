@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/native_oauth_client.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/provider_credential_broker.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 
@@ -46,6 +47,91 @@ void main() {
       );
     },
   );
+
+  test(
+    'refreshes an expired standard OAuth token from secure storage',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = AiProviderRepository(
+        prefs: await SharedPreferences.getInstance(),
+        secureStorage: _FakeSecureStorage(),
+      );
+      final config = AiProviderConfig(
+        id: 'qwen-1',
+        name: 'Qwen Code',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://portal.qwen.ai/v1',
+        modelId: 'qwen3-coder-plus',
+        presetId: 'qwen',
+        authMode: 'oauth',
+        credentialKind: 'refreshToken',
+        tokenExpiresAt: DateTime.utc(2026, 7, 22),
+      );
+      await repository.saveProvider(
+        config,
+        oauthAccessToken: 'expired-access',
+        oauthRefreshToken: 'refresh-token',
+      );
+      final broker = ProviderCredentialBroker(
+        repository: repository,
+        exchangeGithubToken: (_) => throw StateError('not GitHub'),
+        refreshOAuthToken: (providerId, refreshToken) async {
+          expect(providerId, 'qwen');
+          expect(refreshToken, 'refresh-token');
+          return NativeOAuthCredential(
+            accessToken: 'new-access',
+            refreshToken: 'rotated-refresh',
+            expiresAt: DateTime.utc(2026, 7, 23),
+          );
+        },
+        now: () => DateTime.utc(2026, 7, 22, 12),
+      );
+
+      final refreshed = await broker.ensureRuntimeCredential(config);
+
+      expect(await repository.getApiKey(config.id), 'new-access');
+      expect(
+        await repository.getOAuthSourceToken(config.id),
+        'rotated-refresh',
+      );
+      expect(refreshed.tokenExpiresAt, DateTime.utc(2026, 7, 23));
+    },
+  );
+
+  test('rehydrates Gemini project metadata with refreshed token', () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = AiProviderRepository(
+      prefs: await SharedPreferences.getInstance(),
+      secureStorage: _FakeSecureStorage(),
+    );
+    final config = AiProviderConfig(
+      id: 'gemini-cli-1',
+      name: 'Gemini CLI',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal',
+      modelId: 'gemini-2.5-flash',
+      presetId: 'gemini-cli',
+      authMode: 'oauth',
+      credentialKind: 'refreshToken',
+      tokenExpiresAt: DateTime.utc(2026, 7, 22),
+      projectId: 'cloud-project',
+    );
+    await repository.saveProvider(config, oauthRefreshToken: 'google-refresh');
+    final broker = ProviderCredentialBroker(
+      repository: repository,
+      exchangeGithubToken: (_) => throw StateError('not GitHub'),
+      refreshOAuthToken: (_, _) async => NativeOAuthCredential(
+        accessToken: 'google-access',
+        refreshToken: 'google-refresh',
+        expiresAt: DateTime.utc(2026, 7, 23),
+      ),
+      now: () => DateTime.utc(2026, 7, 22, 12),
+    );
+
+    final refreshed = await broker.ensureRuntimeCredential(config);
+    expect(refreshed.projectId, 'cloud-project');
+    expect(await repository.getApiKey(config.id), 'google-access');
+  });
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {

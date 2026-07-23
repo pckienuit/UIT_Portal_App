@@ -11,6 +11,7 @@ import 'src/features/ai_chat/application/router_runtime_service.dart';
 import 'src/features/ai_chat/data/ai_provider_repository.dart';
 import 'src/features/ai_chat/data/github_oauth_service.dart';
 import 'src/features/ai_chat/data/provider_credential_broker.dart';
+import 'src/features/ai_chat/data/native_oauth_client.dart';
 import 'src/features/ai_chat/data/router_admin_client.dart';
 
 import 'package:flutter/services.dart';
@@ -60,6 +61,7 @@ void main() async {
             final broker = ProviderCredentialBroker(
               repository: repo,
               exchangeGithubToken: githubOAuth.exchangeCopilotToken,
+              refreshOAuthToken: const NativeOAuthClient().refresh,
             );
             final providers = <AiProviderConfig>[];
             for (final provider in repo.listProviders()) {

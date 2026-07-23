@@ -84,6 +84,143 @@ void main() {
     expect(find.text('Custom OpenAI · gpt-4o-mini'), findsOneWidget);
     expect(find.text('Nhập tin nhắn...'), findsOneWidget);
   });
+
+  testWidgets('composer does not double-apply keyboard inset', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = _container(prefs, tempDir, secureStorage);
+    addTearDown(container.dispose);
+    final repo = container.read(aiProviderRepositoryProvider);
+    const config = AiProviderConfig(
+      id: 'p1',
+      name: 'Gemini CLI',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'http://localhost',
+      modelId: 'gemini-2.5-flash',
+    );
+    await repo.saveProvider(config);
+    await repo.setActiveProviderId(config.id);
+    container.read(aiProviderControllerProvider);
+    container.read(aiChatControllerProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(viewInsets: const EdgeInsets.only(bottom: 300)),
+            child: child!,
+          ),
+          home: const AiChatScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Nhập tin nhắn...'), findsOneWidget);
+  });
+
+  testWidgets('preserves Vietnamese IME text', (tester) async {
+    final container = _container(prefs, tempDir, secureStorage);
+    addTearDown(container.dispose);
+    final repo = container.read(aiProviderRepositoryProvider);
+    const config = AiProviderConfig(
+      id: 'p1',
+      name: 'Gemini CLI',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'http://127.0.0.1:1/v1',
+      modelId: 'gemini-2.5-flash',
+    );
+    await repo.saveProvider(config);
+    await repo.setActiveProviderId(config.id);
+    container.read(aiProviderControllerProvider);
+    container.read(aiChatControllerProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiChatScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    const vietnamese = 'Tiếng Việt có dấu: lịch học ngày mai thế nào?';
+    await tester.enterText(find.byType(TextField), vietnamese);
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, vietnamese);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('commits Vietnamese IME composition before submitting', () {
+    const text = 'Tiếng Việt';
+    final controller = TextEditingController.fromValue(
+      const TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+        composing: TextRange(start: 0, end: text.length),
+      ),
+    );
+
+    expect(commitComposerText(controller), text);
+    expect(controller.value.composing, TextRange.empty);
+    controller.dispose();
+  });
+
+  testWidgets('thinking and chatting indicators animate', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(children: [AiThinkingIndicator(), AiStreamingCursor()]),
+        ),
+      ),
+    );
+    expect(find.text('Đang suy nghĩ'), findsOneWidget);
+    expect(find.byType(AiStreamingCursor), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 450));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('newline IME action keeps Vietnamese composition in composer', (
+    tester,
+  ) async {
+    final container = _container(prefs, tempDir, secureStorage);
+    addTearDown(container.dispose);
+    final repo = container.read(aiProviderRepositoryProvider);
+    const config = AiProviderConfig(
+      id: 'p1',
+      name: 'Gemini CLI',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'http://127.0.0.1:1/v1',
+      modelId: 'gemini-2.5-flash',
+    );
+    await repo.saveProvider(config);
+    await repo.setActiveProviderId(config.id);
+    container.read(aiProviderControllerProvider);
+    container.read(aiChatControllerProvider);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiChatScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const vietnamese = 'Tiếng Việt có dấu';
+    await tester.enterText(find.byType(TextField), vietnamese);
+    await tester.testTextInput.receiveAction(TextInputAction.newline);
+    await tester.pump();
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, vietnamese);
+    expect(find.text('Đang suy nghĩ'), findsNothing);
+  });
 }
 
 ProviderContainer _container(

@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const UPSTREAM_ROOT = 'C:/Users/Chi Kien/AppData/Local/Temp/9router-reference-20260721-001540';
+const upstreamArg = process.argv.indexOf('--upstream');
+const UPSTREAM_ROOT = upstreamArg >= 0
+  ? process.argv[upstreamArg + 1]
+  : process.env.NINE_ROUTER_ROOT || 'D:/9router';
 const REGISTRY_DIR = path.join(UPSTREAM_ROOT, 'open-sse/providers/registry');
 const SUPPORT_FILE = './tools/9router_mobile/provider-support.json';
 const OUTPUT_FILE = './android/app/src/main/assets/nodejs-project/provider_catalog.json';
@@ -104,6 +107,17 @@ function run() {
       let m;
       while ((m = modelRegex.exec(modelsStr)) !== null) {
         models.push({ id: m[1], name: m[2] });
+      }
+      if (id === 'gemini-cli') {
+        const preferred = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+        models.sort((a, b) => {
+          const idxA = preferred.indexOf(a.id);
+          const idxB = preferred.indexOf(b.id);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return 0;
+        });
       }
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
+import '../data/router_admin_client.dart';
 import '../domain/ai_chat_backend.dart';
 
 class AiModelPickerSheet extends ConsumerStatefulWidget {
@@ -38,12 +39,19 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final colorScheme = Theme.of(context).colorScheme;
 
     final providerState = ref.watch(aiProviderControllerProvider);
-    final models = providerState.models[widget.providerId] ?? const <AiModelOption>[];
+    final cachedModels =
+        providerState.models[widget.providerId] ?? const <AiModelOption>[];
+    final liveModels = ref.watch(routerModelCatalogProvider(widget.providerId));
+    final models = liveModels.when(
+      data: (models) => models,
+      loading: () => cachedModels,
+      error: (_, _) => cachedModels,
+    );
 
     final filteredModels = models.where((model) {
       final query = _searchQuery.toLowerCase();
-      return model.id.toLowerCase().contains(query) || 
-             model.name.toLowerCase().contains(query);
+      return model.id.toLowerCase().contains(query) ||
+          model.name.toLowerCase().contains(query);
     }).toList();
 
     return Padding(
@@ -65,7 +73,9 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                 children: [
                   Text(
                     'Chọn mô hình (Model)',
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -75,7 +85,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               ),
               const Divider(),
               SizedBox(height: PortalSpacing.sm),
-              
+
               TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
@@ -96,51 +106,69 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               SizedBox(height: PortalSpacing.md),
 
               Expanded(
-                child: models.isEmpty
+                child: liveModels.isLoading && models.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : liveModels.hasError && models.isEmpty
+                    ? _buildLoadError(context)
+                    : models.isEmpty
                     ? _buildEmptyOrCustomFallback(context)
                     : filteredModels.isEmpty
-                        ? Center(child: Text('Không tìm thấy mô hình nào khớp: "$_searchQuery"'))
-                        : ListView.builder(
-                            itemCount: filteredModels.length,
-                            itemBuilder: (context, index) {
-                              final model = filteredModels[index];
-                              final isSelected = model.id == widget.currentModelId;
+                    ? Center(
+                        child: Text(
+                          'Không tìm thấy mô hình nào khớp: "$_searchQuery"',
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredModels.length,
+                        itemBuilder: (context, index) {
+                          final model = filteredModels[index];
+                          final isSelected = model.id == widget.currentModelId;
 
-                              return ListTile(
-                                title: Text(
-                                  model.name,
-                                  style: TextStyle(
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          return ListTile(
+                            title: Text(
+                              model.name,
+                              style: TextStyle(
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  model.id,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      model.id,
-                                      style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                                if (model.owner != null)
+                                  Text(
+                                    'Owner: ${model.owner}',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontStyle: FontStyle.italic,
                                     ),
-                                    if (model.owner != null)
-                                      Text(
-                                        'Owner: ${model.owner}',
-                                        style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic),
-                                      ),
-                                    const SizedBox(height: 2),
-                                    _buildCapabilitiesChips(context, model.capabilities),
-                                  ],
+                                  ),
+                                const SizedBox(height: 2),
+                                _buildCapabilitiesChips(
+                                  context,
+                                  model.capabilities,
                                 ),
-                                trailing: isSelected 
-                                    ? Icon(Icons.check, color: colorScheme.primary) 
-                                    : null,
-                                onTap: () {
-                                  widget.onModelSelected(model.id);
-                                  Navigator.of(context).pop();
-                                },
-                              );
+                              ],
+                            ),
+                            trailing: isSelected
+                                ? Icon(Icons.check, color: colorScheme.primary)
+                                : null,
+                            onTap: () {
+                              widget.onModelSelected(model.id);
+                              Navigator.of(context).pop();
                             },
-                          ),
+                          );
+                        },
+                      ),
               ),
-              
+
               SizedBox(height: PortalSpacing.md),
               const Divider(),
               SizedBox(height: PortalSpacing.sm),
@@ -206,35 +234,68 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     );
   }
 
-  Widget _buildCapabilitiesChips(BuildContext context, AiModelCapabilities caps) {
+  Widget _buildLoadError(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('Không thể tải danh sách mô hình khả dụng.'),
+          const SizedBox(height: PortalSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: () =>
+                ref.invalidate(routerModelCatalogProvider(widget.providerId)),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCapabilitiesChips(
+    BuildContext context,
+    AiModelCapabilities caps,
+  ) {
     final list = <Widget>[];
 
     if (caps.vision) {
-      list.add(_buildChip(context, 'Vision', Icons.visibility_outlined, Colors.purple));
+      list.add(
+        _buildChip(context, 'Vision', Icons.visibility_outlined, Colors.purple),
+      );
     }
     if (caps.reasoning) {
-      list.add(_buildChip(context, 'Reasoning', Icons.psychology_outlined, Colors.blue));
+      list.add(
+        _buildChip(
+          context,
+          'Reasoning',
+          Icons.psychology_outlined,
+          Colors.blue,
+        ),
+      );
     }
     if (caps.tools) {
-      list.add(_buildChip(context, 'Tools', Icons.build_outlined, Colors.green));
+      list.add(
+        _buildChip(context, 'Tools', Icons.build_outlined, Colors.green),
+      );
     }
 
     if (list.isEmpty) return const SizedBox.shrink();
 
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      children: list,
-    );
+    return Wrap(spacing: 4, runSpacing: 4, children: list);
   }
 
-  Widget _buildChip(BuildContext context, String label, IconData icon, Color color) {
+  Widget _buildChip(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

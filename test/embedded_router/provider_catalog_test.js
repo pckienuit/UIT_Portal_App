@@ -64,7 +64,7 @@ test('Android auth capabilities distinguish native, gateway, and desktop flows',
 });
 
 test('every catalog provider has a conservative Android auth capability', () => {
-  const allowedAuth = new Set(['device', 'pkce', 'apiKey', 'gateway', 'unsupported']);
+  const allowedAuth = new Set(['device', 'pkce', 'loopback', 'apiKey', 'gateway', 'unsupported']);
   const allowedStatus = new Set(['ready', 'experimental', 'blocked']);
 
   for (const provider of loadCatalog()) {

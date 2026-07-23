@@ -75,4 +75,64 @@ void main() {
     expect(credential.refreshToken, 'refresh-token');
     expect(credential.scope, 'read:user');
   });
+
+  test(
+    'refreshes a provider token through native allowlisted transport',
+    () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'refresh');
+        expect(call.arguments, {
+          'providerId': 'qwen',
+          'refreshToken': 'refresh-token',
+        });
+        return {
+          'accessToken': 'new-access-token',
+          'refreshToken': 'rotated-refresh-token',
+          'expiresAt': '2026-07-22T17:00:00.000Z',
+          'scope': 'openid profile email model.completion',
+        };
+      });
+
+      final credential = await const NativeOAuthClient().refresh(
+        'qwen',
+        'refresh-token',
+      );
+
+      expect(credential.accessToken, 'new-access-token');
+      expect(credential.refreshToken, 'rotated-refresh-token');
+    },
+  );
+
+  test('starts and completes native authorization-code flow', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'startAuthorization') {
+        expect(call.arguments, {'providerId': 'gemini-cli'});
+        return {
+          'flowId': 'google-flow',
+          'authorizationUri':
+              'https://accounts.google.com/o/oauth2/v2/auth?state=x',
+        };
+      }
+      expect(call.method, 'completeAuthorization');
+      expect(call.arguments, {'flowId': 'google-flow'});
+      return {
+        'accessToken': 'google-access',
+        'refreshToken': 'google-refresh',
+        'expiresAt': '2026-07-22T17:00:00.000Z',
+        'scope': 'cloud-platform',
+        'projectId': 'cloud-project',
+        'email': 'user@example.com',
+      };
+    });
+
+    final flow = await const NativeOAuthClient().startAuthorization(
+      'gemini-cli',
+    );
+    final credential = await const NativeOAuthClient().completeAuthorization(
+      flow.flowId,
+    );
+
+    expect(flow.authorizationUri.scheme, 'https');
+    expect(credential.projectId, 'cloud-project');
+  });
 }

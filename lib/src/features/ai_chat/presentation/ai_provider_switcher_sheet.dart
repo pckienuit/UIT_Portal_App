@@ -67,10 +67,7 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
                 ),
               )
             else
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.4,
-                ),
+              Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: providerState.providers.length,
@@ -117,7 +114,10 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
                           );
                           return;
                         }
-                        await ref.read(aiChatControllerProvider.notifier).switchProvider(config);
+                        await ref
+                            .read(aiChatControllerProvider.notifier)
+                            .switchProvider(config);
+                        if (!context.mounted) return;
                         Navigator.of(context).pop();
                       },
                     );

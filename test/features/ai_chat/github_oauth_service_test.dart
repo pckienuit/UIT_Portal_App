@@ -85,7 +85,12 @@ void main() {
           options.path,
           'https://api.github.com/copilot_internal/v2/token',
         );
-        expect(options.headers['Authorization'], 'Bearer github-token');
+        expect(options.headers['Authorization'], 'token github-token');
+        expect(options.headers['Editor-Version'], startsWith('vscode/'));
+        expect(
+          options.headers['Editor-Plugin-Version'],
+          startsWith('copilot-chat/'),
+        );
         return {'token': 'copilot-token', 'expires_at': 1234567890};
       });
 
@@ -129,6 +134,20 @@ class _FakeNativeOAuth implements NativeOAuthApi {
   Future<void> cancel(String flowId) async {
     cancelledFlowId = flowId;
   }
+
+  @override
+  Future<NativeOAuthCredential> refresh(
+    String providerId,
+    String refreshToken,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<NativeAuthorizationFlow> startAuthorization(String providerId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<NativeOAuthCredential> completeAuthorization(String flowId) =>
+      throw UnimplementedError();
 }
 
 class _FakeAdapter implements HttpClientAdapter {

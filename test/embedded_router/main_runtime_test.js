@@ -234,12 +234,158 @@ test('OAuth auth mode persists as metadata while token remains runtime-only', as
   assert.doesNotMatch(stateText, new RegExp(secret));
 });
 
+test('Gemini CLI model listing uses live quota buckets', async (t) => {
+  const upstream = require('node:http').createServer(async (request, response) => {
+    assert.equal(request.url, '/v1internal:retrieveUserQuota');
+    assert.match(request.headers.authorization, /^Bearer /);
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    assert.deepEqual(JSON.parse(raw), { project: 'cloud-project' });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ buckets: [
+      { modelId: 'gemini-live-model', remainingFraction: 1 },
+      { modelId: 'gemini-live-model', remainingFraction: 0.5 },
+      { remainingFraction: 1 },
+    ] }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'gemini-models-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'gemini-provider', name: 'Gemini CLI', presetId: 'gemini-cli',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    modelId: 'stale-model', projectId: 'cloud-project', apiKey: 'runtime-token', active: true,
+  })).status, 201);
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    data: [{ id: 'gemini-live-model', object: 'model', owned_by: 'gemini-cli' }],
+  });
+});
+
+test('model listing targets requested connection instead of active fallback', async (t) => {
+  let requestedProject = null;
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    requestedProject = JSON.parse(raw).project;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ buckets: [{ modelId: 'requested-model' }] }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'connection-models-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'active-provider', name: 'Active', presetId: 'generic',
+    baseUrl: 'https://example.com/v1', modelId: 'active-model', active: true,
+  })).status, 201);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'requested-provider', name: 'Gemini CLI', presetId: 'gemini-cli',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    modelId: 'stale-model', projectId: 'requested-project', apiKey: 'runtime-token',
+  })).status, 201);
+
+  const response = await request(
+    baseUrl,
+    token,
+    'GET',
+    '/v1/models?connectionId=requested-provider',
+  );
+  assert.equal(response.status, 200);
+  assert.equal(requestedProject, 'requested-project');
+  assert.deepEqual(await response.json(), {
+    data: [{ id: 'requested-model', object: 'model', owned_by: 'gemini-cli' }],
+  });
+});
+
+test('GitHub model listing proxies the live upstream catalog', async (t) => {
+  const upstream = require('node:http').createServer((request, response) => {
+    assert.equal(request.url, '/models');
+    assert.equal(request.headers['copilot-integration-id'], 'vscode-chat');
+    assert.match(request.headers.authorization, /^Bearer /);
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ data: [{ id: 'available-model' }] }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'models-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-provider',
+    name: 'GitHub Copilot',
+    presetId: 'github',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}`,
+    modelId: 'retired-model',
+    apiKey: 'runtime-token',
+    active: true,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { data: [{ id: 'available-model' }] });
+});
+
+test('GitHub model listing returns 502 when upstream is unavailable', async (t) => {
+  const unavailablePort = await freePort();
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'models-unavailable-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-unavailable',
+    name: 'GitHub Copilot',
+    presetId: 'github',
+    baseUrl: `http://127.0.0.1:${unavailablePort}`,
+    modelId: 'gpt-5.4',
+    apiKey: 'runtime-only-token',
+    active: true,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'upstream_models_unavailable' });
+  assert.equal(child.exitCode, null);
+});
+
 test('streaming request asks upstream for terminal usage', async (t) => {
   const upstream = require('node:http').createServer(async (request, response) => {
     let raw = '';
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     assert.deepEqual(body.stream_options, { include_usage: true });
+    assert.equal(request.headers['copilot-integration-id'], 'vscode-chat');
+    assert.match(request.headers['editor-version'], /^vscode\//);
+    assert.match(request.headers['editor-plugin-version'], /^copilot-chat\//);
+    assert.match(request.headers['user-agent'], /^GitHubCopilotChat\//);
+    assert.equal(request.headers['openai-intent'], 'conversation-panel');
+    assert.ok(request.headers['x-github-api-version']);
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write('data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":2}}\n\n');
     response.end('data: [DONE]\n\n');
@@ -260,6 +406,7 @@ test('streaming request asks upstream for terminal usage', async (t) => {
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'stream-provider',
     name: 'Stream Provider',
+    presetId: 'github',
     baseUrl: `http://127.0.0.1:${upstreamPort}`,
     modelId: 'stream-model',
     active: true,
@@ -276,4 +423,92 @@ test('streaming request asks upstream for terminal usage', async (t) => {
   const entries = await usageResponse.json();
   assert.equal(entries.at(-1).promptTokens, 7);
   assert.equal(entries.at(-1).completionTokens, 2);
+});
+
+test('Gemini CLI adapter wraps OpenAI requests and translates responses', () => {
+  const {
+    openAiToGeminiCli,
+    geminiResponseToOpenAi,
+    createGeminiSseTranslator,
+  } = require('../../android/app/src/main/assets/nodejs-project/gemini_cli_adapter');
+  const requestBody = openAiToGeminiCli({
+    messages: [{ role: 'user', content: 'xin chào' }],
+    max_tokens: 128,
+  }, 'gemini-2.5-flash', 'project-1');
+  assert.equal(requestBody.project, 'project-1');
+  assert.equal(requestBody.request.contents[0].parts[0].text, 'xin chào');
+  assert.equal(requestBody.request.generationConfig.maxOutputTokens, 128);
+
+  const payload = { response: {
+    responseId: 'response-1',
+    modelVersion: 'gemini-2.5-flash',
+    candidates: [{ content: { parts: [{ text: 'chào bạn' }] }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2, totalTokenCount: 5 },
+  } };
+  const translated = geminiResponseToOpenAi(payload, 'gemini-2.5-flash');
+  assert.equal(translated.choices[0].message.content, 'chào bạn');
+  assert.equal(translated.usage.prompt_tokens, 3);
+
+  const stream = createGeminiSseTranslator('gemini-2.5-flash');
+  const chunks = stream.push(`data: ${JSON.stringify(payload)}\n\n`);
+  const terminal = stream.finish();
+  assert.match(chunks.join(''), /chào bạn/);
+  assert.equal(terminal.usage.completion_tokens, 2);
+  assert.equal(terminal.output.at(-1), 'data: [DONE]\n\n');
+});
+
+test('Gemini CLI routes OpenAI chat through Cloud Code envelope', async (t) => {
+  const upstream = require('node:http').createServer(async (request, response) => {
+    assert.equal(request.url, '/v1internal:generateContent');
+    assert.equal(request.headers.authorization, 'Bearer google-runtime-token');
+    assert.match(request.headers['user-agent'], /^GeminiCLI\//);
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    const body = JSON.parse(raw);
+    assert.equal(body.project, 'cloud-project');
+    assert.equal(body.model, 'gemini-2.5-flash');
+    assert.equal(body.request.contents[0].parts[0].text, 'hello');
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ response: {
+      responseId: 'gemini-response',
+      candidates: [{ content: { parts: [{ text: 'world' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+    } }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'gemini-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'gemini-native',
+    name: 'Gemini CLI',
+    presetId: 'gemini-cli',
+    authMode: 'oauth',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    modelId: 'gemini-2.5-flash',
+    projectId: 'cloud-project',
+    apiKey: 'google-runtime-token',
+    active: true,
+  })).status, 201);
+
+  const result = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'ignored',
+    stream: false,
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(result.status, 200);
+  const payload = await result.json();
+  assert.equal(payload.choices[0].message.content, 'world');
+  assert.equal(payload.usage.total_tokens, 2);
+  const state = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  assert.doesNotMatch(state, /google-runtime-token/);
+  assert.match(state, /cloud-project/);
 });

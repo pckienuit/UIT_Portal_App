@@ -7,6 +7,7 @@ import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_chat_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/chat_history_store.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/auth/auth_controller.dart';
 import 'package:uit_portal_app/src/features/auth/auth_providers.dart';
@@ -83,6 +84,86 @@ void main() {
     expect(state.activeProvider?.id, 'p1');
     expect(state.conversations, isEmpty);
     expect(state.activeConversation, isNull);
+  });
+
+  test('does not restore conversation from another provider', () async {
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final repo = container.read(aiProviderRepositoryProvider);
+    const config = AiProviderConfig(
+      id: 'provider-gemini-cli',
+      name: 'Gemini CLI',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal',
+      modelId: 'gemini-2.5-flash',
+    );
+    await repo.saveProvider(config);
+    await repo.setActiveProviderId(config.id);
+    await ChatHistoryStore(directory: tempDir).writeHistory([
+      AiConversation(
+        id: 'github-conversation',
+        title: 'Reply only OK',
+        providerId: 'provider-github',
+        modelId: 'gpt-5.2',
+        messages: [
+          AiChatMessage(
+            id: 'old-user',
+            role: AiMessageRole.user,
+            content: 'Reply only OK',
+            createdAt: DateTime(2026, 7, 23),
+            status: AiMessageStatus.complete,
+          ),
+          AiChatMessage(
+            id: 'old-assistant',
+            role: AiMessageRole.assistant,
+            content: 'OK',
+            createdAt: DateTime(2026, 7, 23),
+            status: AiMessageStatus.complete,
+          ),
+        ],
+        updatedAt: DateTime(2026, 7, 23),
+      ),
+    ]);
+
+    container.read(aiProviderControllerProvider);
+    container.read(aiChatControllerProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    final state = container.read(aiChatControllerProvider);
+    expect(state.activeProvider?.id, config.id);
+    expect(state.activeConversation, isNull);
+    expect(state.conversations, hasLength(1));
+  });
+
+  test('sends only complete messages to provider', () {
+    final messages = [
+      AiChatMessage(
+        id: 'complete',
+        role: AiMessageRole.user,
+        content: 'real prompt',
+        createdAt: DateTime(2026, 7, 23),
+        status: AiMessageStatus.complete,
+      ),
+      AiChatMessage(
+        id: 'failed',
+        role: AiMessageRole.assistant,
+        content: 'Lỗi từ máy chủ AI (Mã 400).',
+        createdAt: DateTime(2026, 7, 23),
+        status: AiMessageStatus.failed,
+      ),
+    ];
+
+    expect(completedMessagesForRequest(messages).map((message) => message.id), [
+      'complete',
+    ]);
   });
 }
 
