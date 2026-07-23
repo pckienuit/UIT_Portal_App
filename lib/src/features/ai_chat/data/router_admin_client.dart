@@ -6,6 +6,7 @@ import '../application/router_runtime_service.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_provider_repository.dart';
+import '../domain/router_models.dart';
 
 class RouterAdminClient {
   RouterAdminClient({required this.ref, required this.secureStorage}) {
@@ -25,8 +26,10 @@ class RouterAdminClient {
     );
   }
 
-  final Ref ref;
-  final FlutterSecureStorage secureStorage;
+  RouterAdminClient.forTest(Dio dio) : _dio = dio;
+
+  late final Ref ref;
+  late final FlutterSecureStorage secureStorage;
   late final Dio _dio;
 
   static const String _kSecretPrefix = 'ai_provider_key_';
@@ -75,7 +78,11 @@ class RouterAdminClient {
   }
 
   // Thêm / Cập nhật provider connection
-  Future<bool> saveProvider(AiProviderConfig config, {String? apiKey}) async {
+  Future<bool> saveProvider(
+    AiProviderConfig config, {
+    String? apiKey,
+    String? sourceToken,
+  }) async {
     // Chỉ đồng bộ các connection OpenAI compatible có baseUrl mạng hợp lệ
     if (!supportsProvider(config)) {
       return true;
@@ -102,6 +109,7 @@ class RouterAdminClient {
       if (key != null) {
         payload['apiKey'] = key;
       }
+      if (sourceToken != null) payload['sourceToken'] = sourceToken;
 
       if (exists) {
         final res = await _dio.patch(
@@ -189,29 +197,28 @@ class RouterAdminClient {
   }
 
   // Lấy Quota Snapshot
-  Future<Map<String, dynamic>?> getQuota() async {
-    try {
-      final res = await _dio.get('/internal/quota');
-      if (res.statusCode == 200) {
-        return res.data as Map<String, dynamic>?;
-      }
-    } catch (e) {
-      debugPrint('Failed to get quota: $e');
-    }
-    return null;
+  Future<RouterQuotaSnapshot> getQuota([String? connectionId]) async {
+    final path = connectionId == null
+        ? '/internal/quota'
+        : '/internal/quota/$connectionId';
+    final res = await _dio.get(
+      path,
+      options: Options(validateStatus: (status) => status != null),
+    );
+    final data = res.data;
+    if (data is! Map) throw const FormatException('Malformed quota response');
+    return RouterQuotaSnapshot.fromJson(Map<String, dynamic>.from(data));
   }
 
   // Refresh Quota
-  Future<Map<String, dynamic>?> refreshQuota(String connectionId) async {
-    try {
-      final res = await _dio.post('/internal/quota/$connectionId/refresh');
-      if (res.statusCode == 200) {
-        return res.data as Map<String, dynamic>?;
-      }
-    } catch (e) {
-      debugPrint('Failed to refresh quota: $e');
-    }
-    return null;
+  Future<RouterQuotaSnapshot> refreshQuota(String connectionId) async {
+    final res = await _dio.post(
+      '/internal/quota/$connectionId/refresh',
+      options: Options(validateStatus: (status) => status != null),
+    );
+    final data = res.data;
+    if (data is! Map) throw const FormatException('Malformed quota response');
+    return RouterQuotaSnapshot.fromJson(Map<String, dynamic>.from(data));
   }
 
   // Reset toàn bộ dữ liệu Core AI nội bộ (providers, usage, quota)

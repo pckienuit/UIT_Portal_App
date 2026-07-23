@@ -242,6 +242,37 @@ void main() {
 
     expect(stopped, ['p1']);
   });
+
+  test('save injects runtime and source OAuth credentials into Core RAM', () async {
+    final admin = _FakeRouterAdminClient();
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        routerAdminClientProvider.overrideWithValue(admin),
+      ],
+    );
+    addTearDown(container.dispose);
+    const config = AiProviderConfig(
+      id: 'github-1',
+      name: 'GitHub',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://api.githubcopilot.com',
+      modelId: 'gpt-5.4',
+      presetId: 'github',
+      authMode: 'oauth',
+    );
+
+    await container.read(aiProviderControllerProvider.notifier).saveProvider(
+      config,
+      oauthAccessToken: 'runtime-token',
+      oauthSourceToken: 'source-token',
+    );
+
+    expect(admin.savedRuntimeToken, 'runtime-token');
+    expect(admin.savedSourceToken, 'source-token');
+  });
 }
 
 class _ReadyRouterRuntimeService extends RouterRuntimeService {
@@ -259,6 +290,19 @@ class _FakeRouterAdminClient extends Fake implements RouterAdminClient {
   bool setActiveResult;
   final List<String> deletedIds = [];
   final List<String> activatedIds = [];
+  String? savedRuntimeToken;
+  String? savedSourceToken;
+
+  @override
+  Future<bool> saveProvider(
+    AiProviderConfig config, {
+    String? apiKey,
+    String? sourceToken,
+  }) async {
+    savedRuntimeToken = apiKey;
+    savedSourceToken = sourceToken;
+    return true;
+  }
 
   @override
   Future<bool> deleteProvider(String id) async {

@@ -81,7 +81,12 @@ void main() async {
             );
             for (final p in coreProviders) {
               final apiKey = await repo.getApiKey(p.id);
-              await client.saveProvider(p, apiKey: apiKey);
+              final sourceToken = await repo.getOAuthSourceToken(p.id);
+              await client.saveProvider(
+                p,
+                apiKey: apiKey,
+                sourceToken: sourceToken,
+              );
             }
 
             final activeId = repo.getActiveProviderId();

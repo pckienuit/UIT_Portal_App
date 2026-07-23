@@ -52,6 +52,31 @@ test('persists schema v2 metadata without credentials or chat content', () => {
   assert.equal(state.updatedAt, '2026-07-21T00:00:00.000Z');
 });
 
+test('quota normalization strips credential-like fields and malformed entries', () => {
+  const dataDir = tempDir();
+  const store = createStateStore({ dataDir });
+  store.save({
+    connections: [], activeRoute: null, usage: [],
+    quota: {
+      safe: {
+        status: 'fresh', connectionId: 'safe', providerId: 'github',
+        fetchedAt: '2026-07-24T00:00:00Z', apiKey: 'runtime-secret',
+        sourceToken: 'source-secret', entries: [{
+          id: 'chat', label: 'chat', used: 1, total: 2, remaining: 1,
+          remainingPercent: 50, unit: 'count', resetAt: null, unlimited: false,
+          accessToken: 'bucket-secret',
+        }],
+      },
+      malformed: 'secret-string',
+    },
+  });
+  const raw = fs.readFileSync(store.statePath, 'utf8');
+  assert.doesNotMatch(raw, /runtime-secret|source-secret|bucket-secret|secret-string/);
+  assert.equal(store.load().quota.safe.status, 'fresh');
+  assert.equal(store.load().quota.safe.entries[0].remainingPercent, 50);
+  assert.equal(store.load().quota.malformed, undefined);
+});
+
 test('backs up corrupt JSON before returning a fresh state', () => {
   const dataDir = tempDir();
   const statePath = path.join(dataDir, '9router_state.json');

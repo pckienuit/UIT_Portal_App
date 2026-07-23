@@ -10,6 +10,130 @@ enum RouterNativeStatus { ready, experimental, blocked }
 
 enum RouterTokenRefresh { exchange, refreshToken, none }
 
+enum RouterQuotaStatus {
+  fresh,
+  stale,
+  unsupported,
+  unavailable,
+  error,
+  noActiveConnection,
+}
+
+class RouterQuotaEntry {
+  const RouterQuotaEntry({
+    required this.id,
+    required this.label,
+    required this.used,
+    required this.total,
+    required this.remaining,
+    required this.remainingPercent,
+    required this.resetAt,
+    required this.unlimited,
+  });
+
+  final String id;
+  final String label;
+  final num? used;
+  final num? total;
+  final num? remaining;
+  final num? remainingPercent;
+  final DateTime? resetAt;
+  final bool unlimited;
+
+  factory RouterQuotaEntry.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final label = json['label'];
+    if (id is! String || id.isEmpty || label is! String || label.isEmpty) {
+      throw const FormatException('Malformed quota bucket');
+    }
+    DateTime? resetAt;
+    final reset = json['resetAt'];
+    if (reset != null) {
+      if (reset is! String || (resetAt = DateTime.tryParse(reset)) == null) {
+        throw const FormatException('Malformed quota reset time');
+      }
+    }
+    num? nullableNumber(String key) {
+      final value = json[key];
+      if (value == null) return null;
+      if (value is! num || !value.isFinite) {
+        throw const FormatException('Malformed quota number');
+      }
+      return value;
+    }
+    return RouterQuotaEntry(
+      id: id,
+      label: label,
+      used: nullableNumber('used'),
+      total: nullableNumber('total'),
+      remaining: nullableNumber('remaining'),
+      remainingPercent: nullableNumber('remainingPercent'),
+      resetAt: resetAt?.toUtc(),
+      unlimited: json['unlimited'] == true,
+    );
+  }
+}
+
+class RouterQuotaSnapshot {
+  const RouterQuotaSnapshot({
+    required this.status,
+    required this.connectionId,
+    required this.providerId,
+    required this.plan,
+    required this.fetchedAt,
+    required this.entries,
+    this.message,
+  });
+
+  final RouterQuotaStatus status;
+  final String? connectionId;
+  final String? providerId;
+  final String? plan;
+  final DateTime? fetchedAt;
+  final List<RouterQuotaEntry> entries;
+  final String? message;
+
+  factory RouterQuotaSnapshot.fromJson(Map<String, dynamic> json) {
+    final status = switch (json['status']) {
+      'fresh' => RouterQuotaStatus.fresh,
+      'no_active_connection' => RouterQuotaStatus.noActiveConnection,
+      'unsupported' => RouterQuotaStatus.unsupported,
+      'unavailable' => RouterQuotaStatus.unavailable,
+      'stale' => RouterQuotaStatus.stale,
+      'error' => RouterQuotaStatus.error,
+      _ => throw const FormatException('Unknown quota status'),
+    };
+    final rawBuckets = json['entries'];
+    if ((status == RouterQuotaStatus.fresh || status == RouterQuotaStatus.stale) &&
+        rawBuckets is! List) {
+      throw const FormatException('Malformed quota entries');
+    }
+    DateTime? fetchedAt;
+    final rawFetchedAt = json['fetchedAt'];
+    if (rawFetchedAt != null) {
+      if (rawFetchedAt is! String ||
+          (fetchedAt = DateTime.tryParse(rawFetchedAt)) == null) {
+        throw const FormatException('Malformed quota timestamp');
+      }
+    }
+    return RouterQuotaSnapshot(
+      status: status,
+      connectionId: json['connectionId'] as String?,
+      providerId: json['providerId'] as String?,
+      plan: json['plan'] as String?,
+      fetchedAt: fetchedAt?.toUtc(),
+      entries: rawBuckets is List
+          ? rawBuckets
+              .map((item) => RouterQuotaEntry.fromJson(
+                    Map<String, dynamic>.from(item as Map),
+                  ))
+              .toList(growable: false)
+          : const [],
+      message: (json['message'] ?? json['error']) as String?,
+    );
+  }
+}
+
 enum RouterTransportKind {
   openaiChat,
   anthropicMessages,

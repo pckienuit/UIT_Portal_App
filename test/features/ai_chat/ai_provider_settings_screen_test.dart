@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
@@ -131,16 +132,24 @@ void main() {
           ],
         ),
         routerQuotaProvider.overrideWith(
-          (ref) async => {
-            'snapshot': {
-              'connectionId': 'openai-1',
-              'used': 12000,
-              'total': 50000,
-              'unit': 'tokens',
-              'percentage': 24,
-              'fetchedAt': '2026-07-22T08:00:00.000Z',
-            },
-          },
+          (ref) async => RouterQuotaSnapshot.fromJson({
+            'status': 'fresh',
+            'connectionId': 'openai-1',
+            'providerId': 'openai',
+            'fetchedAt': '2026-07-22T08:00:00.000Z',
+            'entries': [
+              {
+                'id': 'tokens',
+                'label': 'Tokens',
+                'used': 12000,
+                'total': 50000,
+                'remaining': 38000,
+                'remainingPercent': 76,
+                'resetAt': null,
+                'unlimited': false,
+              },
+            ],
+          }),
         ),
       ],
     );
@@ -164,8 +173,8 @@ void main() {
     await tester.tap(find.text('Quota Tracker'));
     await tester.pumpAndSettle();
 
-    expect(find.text('24%'), findsOneWidget);
-    expect(find.text('12.000 / 50.000 tokens'), findsOneWidget);
+    expect(find.text('76% còn lại'), findsOneWidget);
+    expect(find.text('12.000 / 50.000'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

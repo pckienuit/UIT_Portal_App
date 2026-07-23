@@ -140,7 +140,11 @@ test('quota refresh is honest when provider has no quota adapter', async (t) => 
   assert.deepEqual(await response.json(), {
     status: 'unsupported',
     connectionId: 'router-1',
-    error: 'Quota is not available for this provider',
+    providerId: 'custom',
+    plan: null,
+    fetchedAt: null,
+    entries: [],
+    message: 'Quota is not available for this provider',
   });
 
   const state = JSON.parse(
@@ -149,6 +153,158 @@ test('quota refresh is honest when provider has no quota adapter', async (t) => 
   assert.deepEqual(state.quota, {});
 });
 
+test('quota refresh keeps runtime and source credentials RAM-only', async (t) => {
+  let receivedAuthorization;
+  const upstream = require('node:http').createServer((request, response) => {
+    receivedAuthorization = request.headers.authorization;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
+      copilot_plan: 'individual',
+      quota_snapshots: { chat: { entitlement: 100, remaining: 60, percent_remaining: 60 } },
+    }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'quota-runtime-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+    env: { ...process.env, GITHUB_QUOTA_BASE_URL: `http://127.0.0.1:${upstream.address().port}` },
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const runtimeSecret = 'copilot-runtime-sentinel';
+  const sourceSecret = 'github-source-sentinel';
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-github', name: 'GitHub Copilot', presetId: 'github',
+    baseUrl: 'https://api.githubcopilot.com', modelId: 'gpt-5.4', active: true,
+    apiKey: runtimeSecret, sourceToken: sourceSecret,
+  })).status, 201);
+
+  const refreshed = await request(
+    baseUrl, token, 'POST', '/internal/quota/provider-github/refresh',
+  );
+  assert.equal(refreshed.status, 200);
+  assert.equal(receivedAuthorization, `Bearer ${sourceSecret}`);
+  const refreshedBody = await refreshed.json();
+  assert.equal(refreshedBody.status, 'fresh');
+  assert.equal(refreshedBody.entries[0].remainingPercent, 60);
+
+  const providersText = await (
+    await request(baseUrl, token, 'GET', '/internal/providers')
+  ).text();
+  const stateText = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  const logText = fs.readFileSync(path.join(dataDir, 'router_node.log'), 'utf8');
+  for (const text of [providersText, stateText, logText]) {
+    assert.doesNotMatch(text, new RegExp(runtimeSecret));
+    assert.doesNotMatch(text, new RegExp(sourceSecret));
+  }
+});
+
+test('quota endpoint returns supported available, stale, error, and no-active states', async (t) => {
+  let mode = 'success';
+  const upstream = require('node:http').createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(mode === 'success'
+      ? JSON.stringify({ quota_snapshots: {
+          chat: { entitlement: 10, remaining: 4, percent_remaining: 40 },
+        } })
+      : '{malformed');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'typed-quota-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+    env: { ...process.env, GITHUB_QUOTA_BASE_URL: `http://127.0.0.1:${upstream.address().port}` },
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.deepEqual(await (await request(baseUrl, token, 'GET', '/internal/quota')).json(), {
+    status: 'no_active_connection', connectionId: null, providerId: null,
+    plan: null, fetchedAt: null, entries: [], message: null,
+  });
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-missing', name: 'GitHub', presetId: 'github',
+    baseUrl: 'https://api.githubcopilot.com', modelId: 'model', active: true,
+  })).status, 201);
+  const neverFetched = await request(
+    baseUrl, token, 'GET', '/internal/quota/github-missing',
+  );
+  assert.equal(neverFetched.status, 200);
+  assert.deepEqual(await neverFetched.json(), {
+    status: 'unavailable', connectionId: 'github-missing', providerId: 'github',
+    plan: null, fetchedAt: null, entries: [], message: null,
+  });
+  const unavailable = await request(baseUrl, token, 'POST', '/internal/quota/github-missing/refresh');
+  assert.equal(unavailable.status, 401);
+  assert.equal((await unavailable.json()).status, 'error');
+  assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/github-missing', {
+    sourceToken: 'typed-source-secret',
+  })).status, 200);
+  const fresh = await request(baseUrl, token, 'POST', '/internal/quota/github-missing/refresh');
+  assert.equal((await fresh.json()).status, 'fresh');
+  mode = 'malformed';
+  const stale = await request(baseUrl, token, 'POST', '/internal/quota/github-missing/refresh');
+  const staleBody = await stale.json();
+  assert.equal(stale.status, 200);
+  assert.equal(staleBody.status, 'stale');
+  assert.equal(staleBody.entries[0].remainingPercent, 40);
+  assert.doesNotMatch(JSON.stringify(staleBody), /typed-source-secret/);
+
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-error', name: 'GitHub error', presetId: 'github',
+    baseUrl: 'https://api.githubcopilot.com', modelId: 'model',
+    sourceToken: 'other-secret', active: true,
+  })).status, 201);
+  const error = await request(baseUrl, token, 'POST', '/internal/quota/github-error/refresh');
+  assert.equal(error.status, 502);
+  assert.equal((await error.json()).status, 'error');
+});
+
+test('quota GET addresses each configured quota-capable connection, not active only', async (t) => {
+  const upstream = require('node:http').createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
+      quota_snapshots: { chat: { entitlement: 10, remaining: 7, percent_remaining: 70 } },
+    }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'per-connection-quota-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+    env: { ...process.env, GITHUB_QUOTA_BASE_URL: `http://127.0.0.1:${upstream.address().port}` },
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  for (const [id, active] of [['github-active', true], ['github-inactive', false]]) {
+    assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+      id, name: id, presetId: 'github', baseUrl: 'https://api.githubcopilot.com',
+      modelId: 'model', sourceToken: `source-${id}`, active,
+    })).status, 201);
+    assert.equal((await request(
+      baseUrl, token, 'POST', `/internal/quota/${id}/refresh`,
+    )).status, 200);
+  }
+
+  for (const id of ['github-active', 'github-inactive']) {
+    const response = await request(baseUrl, token, 'GET', `/internal/quota/${id}`);
+    assert.equal(response.status, 200);
+    const snapshot = await response.json();
+    assert.equal(snapshot.connectionId, id);
+    assert.equal(snapshot.status, 'fresh');
+  }
+});
 
 test('provider delete removes persisted quota snapshot', async (t) => {
   const dataDir = tempDir();

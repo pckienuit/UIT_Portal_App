@@ -27,11 +27,33 @@ const USAGE_FIELDS = [
   'estimatedCost',
   'latencyMs',
 ];
+const QUOTA_FIELDS = [
+  'status', 'connectionId', 'providerId', 'plan', 'fetchedAt', 'entries', 'message',
+];
+const QUOTA_BUCKET_FIELDS = [
+  'id', 'label', 'used', 'total', 'remaining', 'remainingPercent', 'unit', 'resetAt', 'unlimited',
+];
 
 function pick(source, fields) {
   const result = {};
   for (const field of fields) {
     if (source[field] !== undefined) result[field] = source[field];
+  }
+  return result;
+}
+
+function normalizeQuota(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const result = {};
+  for (const [connectionId, value] of Object.entries(input)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const quota = pick(value, QUOTA_FIELDS);
+    quota.entries = Array.isArray(value.entries)
+      ? value.entries
+          .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+          .map((entry) => pick(entry, QUOTA_BUCKET_FIELDS))
+      : [];
+    result[connectionId] = quota;
   }
   return result;
 }
@@ -62,7 +84,7 @@ function createStateStore({ dataDir, now = () => new Date() }) {
       connections,
       activeRoute: input.activeRoute ?? null,
       usage,
-      quota: input.quota && typeof input.quota === 'object' ? input.quota : {},
+      quota: normalizeQuota(input.quota),
       updatedAt: now().toISOString(),
     };
   }

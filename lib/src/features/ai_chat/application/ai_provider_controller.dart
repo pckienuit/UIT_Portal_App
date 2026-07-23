@@ -94,7 +94,11 @@ class AiProviderController extends Notifier<AiProviderState> {
     // Đồng bộ sang Core AI nội bộ
     try {
       final client = ref.read(routerAdminClientProvider);
-      await client.saveProvider(config, apiKey: oauthAccessToken ?? apiKey);
+      await client.saveProvider(
+        config,
+        apiKey: oauthAccessToken ?? apiKey,
+        sourceToken: oauthSourceToken,
+      );
     } catch (_) {}
 
     final providers = _repository.listProviders();

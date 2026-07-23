@@ -5,6 +5,7 @@ const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
 const { createSseUsageParser } = require('./sse_usage');
 const { waitForDrainOrClose } = require('./stream_backpressure');
+const { fetchQuota, listGeminiModels } = require('./quota_adapters');
 const {
   openAiToGeminiCli,
   geminiResponseToOpenAi,
@@ -40,6 +41,19 @@ try {
 
   const stateStore = createStateStore({ dataDir: DATA_DIR });
   const runtimeSecrets = new Map();
+  const refreshedQuota = new Set();
+
+  function quotaState(status, connection = null, details = {}) {
+    return {
+      status,
+      connectionId: connection?.id || null,
+      providerId: connection ? connection.presetId || connection.id : null,
+      plan: details.plan ?? null,
+      fetchedAt: details.fetchedAt ?? null,
+      entries: Array.isArray(details.entries) ? details.entries : [],
+      message: details.message ?? null,
+    };
+  }
 
   function toLegacyDb(state) {
     const activeConnectionId = state.activeRoute?.connectionId;
@@ -57,7 +71,7 @@ try {
           : {}),
         authMode: connection.authMode || 'apiKey',
         active: connection.id === activeConnectionId,
-        apiKey: runtimeSecrets.get(connection.id) || '',
+        apiKey: runtimeSecrets.get(connection.id)?.runtimeToken || '',
       })),
       usage: state.usage,
       quota: state.quota,
@@ -98,7 +112,16 @@ try {
 
   function saveDb(db) {
     for (const provider of db.providers) {
-      if (provider.apiKey) runtimeSecrets.set(provider.id, provider.apiKey);
+      const current = runtimeSecrets.get(provider.id) || {};
+      const runtimeToken = provider.apiKey || current.runtimeToken;
+      const sourceToken = provider.sourceToken || current.sourceToken;
+      if (runtimeToken || sourceToken) {
+        runtimeSecrets.set(provider.id, {
+          runtimeToken: runtimeToken || null,
+          sourceToken: sourceToken || null,
+          secureMetadata: provider.secureMetadata || current.secureMetadata || null,
+        });
+      }
     }
     stateStore.save(toSchemaV2(db));
   }
@@ -162,23 +185,11 @@ try {
       }
       if (activeProvider.presetId === 'gemini-cli' && activeProvider.apiKey && activeProvider.projectId) {
         try {
-          const upstream = await fetch(`${activeProvider.baseUrl}:retrieveUserQuota`, {
-            method: 'POST',
-            headers: {
-              'authorization': `Bearer ${activeProvider.apiKey}`,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({ project: activeProvider.projectId }),
+          const ids = await listGeminiModels({
+            baseUrl: activeProvider.baseUrl,
+            projectId: activeProvider.projectId,
+            runtimeToken: activeProvider.apiKey,
           });
-          if (!upstream.ok) {
-            return sendJson(response, 502, { error: 'upstream_models_unavailable' });
-          }
-          const payload = await upstream.json();
-          const ids = [...new Set(
-            (Array.isArray(payload.buckets) ? payload.buckets : [])
-              .map((bucket) => bucket?.modelId)
-              .filter((id) => typeof id === 'string' && id.length > 0),
-          )];
           return sendJson(response, 200, {
             data: ids.map((id) => ({ id, object: 'model', owned_by: 'gemini-cli' })),
           });
@@ -462,7 +473,8 @@ try {
           authMode: data.authMode || 'apiKey',
           projectId: data.projectId || '',
           active: !!data.active,
-          apiKey: data.apiKey || ''
+          apiKey: data.apiKey || '',
+          sourceToken: data.sourceToken || ''
         });
 
         saveDb(db);
@@ -487,6 +499,7 @@ try {
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
         if (data.projectId !== undefined) provider.projectId = data.projectId;
         if (data.apiKey !== undefined) provider.apiKey = data.apiKey;
+        if (data.sourceToken !== undefined) provider.sourceToken = data.sourceToken;
         if (data.active !== undefined) {
           provider.active = !!data.active;
           if (provider.active) {
@@ -510,6 +523,7 @@ try {
 
       db.providers.splice(index, 1);
       runtimeSecrets.delete(id);
+      refreshedQuota.delete(id);
       delete db.quota[id];
       saveDb(db);
       return sendJson(response, 200, { success: true });
@@ -555,13 +569,22 @@ try {
       return sendJson(response, 200, { success: true });
     }
 
-    if (request.method === 'GET' && url.pathname === '/internal/quota') {
-      const activeProvider = db.providers.find(p => p.active);
-      if (!activeProvider) {
-        return sendJson(response, 200, { status: 'no_active_connection' });
+    if (request.method === 'GET' && url.pathname.startsWith('/internal/quota')) {
+      const connectionId = url.pathname.split('/')[3];
+      const provider = connectionId
+        ? db.providers.find(p => p.id === connectionId)
+        : db.providers.find(p => p.active);
+      if (!provider) {
+        return sendJson(response, connectionId ? 404 : 200, connectionId
+          ? quotaState('error', { id: connectionId }, { message: 'Provider connection not found' })
+          : quotaState('no_active_connection'));
       }
-      const snapshot = db.quota[activeProvider.id] || null;
-      return sendJson(response, 200, { snapshot });
+      const snapshot = db.quota[provider.id];
+      if (!snapshot) return sendJson(response, 200, quotaState('unavailable', provider));
+      return sendJson(response, 200, {
+        ...snapshot,
+        status: refreshedQuota.has(provider.id) ? 'fresh' : 'stale',
+      });
     }
 
     if (request.method === 'POST' && url.pathname.startsWith('/internal/quota/')) {
@@ -572,11 +595,34 @@ try {
         return sendJson(response, 404, { error: 'Provider connection not found' });
       }
 
-      return sendJson(response, 501, {
-        status: 'unsupported',
-        connectionId,
-        error: 'Quota is not available for this provider'
-      });
+      try {
+        const snapshot = await fetchQuota({
+          connection: {
+            id: provider.id,
+            providerId: provider.presetId || provider.id,
+            baseUrl: provider.baseUrl,
+            projectId: provider.projectId,
+          },
+          secrets: runtimeSecrets.get(provider.id) || {},
+        });
+        db.quota[connectionId] = snapshot;
+        refreshedQuota.add(connectionId);
+        saveDb(db);
+        return sendJson(response, 200, snapshot);
+      } catch (error) {
+        const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
+        if (db.quota[connectionId]) {
+          return sendJson(response, 200, {
+            ...db.quota[connectionId],
+            status: 'stale',
+            message: error?.message || 'Quota unavailable',
+          });
+        }
+        const quotaStatus = error?.code === 'unsupported' ? 'unsupported' : 'error';
+        return sendJson(response, statusCode, quotaState(quotaStatus, provider, {
+          message: error?.message || 'Quota unavailable',
+        }));
+      }
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/reset') {
@@ -585,6 +631,8 @@ try {
         usage: [],
         quota: {}
       };
+      runtimeSecrets.clear();
+      refreshedQuota.clear();
       saveDb(dbReset);
       return sendJson(response, 200, { success: true });
     }
