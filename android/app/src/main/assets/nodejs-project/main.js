@@ -262,18 +262,20 @@ try {
       if (!activeProvider) {
         return sendJson(response, 200, { data: [] });
       }
-      if (activeProvider.presetId === 'gemini-cli' && activeProvider.apiKey && activeProvider.projectId) {
+      if ((activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity') && activeProvider.apiKey && activeProvider.projectId) {
         try {
           const ids = await listGeminiModels({
             baseUrl: activeProvider.baseUrl,
             projectId: activeProvider.projectId,
             runtimeToken: activeProvider.apiKey,
           });
-          return sendJson(response, 200, {
-            data: ids.map((id) => ({ id, object: 'model', owned_by: 'gemini-cli' })),
-          });
+          if (ids.length > 0) {
+            return sendJson(response, 200, {
+              data: ids.map((id) => ({ id, object: 'model', owned_by: activeProvider.presetId })),
+            });
+          }
         } catch {
-          return sendJson(response, 502, { error: 'upstream_models_unavailable' });
+          // fallback to configured models below
         }
       }
       if (activeProvider.presetId === 'github' && activeProvider.apiKey) {
@@ -328,7 +330,9 @@ try {
 
         let body = await parseJsonBody(request);
         const requestedStream = body.stream === true;
-        body.model = activeProvider.modelId;
+        const rawModel = (typeof body.model === 'string' && body.model.trim()) ? body.model.trim() : '';
+        const selectedModel = (rawModel && rawModel !== 'ignored') ? rawModel : activeProvider.modelId;
+        body.model = selectedModel;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
@@ -341,26 +345,26 @@ try {
         if (isGeminiCli) {
           Object.assign(headers, {
             'accept': requestedStream ? 'text/event-stream' : 'application/json',
-            'user-agent': `GeminiCLI/0.34.0/${activeProvider.modelId} (android; arm64)`,
+            'user-agent': `GeminiCLI/0.34.0/${selectedModel} (android; arm64)`,
             'x-goog-api-client': 'google-genai-sdk/1.41.0 gl-node/v22.19.0',
           });
-          body = openAiToGeminiCli(body, activeProvider.modelId, activeProvider.projectId);
+          body = openAiToGeminiCli(body, selectedModel, activeProvider.projectId);
         }
         if (isAnthropicMessages) {
           headers.accept = requestedStream ? 'text/event-stream' : 'application/json';
           headers['anthropic-version'] =
             activeProvider.staticHeaders?.['anthropic-version'] || '2023-06-01';
-          body = openAiToAnthropic(body, activeProvider.modelId);
+          body = openAiToAnthropic(body, selectedModel);
         }
         if (isGeminiContent) {
           headers.accept = requestedStream ? 'text/event-stream' : 'application/json';
           body = openAiToGeminiContent(body);
         }
         if (isOllamaChat) {
-          body = openAiToOllamaChat(body, activeProvider.modelId);
+          body = openAiToOllamaChat(body, selectedModel);
         }
         if (isOpenAiResponses) {
-          body = openAiToOpenAiResponses(body, activeProvider.modelId);
+          body = openAiToOpenAiResponses(body, selectedModel);
         }
 
         if (activeProvider.presetId === 'github') {
@@ -393,7 +397,7 @@ try {
         const targetUrl = isGeminiCli
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
           : isGeminiContent
-            ? buildGeminiContentUrl(activeProvider.baseUrl, activeProvider.modelId, requestedStream, providerKey)
+            ? buildGeminiContentUrl(activeProvider.baseUrl, selectedModel, requestedStream, providerKey)
             : ['openaiChat', 'anthropicMessages', 'ollamaChat', 'openaiResponses'].includes(activeProvider.transportKind) && activeProvider.chatUrl
               ? activeProvider.chatUrl
               : `${activeProvider.baseUrl}/chat/completions`;
