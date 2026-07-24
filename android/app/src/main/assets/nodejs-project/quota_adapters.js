@@ -63,6 +63,27 @@ async function retrieveGeminiQuota({ baseUrl, projectId, runtimeToken, fetchImpl
   return payload;
 }
 
+async function retrieveAntigravityModels({ baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs }) {
+  if (!runtimeToken) {
+    throw new QuotaError('missing_credential', 401, 'Quota credential unavailable', 'error');
+  }
+  const payload = await fetchJson(`${baseUrl}:fetchAvailableModels`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${runtimeToken}`,
+      'content-type': 'application/json',
+      'user-agent': 'antigravity/ide/2.1.1 darwin/arm64',
+      'x-client-name': 'antigravity',
+      'x-client-version': '2.1.1',
+    },
+    body: JSON.stringify(projectId ? { project: projectId } : {}),
+  }, fetchImpl, timeoutMs);
+  if (!payload || typeof payload.models !== 'object' || Array.isArray(payload.models)) {
+    throw new QuotaError('malformed', 502, 'Quota payload malformed');
+  }
+  return payload;
+}
+
 async function listGeminiModels({ baseUrl, projectId, runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
   const payload = await retrieveGeminiQuota({
     baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs,
@@ -93,6 +114,45 @@ function normalizeGemini(connection, payload, now) {
     });
   if (entries.length === 0) throw new QuotaError('malformed', 502, 'Quota payload malformed');
   return snapshot(connection, payload.plan ?? null, entries, now);
+}
+
+function antigravityModels(payload) {
+  const models = Object.entries(payload.models)
+    .filter(([id, model]) => id && model && model.isInternal !== true && model.quotaInfo)
+    .map(([id, model]) => ({
+      id,
+      name: typeof model.displayName === 'string' && model.displayName ? model.displayName : id,
+      quotaInfo: model.quotaInfo,
+    }));
+  if (models.length === 0) throw new QuotaError('malformed', 502, 'Quota payload malformed');
+  return models;
+}
+
+async function listAntigravityModels({ baseUrl, projectId, runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
+  const payload = await retrieveAntigravityModels({
+    baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs,
+  });
+  return antigravityModels(payload).map(({ id, name }) => ({ id, name }));
+}
+
+function normalizeAntigravity(connection, payload, now) {
+  const entries = antigravityModels(payload).map(({ id, name, quotaInfo }) => {
+    const fraction = numberOrNull(quotaInfo.remainingFraction);
+    return {
+      id,
+      label: name,
+      used: null,
+      total: null,
+      remaining: null,
+      remainingPercent: fraction == null
+        ? null
+        : Math.max(0, Math.min(100, Math.round(fraction * 100))),
+      unit: 'percent',
+      resetAt: dateOrNull(quotaInfo.resetTime),
+      unlimited: false,
+    };
+  });
+  return snapshot(connection, null, entries, now);
 }
 
 function normalizeGithub(connection, payload, now) {
@@ -166,7 +226,7 @@ async function fetchQuota({
   now = () => new Date(),
   githubBaseUrl = process.env.GITHUB_QUOTA_BASE_URL || 'https://api.github.com',
 }) {
-  if (connection.providerId === 'gemini-cli' || connection.providerId === 'antigravity') {
+  if (connection.providerId === 'gemini-cli') {
     const payload = await retrieveGeminiQuota({
       baseUrl: connection.baseUrl,
       projectId: connection.projectId,
@@ -175,6 +235,16 @@ async function fetchQuota({
       timeoutMs,
     });
     return normalizeGemini(connection, payload, now);
+  }
+  if (connection.providerId === 'antigravity') {
+    const payload = await retrieveAntigravityModels({
+      baseUrl: connection.baseUrl,
+      projectId: connection.projectId,
+      runtimeToken: secrets.runtimeToken,
+      fetchImpl,
+      timeoutMs,
+    });
+    return normalizeAntigravity(connection, payload, now);
   }
   if (connection.providerId === 'github') {
     if (!secrets.sourceToken) {
@@ -206,4 +276,4 @@ async function fetchQuota({
   throw new QuotaError('unsupported', 501, 'Quota is not available for this provider');
 }
 
-module.exports = { fetchQuota, listGeminiModels, QuotaError };
+module.exports = { fetchQuota, listAntigravityModels, listGeminiModels, QuotaError };
