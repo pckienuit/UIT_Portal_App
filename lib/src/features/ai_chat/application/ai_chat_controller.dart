@@ -297,6 +297,7 @@ class AiChatController extends Notifier<AiChatState> {
       apiKey: '',
       messages: requestMessages,
       context: contextSnapshot,
+      modelId: updatedConvo.modelId,
     );
 
     _streamSub = _activeBackend!
