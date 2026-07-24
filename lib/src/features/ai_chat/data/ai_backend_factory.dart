@@ -29,9 +29,10 @@ class AiBackendFactory {
       '${runtimeBaseUrl.replaceFirst(RegExp(r'/$'), '')}/v1';
 
   Future<AiChatBackend?> buildBackend(AiProviderConfig config) async {
+    final repository =
+        ref.read(aiProviderRepositoryProvider) as AiProviderRepository;
+
     if (config.presetId == 'github' && config.authMode == 'oauth') {
-      final repository =
-          ref.read(aiProviderRepositoryProvider) as AiProviderRepository;
       final oauth = ref.read(githubOAuthServiceProvider) as GithubOAuthService;
       final broker = ProviderCredentialBroker(
         repository: repository,
@@ -39,7 +40,16 @@ class AiBackendFactory {
       );
       config = await broker.ensureRuntimeCredential(config);
       await (ref.read(routerAdminClientProvider) as RouterAdminClient)
-          .saveProvider(config, apiKey: await repository.getApiKey(config.id));
+          .saveProvider(config, apiKey: *** repository.getApiKey(config.id));
+    } else if (config.authMode == 'oauth') {
+      final sourceToken = await repository.getOAuthSourceToken(config.id);
+      final accessToken = await repository.getOAuthAccessToken(config.id);
+      await (ref.read(routerAdminClientProvider) as RouterAdminClient)
+          .saveProvider(
+            config,
+            apiKey: ***
+            sourceToken: sourceToken,
+          );
     }
     final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
     if (shouldUseEmbeddedCore(config, runtimeState)) {

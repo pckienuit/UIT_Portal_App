@@ -333,7 +333,7 @@ try {
         const rawModel = (typeof body.model === 'string' && body.model.trim()) ? body.model.trim() : '';
         const selectedModel = (rawModel && rawModel !== 'ignored') ? rawModel : activeProvider.modelId;
         body.model = selectedModel;
-        const isGeminiCli = activeProvider.presetId === 'gemini-cli';
+        const isGeminiCli = activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
         const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
