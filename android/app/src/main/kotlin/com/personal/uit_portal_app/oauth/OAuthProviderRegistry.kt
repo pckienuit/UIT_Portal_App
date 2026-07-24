@@ -29,7 +29,7 @@ object OAuthProviderRegistry {
         "codex" to AuthorizationOAuthProvider(
             id = "codex",
             clientId = "app-4f89d5a7",
-            clientSecret = "",
+            clientSecret = null,
             authorizeUrl = java.net.URI("https://auth.openai.com/authorize"),
             tokenUrl = java.net.URI("https://auth.openai.com/oauth/token"),
             scope = "openid profile email offline_access model.request",
