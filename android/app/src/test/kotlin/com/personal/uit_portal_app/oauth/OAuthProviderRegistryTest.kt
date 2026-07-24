@@ -7,22 +7,19 @@ import kotlin.test.assertFailsWith
 
 class OAuthProviderRegistryTest {
     @Test
-    fun `GitHub and Qwen expose native device providers`() {
+    fun `GitHub exposes native device provider`() {
         val provider = OAuthProviderRegistry.requireDeviceProvider("github")
 
         assertEquals("https://github.com/login/device/code", provider.deviceCodeUrl.toString())
         assertEquals("https://github.com/login/oauth/access_token", provider.tokenUrl.toString())
         assertEquals("read:user", provider.scope)
-
-        val qwen = OAuthProviderRegistry.requireDeviceProvider("qwen")
-        assertEquals("https://chat.qwen.ai/api/v1/oauth2/device/code", qwen.deviceCodeUrl.toString())
-        assertEquals("https://chat.qwen.ai/api/v1/oauth2/token", qwen.tokenUrl.toString())
-        assertEquals(true, qwen.usesPkce)
-        assertEquals("https://chat.qwen.ai/api/v1/oauth2/token", qwen.refreshUrl?.toString())
     }
 
     @Test
-    fun `unknown and blocked providers fail closed`() {
+    fun `unknown, EOL, and blocked providers fail closed`() {
+        assertFailsWith<IllegalArgumentException> {
+            OAuthProviderRegistry.requireDeviceProvider("qwen")
+        }
         assertFailsWith<IllegalArgumentException> {
             OAuthProviderRegistry.requireDeviceProvider("codex")
         }
