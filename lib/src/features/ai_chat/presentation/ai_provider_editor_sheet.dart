@@ -301,6 +301,34 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                         },
                       ),
                       SizedBox(height: PortalSpacing.md),
+                      if (widget.preset.models.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: widget.preset.models.any((m) => m.id == _modelIdController.text.trim())
+                              ? _modelIdController.text.trim()
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Gợi ý Model từ Provider',
+                          ),
+                          hint: const Text('Chọn model từ danh sách'),
+                          items: widget.preset.models
+                              .map(
+                                (m) => DropdownMenuItem(
+                                  value: m.id,
+                                  child: Text('${m.name} (${m.id})'),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _modelIdController.text = val;
+                              });
+                            }
+                          },
+                        ),
+                        SizedBox(height: PortalSpacing.md),
+                      ],
                       TextFormField(
                         controller: _modelIdController,
                         decoration: const InputDecoration(

@@ -45,6 +45,7 @@ class AiProviderCatalog {
       name: 'OpenRouter',
       tier: AiProviderTier.officialApi,
       baseUrl: 'https://openrouter.ai/api/v1',
+      defaultModelId: 'openrouter/auto',
       note: 'Kết nối hàng trăm mô hình ngôn ngữ lớn qua một cổng duy nhất.',
     ),
     AiProviderPreset(
