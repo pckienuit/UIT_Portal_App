@@ -27,6 +27,11 @@ const {
   ollamaChatResponseToOpenAi,
   createOllamaChatStreamTranslator,
 } = require('./ollama_chat_adapter');
+const {
+  openAiToOpenAiResponses,
+  openAiResponsesResponseToOpenAi,
+  createOpenAiResponsesSseTranslator,
+} = require('./openai_responses_adapter');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -328,6 +333,7 @@ try {
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
         const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
+        const isOpenAiResponses = activeProvider.transportKind === 'openaiResponses';
 
         const headers = {
           'content-type': 'application/json',
@@ -352,6 +358,9 @@ try {
         }
         if (isOllamaChat) {
           body = openAiToOllamaChat(body, activeProvider.modelId);
+        }
+        if (isOpenAiResponses) {
+          body = openAiToOpenAiResponses(body, activeProvider.modelId);
         }
 
         if (activeProvider.presetId === 'github') {
@@ -385,7 +394,7 @@ try {
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
           : isGeminiContent
             ? buildGeminiContentUrl(activeProvider.baseUrl, activeProvider.modelId, requestedStream, providerKey)
-            : ['openaiChat', 'anthropicMessages', 'ollamaChat'].includes(activeProvider.transportKind) && activeProvider.chatUrl
+            : ['openaiChat', 'anthropicMessages', 'ollamaChat', 'openaiResponses'].includes(activeProvider.transportKind) && activeProvider.chatUrl
               ? activeProvider.chatUrl
               : `${activeProvider.baseUrl}/chat/completions`;
 
@@ -448,13 +457,16 @@ try {
           const ollamaTranslator = isOllamaChat
             ? createOllamaChatStreamTranslator(activeProvider.modelId)
             : null;
+          const openAiResponsesTranslator = isOpenAiResponses
+            ? createOpenAiResponsesSseTranslator(activeProvider.modelId)
+            : null;
           try {
             while (downstreamOpen) {
               const { done, value } = await reader.read();
               if (done) break;
               const chunk = decoder.decode(value, { stream: true });
-              if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator) {
-                const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator;
+              if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator) {
+                const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator;
                 for (const translated of translator.push(chunk)) {
                   downstreamOpen = await writeWithBackpressure(response, translated);
                   if (!downstreamOpen) break;
@@ -473,8 +485,8 @@ try {
           }
           if (!downstreamOpen) return;
           let usage;
-          if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator) {
-            const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator;
+          if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator) {
+            const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator;
             const terminal = translator.finish();
             for (const translated of terminal.output) {
               downstreamOpen = await writeWithBackpressure(response, translated);
@@ -532,7 +544,9 @@ try {
                 ? geminiContentResponseToOpenAi(upstreamData, activeProvider.modelId)
                 : isOllamaChat
                   ? ollamaChatResponseToOpenAi(upstreamData, activeProvider.modelId)
-                  : upstreamData;
+                  : isOpenAiResponses
+                    ? openAiResponsesResponseToOpenAi(upstreamData, activeProvider.modelId)
+                    : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
           if (upstreamResponse.ok) {
