@@ -100,6 +100,30 @@ test('quota-enabled providers keep their own documented adapter contract', () =>
       quotaSupported: true,
     },
   );
+  assert.deepEqual(
+    byId.get('antigravity').models.map((model) => model.id),
+    [
+      'gemini-3-flash-agent',
+      'gemini-3.5-flash-low',
+      'gemini-3.5-flash-extra-low',
+      'gemini-pro-agent',
+      'gemini-3.1-pro-low',
+      'claude-sonnet-4-6',
+      'claude-opus-4-6-thinking',
+      'gpt-oss-120b-medium',
+      'gemini-3-flash',
+    ],
+  );
+  assert.equal(
+    byId.get('antigravity').models.some((model) => model.id.includes('image')),
+    false,
+  );
+  assert.equal(
+    byId.get('antigravity').models.some((model) =>
+      byId.get('gemini-cli').models.some((gemini) => gemini.id === model.id),
+    ),
+    false,
+  );
   for (const id of ['gemini-cli', 'github', 'openrouter']) {
     assert.equal(byId.get(id).quotaSupported, true, id);
   }
