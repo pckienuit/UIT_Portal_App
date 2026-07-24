@@ -14,6 +14,18 @@ object OAuthProviderRegistry {
                 "https://www.googleapis.com/auth/userinfo.profile",
             ).joinToString(" "),
         ),
+        "antigravity" to AuthorizationOAuthProvider(
+            id = "antigravity",
+            clientId = "108493108920-lksbd0b3v54mbfp4b21650r39v03d274.apps.googleusercontent.com",
+            clientSecret = "GOCSPX-d16c5n2-uX2W7g5P7L4i_63Y",
+            authorizeUrl = java.net.URI("https://accounts.google.com/o/oauth2/v2/auth"),
+            tokenUrl = java.net.URI("https://oauth2.googleapis.com/token"),
+            scope = listOf(
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+            ).joinToString(" "),
+        ),
         "codex" to AuthorizationOAuthProvider(
             id = "codex",
             clientId = "app-4f89d5a7",

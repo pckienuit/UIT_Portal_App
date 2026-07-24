@@ -1,8 +1,17 @@
 {
   "oauth": {
     "antigravity": {
-      "disposition": "remove",
-      "reason": "Excluded from mobile release pending safe supported flow"
+      "disposition": "ready",
+      "androidAuth": "loopback",
+      "transportKind": "geminiCli",
+      "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "modelsUrl": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "quotaAdapter": "geminiCli",
+      "nativeStatus": "experimental",
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal"
     },
     "claude": {
       "disposition": "candidate",

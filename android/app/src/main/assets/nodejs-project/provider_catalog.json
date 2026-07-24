@@ -1,6 +1,70 @@
 {
   "providers": [
     {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "category": "oauth",
+      "color": "#F59E0B",
+      "icon": "rocket_launch",
+      "disposition": "ready",
+      "mobileSupported": true,
+      "unsupportedReason": null,
+      "hasOAuth": true,
+      "quotaSupported": true,
+      "quotaAdapter": "geminiCli",
+      "androidAuth": "loopback",
+      "gatewayFallback": false,
+      "nativeStatus": "experimental",
+      "nativeBlockReason": null,
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal",
+      "transportKind": "geminiCli",
+      "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      "modelsUrl": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "requiredFields": [],
+      "staticHeaders": {},
+      "models": [
+        {
+          "id": "gemini-3-flash-agent",
+          "name": "Gemini 3.5 Flash (High)"
+        },
+        {
+          "id": "gemini-3.5-flash-low",
+          "name": "Gemini 3.5 Flash (Medium)"
+        },
+        {
+          "id": "gemini-3.5-flash-extra-low",
+          "name": "Gemini 3.5 Flash (Low)"
+        },
+        {
+          "id": "gemini-pro-agent",
+          "name": "Gemini 3.1 Pro (High)"
+        },
+        {
+          "id": "gemini-3.1-pro-low",
+          "name": "Gemini 3.1 Pro (Low)"
+        },
+        {
+          "id": "claude-sonnet-4-6",
+          "name": "Claude Sonnet 4.6 (Thinking)"
+        },
+        {
+          "id": "claude-opus-4-6-thinking",
+          "name": "Claude Opus 4.6 (Thinking)"
+        },
+        {
+          "id": "gpt-oss-120b-medium",
+          "name": "GPT-OSS 120B (Medium)"
+        },
+        {
+          "id": "gemini-3-flash",
+          "name": "Gemini 3 Flash"
+        }
+      ]
+    },
+    {
       "id": "codex",
       "name": "OpenAI Codex",
       "category": "oauth",

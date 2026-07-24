@@ -80,7 +80,7 @@ test('generated catalog excludes candidate and removed providers', () => {
     },
     { androidAuth: 'device', nativeStatus: 'ready', tokenRefresh: 'exchange' },
   );
-  for (const id of ['antigravity', 'claude', 'cursor', 'qwen', 'xai']) {
+  for (const id of ['claude', 'cursor', 'qwen', 'xai']) {
     assert.equal(providers.has(id), false, id);
   }
 });
