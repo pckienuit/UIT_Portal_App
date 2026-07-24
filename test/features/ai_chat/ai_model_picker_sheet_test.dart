@@ -91,6 +91,46 @@ void main() {
     },
   );
 
+  testWidgets('shows Antigravity label then model ID without owner text', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    String? selected;
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        routerModelCatalogProvider('provider-antigravity').overrideWith(
+          (ref) async => const [
+            AiModelOption(
+              id: 'claude-sonnet-4-6',
+              name: 'Claude Sonnet 4.6 (Thinking)',
+              owner: 'antigravity',
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Scaffold(body: AiModelPickerSheet(
+        providerId: 'provider-antigravity',
+        currentModelId: 'claude-sonnet-4-6',
+        onModelSelected: (modelId) => selected = modelId,
+      ))),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Claude Sonnet 4.6 (Thinking)'), findsOneWidget);
+    expect(find.text('claude-sonnet-4-6'), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.textContaining('Owner:'), findsNothing);
+    await tester.tap(find.text('Claude Sonnet 4.6 (Thinking)'));
+    expect(selected, 'claude-sonnet-4-6');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('loads live models from embedded router', (tester) async {
     final container = ProviderContainer(
       overrides: [
@@ -131,6 +171,6 @@ void main() {
 
     expect(find.text('gemini-2.5-flash-lite'), findsNWidgets(2));
     expect(find.text('gemini-2.5-flash'), findsNWidgets(2));
-    expect(find.text('Owner: gemini-cli'), findsNWidgets(2));
+    expect(find.textContaining('Owner:'), findsNothing);
   });
 }

@@ -11,6 +11,8 @@ import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
+import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -442,6 +444,47 @@ void main() {
     expect(find.text('Đăng xuất'), findsOneWidget);
     expect(find.text('Đổi tài khoản'), findsOneWidget);
     expect(find.text('Model: gpt-5.4'), findsOneWidget);
+  });
+
+  testWidgets('connected Antigravity changes model through shared picker', (tester) async {
+    await RouterCatalog.load('''{"providers":[
+      {"id":"antigravity","name":"Antigravity","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","tokenRefresh":"refreshToken","transportKind":"geminiCli","chatUrl":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"gemini-3-flash-agent","name":"Gemini 3.5 Flash (High)"}]}
+    ]}''');
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      '[{"id":"provider-antigravity","name":"Antigravity","kind":"openAiCompatible","baseUrl":"https://cloudcode-pa.googleapis.com/v1internal","modelId":"legacy-model","presetId":"antigravity","authMode":"oauth"}]',
+    );
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(_StoppedRouterRuntimeService.new),
+        routerModelCatalogProvider('provider-antigravity').overrideWith(
+          (ref) async => const [
+            AiModelOption(
+              id: 'claude-sonnet-4-6',
+              name: 'Claude Sonnet 4.6 (Thinking)',
+              owner: 'antigravity',
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AiProviderSettingsScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Đổi Model'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn mô hình (Model)'), findsOneWidget);
+    expect(find.text('Chọn model cho Antigravity'), findsNothing);
+    await tester.tap(find.text('Claude Sonnet 4.6 (Thinking)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Model: claude-sonnet-4-6'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('API-key deletion confirms, labels action, and bounds failure', (

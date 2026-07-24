@@ -142,15 +142,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                if (model.owner != null)
-                                  Text(
-                                    'Owner: ${model.owner}',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                const SizedBox(height: 2),
+
                                 _buildCapabilitiesChips(
                                   context,
                                   model.capabilities,

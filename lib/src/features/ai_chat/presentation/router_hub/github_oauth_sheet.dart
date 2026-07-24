@@ -9,6 +9,11 @@ import '../../data/native_oauth_client.dart';
 import '../../domain/ai_chat_models.dart';
 import '../../domain/router_models.dart';
 
+String oauthDefaultModelId(RouterProviderDefinition definition) =>
+    definition.id == 'gemini-cli'
+    ? 'gemini-2.5-flash'
+    : definition.models.firstOrNull?.id ?? '';
+
 class GithubOAuthSheet extends ConsumerStatefulWidget {
   const GithubOAuthSheet({super.key, required this.definition});
 
@@ -134,9 +139,7 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
           'Provider không cấp refresh token. Cần đăng nhập lại khi token hết hạn.',
         );
       }
-      final modelId = (widget.definition.id == 'gemini-cli' || widget.definition.id == 'antigravity')
-          ? 'gemini-2.5-flash'
-          : widget.definition.models.firstOrNull?.id ?? '';
+      final modelId = oauthDefaultModelId(widget.definition);
       final baseUrl = widget.definition.defaultBaseUrl ?? '';
       if (modelId.isEmpty || baseUrl.isEmpty) {
         throw const NativeOAuthException(

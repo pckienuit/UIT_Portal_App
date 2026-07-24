@@ -6,6 +6,28 @@ import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dar
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 
+class _ModelsAdapter implements HttpClientAdapter {
+  final requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return ResponseBody.fromString(
+      '{"data":[{"id":"claude-sonnet-4-6",'
+      '"name":"Claude Sonnet 4.6 (Thinking)","owned_by":"antigravity"}]}',
+      200,
+      headers: {Headers.contentTypeHeader: ['application/json']},
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 class _QuotaAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
 
@@ -76,6 +98,24 @@ void main() {
 
     expect(restored.staticHeaders, {'anthropic-version': '2023-06-01'});
     expect(restored.authScheme, '');
+  });
+
+  test('model client keeps core display name instead of reducing it to ID', () async {
+    final adapter = _ModelsAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+
+    final models = await RouterAdminClient.forTest(dio).listModels('provider-antigravity');
+
+    expect(adapter.requests.single.path, '/v1/models');
+    expect(adapter.requests.single.queryParameters, {'connectionId': 'provider-antigravity'});
+    expect(models, const [
+      AiModelOption(
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6 (Thinking)',
+        owner: 'antigravity',
+      ),
+    ]);
   });
 
   test(
