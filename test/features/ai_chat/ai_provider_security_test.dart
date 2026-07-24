@@ -86,7 +86,7 @@ void main() {
             'http://10.0.2.2/v1',
             debugMode: true,
           ),
-          isNotNull,
+          isNull,
         );
         expect(
           AiProviderValidator.validateBaseUrl(
