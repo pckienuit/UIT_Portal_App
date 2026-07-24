@@ -149,9 +149,15 @@ class AiProviderController extends Notifier<AiProviderState> {
     if (activeId != null &&
         runtime.state == RouterState.ready &&
         _coreDeletedProviderIds.contains(id)) {
-      try {
-        await ref.read(routerAdminClientProvider).setActiveProvider(activeId);
-      } catch (_) {}
+      final activated = await ref
+          .read(routerAdminClientProvider)
+          .setActiveProvider(activeId);
+      if (!activated) {
+        _coreDeletedProviderIds.remove(id);
+        throw StateError(
+          'Không thể chuyển provider dự phòng an toàn. Vui lòng thử lại.',
+        );
+      }
     }
 
     final newHealth = Map<String, AiProviderHealth>.from(state.health)
