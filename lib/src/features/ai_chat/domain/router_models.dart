@@ -80,6 +80,7 @@ class RouterQuotaSnapshot {
     required this.status,
     required this.connectionId,
     required this.providerId,
+    required this.source,
     required this.plan,
     required this.fetchedAt,
     required this.entries,
@@ -89,6 +90,7 @@ class RouterQuotaSnapshot {
   final RouterQuotaStatus status;
   final String? connectionId;
   final String? providerId;
+  final String? source;
   final String? plan;
   final DateTime? fetchedAt;
   final List<RouterQuotaEntry> entries;
@@ -122,6 +124,7 @@ class RouterQuotaSnapshot {
       status: status,
       connectionId: json['connectionId'] as String?,
       providerId: json['providerId'] as String?,
+      source: json['source'] as String?,
       plan: json['plan'] as String?,
       fetchedAt: fetchedAt?.toUtc(),
       entries: rawBuckets is List

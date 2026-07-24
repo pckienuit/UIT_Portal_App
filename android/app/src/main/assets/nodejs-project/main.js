@@ -64,16 +64,39 @@ try {
   const runtimeSecrets = new Map();
   const refreshedQuota = new Set();
 
+  const quotaSources = {
+    'gemini-cli': 'gemini-cli.retrieveUserQuota',
+    antigravity: 'antigravity.fetchAvailableModels',
+    github: 'github.copilot_internal/user',
+    openrouter: 'openrouter.auth/key',
+  };
+
   function quotaState(status, connection = null, details = {}) {
     return {
       status,
       connectionId: connection?.id || null,
       providerId: connection ? connection.presetId || connection.id : null,
+      ...(details.source ? { source: details.source } : {}),
       plan: details.plan ?? null,
       fetchedAt: details.fetchedAt ?? null,
       entries: Array.isArray(details.entries) ? details.entries : [],
       message: details.message ?? null,
     };
+  }
+
+  function cachedQuotaFor(provider, db) {
+    const snapshot = db.quota[provider.id];
+    const providerId = provider.presetId || provider.id;
+    if (!snapshot || snapshot.connectionId !== provider.id ||
+        snapshot.providerId !== providerId ||
+        snapshot.source !== quotaSources[providerId]) {
+      if (snapshot) {
+        delete db.quota[provider.id];
+        saveDb(db);
+      }
+      return null;
+    }
+    return snapshot;
   }
 
   function toLegacyDb(state) {
@@ -770,7 +793,7 @@ try {
           ? quotaState('error', { id: connectionId }, { message: 'Provider connection not found' })
           : quotaState('no_active_connection'));
       }
-      const snapshot = db.quota[provider.id];
+      const snapshot = cachedQuotaFor(provider, db);
       if (!snapshot) return sendJson(response, 200, quotaState('unavailable', provider));
       return sendJson(response, 200, {
         ...snapshot,
@@ -786,6 +809,7 @@ try {
         return sendJson(response, 404, { error: 'Provider connection not found' });
       }
 
+      const cachedSnapshot = cachedQuotaFor(provider, db);
       try {
         const snapshot = await fetchQuota({
           connection: {
@@ -803,9 +827,9 @@ try {
         return sendJson(response, 200, snapshot);
       } catch (error) {
         const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
-        if (db.quota[connectionId]) {
+        if (cachedSnapshot) {
           return sendJson(response, 200, {
-            ...db.quota[connectionId],
+            ...cachedSnapshot,
             status: 'stale',
             message: error?.message || 'Quota unavailable',
           });

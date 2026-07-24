@@ -101,6 +101,7 @@ void main() {
     });
 
     expect(quota.status, RouterQuotaStatus.fresh);
+    expect(quota.source, isNull);
     expect(quota.entries.single.used, isNull);
     expect(quota.entries.single.total, isNull);
     expect(quota.entries.single.remainingPercent, 76);

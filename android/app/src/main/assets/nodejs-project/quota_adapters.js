@@ -132,7 +132,7 @@ function normalizeGemini(connection, payload, now) {
       };
     });
   if (entries.length === 0) throw new QuotaError('malformed', 502, 'Quota payload malformed');
-  return snapshot(connection, payload.plan ?? null, entries, now);
+  return snapshot(connection, payload.plan ?? null, entries, now, 'gemini-cli.retrieveUserQuota');
 }
 
 function antigravityModels(payload, configuredModels) {
@@ -182,7 +182,7 @@ function normalizeAntigravity(connection, result, now) {
       unlimited: false,
     };
   });
-  return snapshot(connection, result.plan, entries, now);
+  return snapshot(connection, result.plan, entries, now, 'antigravity.fetchAvailableModels');
 }
 
 function normalizeGithub(connection, payload, now) {
@@ -205,7 +205,7 @@ function normalizeGithub(connection, payload, now) {
     };
   });
   if (buckets.length === 0) throw new QuotaError('malformed', 502, 'Quota payload malformed');
-  return snapshot(connection, payload.copilot_plan ?? null, buckets, now);
+  return snapshot(connection, payload.copilot_plan ?? null, buckets, now, 'github.copilot_internal/user');
 }
 
 function normalizeOpenRouter(connection, payload, now) {
@@ -234,14 +234,15 @@ function normalizeOpenRouter(connection, payload, now) {
     },
   ];
 
-  return snapshot(connection, data.is_free_tier ? 'free_tier' : 'paid', entries, now);
+  return snapshot(connection, data.is_free_tier ? 'free_tier' : 'paid', entries, now, 'openrouter.auth/key');
 }
 
-function snapshot(connection, plan, entries, now) {
+function snapshot(connection, plan, entries, now, source) {
   return {
     status: 'fresh',
     connectionId: connection.id,
     providerId: connection.providerId,
+    source,
     plan,
     fetchedAt: now().toISOString(),
     entries,

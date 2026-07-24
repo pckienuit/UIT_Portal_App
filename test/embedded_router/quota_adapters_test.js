@@ -63,6 +63,7 @@ test('Gemini quota reports only upstream percentage and reset without fake total
     status: 'fresh',
     connectionId: 'provider-gemini-cli',
     providerId: 'gemini-cli',
+    source: 'gemini-cli.retrieveUserQuota',
     plan: null,
     fetchedAt: '2026-07-24T12:00:00.000Z',
     entries: [
@@ -212,6 +213,7 @@ test('OpenRouter quota fetches balance and usage from auth key endpoint', async 
     status: 'fresh',
     connectionId: 'provider-openrouter',
     providerId: 'openrouter',
+    source: 'openrouter.auth/key',
     plan: 'paid',
     fetchedAt: '2026-07-24T12:00:00.000Z',
     entries: [

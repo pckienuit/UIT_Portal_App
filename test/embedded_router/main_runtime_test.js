@@ -871,6 +871,61 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
   assert.doesNotMatch(persisted, new RegExp(runtimeSecret));
 });
 
+test('Antigravity rejects legacy Gemini-shaped cache while Gemini cache remains addressable', async (t) => {
+  const dataDir = tempDir();
+  fs.writeFileSync(path.join(dataDir, '9router_state.json'), JSON.stringify({
+    schemaVersion: 2,
+    connections: [
+      {
+        id: 'provider-antigravity', providerId: 'antigravity', displayName: 'Antigravity',
+        authMode: 'oauth', modelId: 'claude-sonnet-4-6', enabled: true,
+        mobileMetadata: { baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal' },
+      },
+      {
+        id: 'provider-gemini-cli', providerId: 'gemini-cli', displayName: 'Gemini CLI',
+        authMode: 'oauth', modelId: 'gemini-2.5-flash', enabled: true,
+        mobileMetadata: { baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal' },
+      },
+    ],
+    activeRoute: { connectionId: 'provider-antigravity', modelId: 'claude-sonnet-4-6', local: false },
+    usage: [],
+    quota: {
+      'provider-antigravity': {
+        status: 'fresh', connectionId: 'provider-antigravity', providerId: 'antigravity',
+        entries: [{ id: 'gemini-2.5-flash', label: 'Gemini bucket', remainingPercent: 50 }],
+      },
+      'provider-gemini-cli': {
+        status: 'fresh', connectionId: 'provider-gemini-cli', providerId: 'gemini-cli',
+        source: 'gemini-cli.retrieveUserQuota',
+        entries: [{ id: 'gemini-2.5-flash', label: 'Gemini bucket', remainingPercent: 50 }],
+      },
+    },
+  }), 'utf8');
+  const port = await freePort();
+  const token = 'quota-provenance-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  const antigravity = await request(baseUrl, token, 'GET', '/internal/quota/provider-antigravity');
+  assert.equal(antigravity.status, 200);
+  assert.deepEqual(await antigravity.json(), {
+    status: 'unavailable', connectionId: 'provider-antigravity', providerId: 'antigravity',
+    plan: null, fetchedAt: null, entries: [], message: null,
+  });
+  const gemini = await request(baseUrl, token, 'GET', '/internal/quota/provider-gemini-cli');
+  assert.equal(gemini.status, 200);
+  assert.equal((await gemini.json()).status, 'stale');
+
+  const persisted = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.equal(persisted.quota['provider-antigravity'], undefined);
+  assert.equal(
+    persisted.quota['provider-gemini-cli'].source,
+    'gemini-cli.retrieveUserQuota',
+  );
+});
+
 test('Antigravity model listing fails closed instead of returning configured models', async (t) => {
   const upstream = require('node:http').createServer((_request, response) => {
     response.writeHead(403, { 'content-type': 'application/json' });

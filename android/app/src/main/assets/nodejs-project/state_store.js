@@ -28,7 +28,7 @@ const USAGE_FIELDS = [
   'latencyMs',
 ];
 const QUOTA_FIELDS = [
-  'status', 'connectionId', 'providerId', 'plan', 'fetchedAt', 'entries', 'message',
+  'status', 'connectionId', 'providerId', 'source', 'plan', 'fetchedAt', 'entries', 'message',
 ];
 const QUOTA_BUCKET_FIELDS = [
   'id', 'label', 'used', 'total', 'remaining', 'remainingPercent', 'unit', 'resetAt', 'unlimited',

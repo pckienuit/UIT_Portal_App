@@ -77,6 +77,28 @@ test('quota normalization strips credential-like fields and malformed entries', 
   assert.equal(store.load().quota.malformed, undefined);
 });
 
+test('persists quota source provenance without accepting credential fields', () => {
+  const dataDir = tempDir();
+  const store = createStateStore({ dataDir });
+  store.save({
+    connections: [], activeRoute: null, usage: [],
+    quota: {
+      antigravity: {
+        status: 'fresh',
+        connectionId: 'antigravity',
+        providerId: 'antigravity',
+        source: 'antigravity.fetchAvailableModels',
+        entries: [],
+      },
+    },
+  });
+
+  assert.equal(
+    store.load().quota.antigravity.source,
+    'antigravity.fetchAvailableModels',
+  );
+});
+
 test('backs up corrupt JSON before returning a fresh state', () => {
   const dataDir = tempDir();
   const statePath = path.join(dataDir, '9router_state.json');
