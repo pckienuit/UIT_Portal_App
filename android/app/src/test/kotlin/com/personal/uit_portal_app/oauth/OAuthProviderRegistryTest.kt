@@ -32,6 +32,36 @@ class OAuthProviderRegistryTest {
     }
 
     @Test
+    fun `device providers lock GitHub and Grok CLI native contracts`() {
+        val github = OAuthProviderRegistry.requireDeviceProvider("github")
+        val grok = OAuthProviderRegistry.requireDeviceProvider("grok-cli")
+
+        assertEquals("https://github.com/login/device/code", github.deviceCodeUrl.toString())
+        assertEquals("https://github.com/login/oauth/access_token", github.tokenUrl.toString())
+        assertEquals("read:user", github.scope)
+        assertEquals("https://auth.x.ai/oauth2/device/code", grok.deviceCodeUrl.toString())
+        assertEquals("https://auth.x.ai/oauth2/token", grok.tokenUrl.toString())
+        assertEquals(
+            "openid profile email offline_access grok-cli:access api:access",
+            grok.scope,
+        )
+        assertFalse(github.usesPkce)
+        assertFalse(grok.usesPkce)
+    }
+
+    @Test
+    fun `Google providers retain separate post authorization contracts`() {
+        val gemini = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
+        val antigravity = OAuthProviderRegistry.requireAuthorizationProvider("antigravity")
+
+        assertTrue(gemini.resolvesGoogleProject)
+        assertTrue(antigravity.resolvesGoogleProject)
+        assertFalse(gemini.scope.contains("cclog"))
+        assertTrue(antigravity.scope.contains("cclog"))
+        assertTrue(antigravity.scope.contains("experimentsandconfigs"))
+    }
+
+    @Test
     fun `Gemini CLI exposes loopback authorization code flow`() {
         val provider = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
 

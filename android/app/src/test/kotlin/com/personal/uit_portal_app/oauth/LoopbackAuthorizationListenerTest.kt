@@ -13,6 +13,28 @@ import kotlin.test.assertTrue
 
 class LoopbackAuthorizationListenerTest {
     @Test
+    fun `listener accepts configured Codex callback path only`() {
+        val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
+        val callback = CompletableFuture<Map<String, String>>()
+        val listener = LoopbackAuthorizationListener(
+            server = server,
+            expectedState = "codex-state",
+            expectedCallbackPath = "/auth/callback",
+            callback = callback,
+            timeoutMillis = 2_000,
+            log = {},
+        )
+        val thread = Thread(listener::run).apply { start() }
+
+        assertEquals(400, get(server.localPort, "/callback?code=wrong&state=codex-state").status)
+        assertFalse(callback.isDone)
+        assertEquals(302, get(server.localPort, "/auth/callback?code=accepted&state=codex-state").status)
+        assertEquals("accepted", callback.get(1, TimeUnit.SECONDS)["code"])
+        thread.join(1_000)
+        assertFalse(thread.isAlive)
+    }
+
+    @Test
     fun `listener ignores invalid request then completes valid callback`() {
         val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
         val callback = CompletableFuture<Map<String, String>>()
