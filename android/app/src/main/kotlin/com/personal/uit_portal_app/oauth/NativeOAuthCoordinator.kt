@@ -382,9 +382,13 @@ class NativeOAuthCoordinator {
         val providerId = call.argument<String>("providerId") ?: return result.error("invalid_refresh", "Thiếu provider", null)
         val refreshToken = call.argument<String>("refreshToken") ?: return result.error("invalid_refresh", "Thiếu refresh token", null)
         val clientAndUrl = try {
-            if (providerId == "gemini-cli") {
-                val provider = OAuthProviderRegistry.requireAuthorizationProvider(providerId)
-                Triple(provider.clientId, provider.clientSecret, provider.tokenUrl)
+            val authorizationProvider = OAuthProviderRegistry.authorizationProviderOrNull(providerId)
+            if (authorizationProvider != null) {
+                Triple(
+                    authorizationProvider.clientId,
+                    authorizationProvider.clientSecret,
+                    authorizationProvider.tokenUrl,
+                )
             } else {
                 val provider = OAuthProviderRegistry.requireDeviceProvider(providerId)
                 Triple(provider.clientId, null, provider.refreshUrl ?: throw IllegalArgumentException("Provider không hỗ trợ refresh native"))

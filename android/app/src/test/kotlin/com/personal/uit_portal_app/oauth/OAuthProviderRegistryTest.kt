@@ -38,6 +38,24 @@ class OAuthProviderRegistryTest {
     }
 
     @Test
+    fun `Antigravity uses separate authorization client and required scopes`() {
+        val antigravity = OAuthProviderRegistry.requireAuthorizationProvider("antigravity")
+        val gemini = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
+
+        assertEquals("https://oauth2.googleapis.com/token", antigravity.tokenUrl.toString())
+        assertEquals(false, antigravity.clientId == gemini.clientId)
+        assertEquals(true, antigravity.scope.contains("cloud-platform"))
+        assertEquals(true, antigravity.scope.contains("userinfo.email"))
+        assertEquals(true, antigravity.scope.contains("userinfo.profile"))
+        assertEquals(true, antigravity.scope.contains("cclog"))
+        assertEquals(true, antigravity.scope.contains("experimentsandconfigs"))
+        assertEquals(false, gemini.scope.contains("cclog"))
+        assertEquals(false, gemini.scope.contains("experimentsandconfigs"))
+        assertEquals(antigravity, OAuthProviderRegistry.authorizationProviderOrNull("antigravity"))
+        assertEquals(null, OAuthProviderRegistry.authorizationProviderOrNull("github"))
+    }
+
+    @Test
     fun `provider endpoints must use https`() {
         assertFailsWith<IllegalArgumentException> {
             DeviceOAuthProvider(

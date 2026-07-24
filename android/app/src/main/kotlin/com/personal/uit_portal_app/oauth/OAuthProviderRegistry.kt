@@ -24,6 +24,8 @@ object OAuthProviderRegistry {
                 "https://www.googleapis.com/auth/cloud-platform",
                 "https://www.googleapis.com/auth/userinfo.email",
                 "https://www.googleapis.com/auth/userinfo.profile",
+                "https://www.googleapis.com/auth/cclog",
+                "https://www.googleapis.com/auth/experimentsandconfigs",
             ).joinToString(" "),
         ),
         "codex" to AuthorizationOAuthProvider(
@@ -62,4 +64,7 @@ object OAuthProviderRegistry {
         requireNotNull(authorizationProviders[providerId]) {
             "Provider does not expose a native Android authorization flow"
         }
+
+    fun authorizationProviderOrNull(providerId: String): AuthorizationOAuthProvider? =
+        authorizationProviders[providerId]
 }
