@@ -65,8 +65,12 @@ void main() async {
             );
             final providers = <AiProviderConfig>[];
             for (final provider in repo.listProviders()) {
+              final hydrated = RouterCatalog.hydrateConfig(provider);
+              if (!identical(hydrated, provider)) {
+                await repo.saveProvider(hydrated);
+              }
               try {
-                providers.add(await broker.ensureRuntimeCredential(provider));
+                providers.add(await broker.ensureRuntimeCredential(hydrated));
               } catch (error) {
                 debugPrint(
                   'Skipped unavailable OAuth connection ${provider.id}: $error',

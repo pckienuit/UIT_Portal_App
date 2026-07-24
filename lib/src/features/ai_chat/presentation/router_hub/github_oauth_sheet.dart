@@ -7,6 +7,7 @@ import '../../application/ai_provider_controller.dart';
 import '../../data/github_oauth_service.dart';
 import '../../data/native_oauth_client.dart';
 import '../../domain/ai_chat_models.dart';
+import '../../domain/router_catalog.dart';
 import '../../domain/router_models.dart';
 
 String oauthDefaultModelId(RouterProviderDefinition definition) =>
@@ -146,17 +147,19 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
           'Provider thiếu model hoặc Base URL mobile.',
         );
       }
-      final config = AiProviderConfig(
-        id: 'provider-${widget.definition.id}',
-        name: widget.definition.name,
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: baseUrl,
-        modelId: modelId,
-        presetId: widget.definition.id,
-        authMode: 'oauth',
-        credentialKind: credentialKind,
-        tokenExpiresAt: runtimeExpiry,
-        projectId: oauth.projectId,
+      final config = RouterCatalog.hydrateConfig(
+        AiProviderConfig(
+          id: 'provider-${widget.definition.id}',
+          name: widget.definition.name,
+          kind: AiBackendKind.openAiCompatible,
+          baseUrl: baseUrl,
+          modelId: modelId,
+          presetId: widget.definition.id,
+          authMode: 'oauth',
+          credentialKind: credentialKind,
+          tokenExpiresAt: runtimeExpiry,
+          projectId: oauth.projectId,
+        ),
       );
       await ref
           .read(aiProviderControllerProvider.notifier)

@@ -6,6 +6,7 @@ import 'router_runtime_service.dart';
 import 'ai_chat_controller.dart';
 import '../domain/ai_chat_models.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/router_catalog.dart';
 
 enum AiProviderHealth { unchecked, checking, connected, failed }
 
@@ -84,8 +85,9 @@ class AiProviderController extends Notifier<AiProviderState> {
     String? oauthAccessToken,
     String? oauthSourceToken,
   }) async {
+    final hydrated = RouterCatalog.hydrateConfig(config);
     await _repository.saveProvider(
-      config,
+      hydrated,
       apiKey: apiKey,
       oauthAccessToken: oauthAccessToken,
       oauthSourceToken: oauthSourceToken,
@@ -95,7 +97,7 @@ class AiProviderController extends Notifier<AiProviderState> {
     try {
       final client = ref.read(routerAdminClientProvider);
       await client.saveProvider(
-        config,
+        hydrated,
         apiKey: oauthAccessToken ?? apiKey,
         sourceToken: oauthSourceToken,
       );

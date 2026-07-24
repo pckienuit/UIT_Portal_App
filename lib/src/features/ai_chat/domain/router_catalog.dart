@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import 'ai_chat_models.dart';
 import 'router_models.dart';
 
 class RouterCatalog {
@@ -93,5 +95,29 @@ class RouterCatalog {
       if (p.id == id) return p;
     }
     return null;
+  }
+
+  static AiProviderConfig hydrateConfig(AiProviderConfig config) {
+    final presetId = config.presetId;
+    if (presetId == null) return config;
+    final definition = byId(presetId);
+    if (definition == null) return config;
+
+    return config.copyWith(
+      transportKind: () => definition.transportKind.name,
+      chatUrl: () => definition.chatUrl,
+      modelsUrl: () => definition.modelsUrl,
+      authHeader: () => definition.authHeader,
+      authScheme: () => definition.authScheme,
+      models: definition.models
+          .map(
+            (model) => AiProviderModelDescriptor(
+              id: model.id,
+              name: model.name,
+            ),
+          )
+          .toList(growable: false),
+      staticHeaders: definition.staticHeaders,
+    );
   }
 }
