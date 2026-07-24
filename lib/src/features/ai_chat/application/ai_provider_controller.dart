@@ -93,15 +93,20 @@ class AiProviderController extends Notifier<AiProviderState> {
       oauthSourceToken: oauthSourceToken,
     );
 
-    // Đồng bộ sang Core AI nội bộ
-    try {
-      final client = ref.read(routerAdminClientProvider);
-      await client.saveProvider(
-        hydrated,
-        apiKey: oauthAccessToken ?? apiKey,
-        sourceToken: oauthSourceToken,
-      );
-    } catch (_) {}
+    // Model-only save không chờ Core dừng; credential phải vào Core RAM ngay.
+    final hasRuntimeCredential =
+        oauthAccessToken != null || oauthSourceToken != null || apiKey != null;
+    if (hasRuntimeCredential ||
+        ref.read(routerRuntimeServiceProvider).state == RouterState.ready) {
+      try {
+        final client = ref.read(routerAdminClientProvider);
+        await client.saveProvider(
+          hydrated,
+          apiKey: oauthAccessToken ?? apiKey,
+          sourceToken: oauthSourceToken,
+        );
+      } catch (_) {}
+    }
 
     final providers = _repository.listProviders();
     var activeId = state.activeProviderId;

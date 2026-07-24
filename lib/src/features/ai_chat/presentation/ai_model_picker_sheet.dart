@@ -193,7 +193,12 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                                 : null,
                             onTap: () async {
                               await widget.onModelSelected(model.id);
-                              if (context.mounted) Navigator.of(context).pop();
+                              if (context.mounted) {
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop();
+                              }
                             },
                           );
                         },

@@ -365,14 +365,18 @@ void main() {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
-        routerRuntimeServiceProvider.overrideWith(_StoppedRouterRuntimeService.new),
+        routerRuntimeServiceProvider.overrideWith(
+          _StoppedRouterRuntimeService.new,
+        ),
       ],
     );
     addTearDown(container.dispose);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(home: AiProviderSettingsScreen()),
-    ));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AiProviderSettingsScreen()),
+      ),
+    );
     await tester.pump();
 
     await tester.ensureVisible(find.text('Ollama Local'));
@@ -480,7 +484,7 @@ void main() {
     tester,
   ) async {
     await RouterCatalog.load('''{"providers":[
-      {"id":"antigravity","name":"Antigravity","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","tokenRefresh":"refreshToken","transportKind":"geminiCli","chatUrl":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"gemini-3-flash-agent","name":"Gemini 3.5 Flash (High)"}]}
+      {"id":"antigravity","name":"Antigravity","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","tokenRefresh":"refreshToken","transportKind":"geminiCli","chatUrl":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"claude-sonnet-4-6","name":"Claude Sonnet 4.6 (Thinking)"}]}
     ]}''');
     await prefs.setString(
       'ai_provider_configs_v1',
