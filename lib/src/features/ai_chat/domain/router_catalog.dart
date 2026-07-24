@@ -103,10 +103,14 @@ class RouterCatalog {
     final definition = byId(presetId);
     if (definition == null) return config;
 
+    final isOllama = definition.transportKind == RouterTransportKind.ollamaChat;
+    final baseUrl = config.baseUrl.endsWith('/')
+        ? config.baseUrl.substring(0, config.baseUrl.length - 1)
+        : config.baseUrl;
     return config.copyWith(
       transportKind: () => definition.transportKind.name,
-      chatUrl: () => definition.chatUrl,
-      modelsUrl: () => definition.modelsUrl,
+      chatUrl: () => isOllama ? '$baseUrl/api/chat' : definition.chatUrl,
+      modelsUrl: () => isOllama ? '$baseUrl/api/tags' : definition.modelsUrl,
       authHeader: () => definition.authHeader,
       authScheme: () => definition.authScheme,
       models: definition.models

@@ -257,7 +257,8 @@ class RouterProviderDefinition {
     final chatUrl = Uri.tryParse(json['chatUrl'] as String? ?? '');
     final hasSafeChatUrl =
         chatUrl != null &&
-        chatUrl.scheme == 'https' &&
+        (chatUrl.scheme == 'https' ||
+            (json['id'] == 'ollama-local' && chatUrl.scheme == 'http')) &&
         chatUrl.host.isNotEmpty &&
         chatUrl.userInfo.isEmpty;
     final authModes = <RouterAuthMode>[];

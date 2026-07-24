@@ -138,8 +138,12 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       presetId: widget.preset.id,
       systemPrompt: widget.config?.systemPrompt,
       transportKind: widget.preset.transportKind,
-      chatUrl: widget.preset.chatUrl,
-      modelsUrl: widget.preset.modelsUrl,
+      chatUrl: widget.preset.transportKind == 'ollamaChat'
+          ? '$baseUrl/api/chat'
+          : widget.preset.chatUrl,
+      modelsUrl: widget.preset.transportKind == 'ollamaChat'
+          ? '$baseUrl/api/tags'
+          : widget.preset.modelsUrl,
       authHeader: widget.preset.authHeader,
       authScheme: widget.preset.authScheme,
       staticHeaders: widget.preset.staticHeaders,
@@ -261,8 +265,8 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                           labelText: 'Base URL',
                           hintText: 'https://api.openai.com/v1',
                         ),
-                        enabled:
-                            widget.preset.id == 'custom' ||
+                        enabled: widget.preset.id == 'custom' ||
+                            widget.preset.id == 'ollama-local' ||
                             widget.preset.requiresBaseUrl,
                         validator: (value) {
                           final err = AiProviderValidator.validateBaseUrl(

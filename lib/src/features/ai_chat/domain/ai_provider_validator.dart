@@ -35,13 +35,14 @@ class AiProviderValidator {
         }
 
         final host = uri.host.toLowerCase();
-        final isLocal =
-            host != '10.0.2.2' &&
-            (host == 'localhost' ||
-                host == '127.0.0.1' ||
-                host.startsWith('192.168.') ||
-                host.startsWith('10.') ||
-                host.startsWith('172.'));
+        final parts = host.split('.').map(int.tryParse).toList();
+        final isPrivateIpv4 =
+            parts.length == 4 &&
+            parts.every((part) => part != null && part >= 0 && part <= 255) &&
+            (parts[0] == 10 ||
+                (parts[0] == 192 && parts[1] == 168) ||
+                (parts[0] == 172 && parts[1]! >= 16 && parts[1]! <= 31));
+        final isLocal = host == 'localhost' || host == '127.0.0.1' || isPrivateIpv4;
 
         if (!isLocal) {
           return 'HTTP chỉ được phép sử dụng cho localhost hoặc IP mạng LAN ở chế độ debug';

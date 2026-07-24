@@ -348,11 +348,11 @@
       "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "ollamaChat",
-      "chatUrl": "https://localhost:11434/api/chat",
-      "modelsUrl": "https://localhost:11434/api/tags",
+      "chatUrl": "http://10.0.2.2:11434/api/chat",
+      "modelsUrl": "http://10.0.2.2:11434/api/tags",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "defaultBaseUrl": "https://localhost:11434"
+      "defaultBaseUrl": "http://10.0.2.2:11434"
     },
     "openai": {
       "disposition": "ready",

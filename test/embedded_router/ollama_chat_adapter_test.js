@@ -50,3 +50,12 @@ test('translates Ollama Chat JSON lines stream to OpenAI SSE chunks', () => {
   assert.equal(terminal.usage.prompt_tokens, 5);
   assert.equal(terminal.usage.completion_tokens, 8);
 });
+
+test('ignores malformed Ollama NDJSON while preserving later valid chunks', () => {
+  const translator = createOllamaChatStreamTranslator('llama3');
+  const output = translator.push('{broken}\n{"model":"llama3","message":{"content":"ok"},"done":true}\n');
+
+  assert.equal(output.length, 1);
+  assert.match(output[0], /"content":"ok"/);
+  assert.match(translator.finish().output.at(-1), /\[DONE\]/);
+});

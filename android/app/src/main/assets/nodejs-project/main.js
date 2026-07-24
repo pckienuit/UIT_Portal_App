@@ -249,6 +249,10 @@ try {
     return { [authHeader]: authScheme ? `${authScheme} ${provider.apiKey}` : provider.apiKey };
   }
 
+  function ollamaUrl(provider, path) {
+    return `${provider.baseUrl.replace(/\/$/, '')}${path}`;
+  }
+
   function configuredModels(provider) {
     const models = provider.presetId === 'antigravity'
       ? (Array.isArray(provider.models) ? provider.models : [])
@@ -364,6 +368,27 @@ try {
           return sendJson(response, 502, { error: 'upstream_models_unavailable' });
         }
       }
+      if (activeProvider.transportKind === 'ollamaChat') {
+        try {
+          const upstream = await fetch(ollamaUrl(activeProvider, '/api/tags'), {
+            headers: { accept: 'application/json', ...providerAuthHeaders(activeProvider) },
+          });
+          if (upstream.ok) {
+            const payload = await upstream.json();
+            if (Array.isArray(payload?.models) && payload.models.every(
+              (model) => model && typeof model.name === 'string' && model.name.trim(),
+            )) {
+              return sendJson(response, 200, {
+                data: payload.models.map((model) => ({
+                  id: model.name,
+                  object: 'model',
+                  owned_by: activeProvider.id,
+                })),
+              });
+            }
+          }
+        } catch (_) {}
+      }
       if (activeProvider.modelsUrl) {
         try {
           const upstream = await fetch(activeProvider.modelsUrl, {
@@ -465,6 +490,8 @@ try {
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
           : isGeminiContent
             ? buildGeminiContentUrl(activeProvider.baseUrl, selectedModel, requestedStream, providerKey)
+            : isOllamaChat
+              ? ollamaUrl(activeProvider, '/api/chat')
             : ['openaiChat', 'anthropicMessages', 'ollamaChat', 'openaiResponses'].includes(activeProvider.transportKind) && activeProvider.chatUrl
               ? activeProvider.chatUrl
               : `${activeProvider.baseUrl}/chat/completions`;
@@ -476,19 +503,48 @@ try {
           const upstreamController = new AbortController();
           let downstreamOpen = true;
           let reader;
+          let upstreamTimedOut = false;
+          let streamWatchdog;
+          const clearWatchdog = () => {
+            if (streamWatchdog) clearTimeout(streamWatchdog);
+            streamWatchdog = undefined;
+          };
+          const armWatchdog = () => {
+            if (!isOllamaChat) return;
+            clearWatchdog();
+            const timeout = Math.max(10, Number(process.env.OLLAMA_STREAM_TIMEOUT_MS) || 15000);
+            streamWatchdog = setTimeout(() => {
+              upstreamTimedOut = true;
+              upstreamController.abort();
+            }, timeout);
+          };
           const closeDownstream = () => {
             downstreamOpen = false;
+            clearWatchdog();
             upstreamController.abort();
             reader?.cancel().catch(() => {});
           };
           response.once('close', closeDownstream);
           response.once('error', closeDownstream);
-          const upstreamResponse = await fetch(targetUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-            signal: upstreamController.signal,
-          });
+          armWatchdog();
+          let upstreamResponse;
+          try {
+            upstreamResponse = await fetch(targetUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body),
+              signal: upstreamController.signal,
+            });
+          } catch (_) {
+            clearWatchdog();
+            response.removeListener('close', closeDownstream);
+            response.removeListener('error', closeDownstream);
+            if (!downstreamOpen) return;
+            return sendJson(response, upstreamTimedOut ? 504 : 502, {
+              error: upstreamTimedOut ? 'upstream_stream_timeout' : 'upstream_request_failed',
+            });
+          }
+          clearWatchdog();
 
           if (!upstreamResponse.ok) {
             response.removeListener('close', closeDownstream);
@@ -514,6 +570,7 @@ try {
           });
 
           reader = upstreamResponse.body.getReader();
+          armWatchdog();
           const decoder = new TextDecoder();
           const usageParser = createSseUsageParser();
           const geminiTranslator = isGeminiCli
@@ -535,6 +592,7 @@ try {
             while (downstreamOpen) {
               const { done, value } = await reader.read();
               if (done) break;
+              armWatchdog();
               const chunk = decoder.decode(value, { stream: true });
               if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator) {
                 const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator || openAiResponsesTranslator;
@@ -549,7 +607,21 @@ try {
                 }
               }
             }
+          } catch (error) {
+            if (downstreamOpen && upstreamTimedOut) {
+              downstreamOpen = await writeWithBackpressure(
+                response,
+                'data: {"error":"upstream_stream_timeout"}\n\n',
+              );
+              if (downstreamOpen) {
+                await writeWithBackpressure(response, 'data: [DONE]\n\n');
+              }
+              response.end();
+              return;
+            }
+            throw error;
           } finally {
+            clearWatchdog();
             response.removeListener('close', closeDownstream);
             response.removeListener('error', closeDownstream);
             if (!downstreamOpen) await reader.cancel().catch(() => {});

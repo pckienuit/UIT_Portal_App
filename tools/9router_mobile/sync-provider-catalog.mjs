@@ -128,14 +128,19 @@ function run() {
       throw new Error(`Missing chatUrl for ${category}/${id}`);
     }
     const chatUrl = new URL(providerSupport.chatUrl);
-    if (chatUrl.protocol !== 'https:' || chatUrl.username || chatUrl.password) {
+    const isOllamaLocal = id === 'ollama-local';
+    if ((!isOllamaLocal && chatUrl.protocol !== 'https:') ||
+        (isOllamaLocal && chatUrl.protocol !== 'http:') ||
+        chatUrl.username || chatUrl.password) {
       throw new Error(`Unsafe chatUrl for ${category}/${id}`);
     }
     for (const field of ['modelsUrl', 'defaultBaseUrl']) {
       const value = providerSupport[field];
       if (value == null) continue;
       const url = new URL(value);
-      if (url.protocol !== 'https:' || url.username || url.password) {
+      if ((!isOllamaLocal && url.protocol !== 'https:') ||
+          (isOllamaLocal && url.protocol !== 'http:') ||
+          url.username || url.password) {
         throw new Error(`Unsafe ${field} for ${category}/${id}`);
       }
     }

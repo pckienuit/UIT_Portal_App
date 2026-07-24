@@ -357,6 +357,34 @@ void main() {
     },
   );
 
+  testWidgets('Ollama local Base URL remains editable', (tester) async {
+    await RouterCatalog.load('''{"providers":[
+      {"id":"ollama-local","name":"Ollama Local","category":"apikey","disposition":"ready","mobileSupported":true,"androidAuth":"apiKey","nativeStatus":"ready","transportKind":"ollamaChat","chatUrl":"http://10.0.2.2:11434/api/chat","modelsUrl":"http://10.0.2.2:11434/api/tags","defaultBaseUrl":"http://10.0.2.2:11434","models":[]}
+    ]}''');
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+        routerRuntimeServiceProvider.overrideWith(_StoppedRouterRuntimeService.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AiProviderSettingsScreen()),
+    ));
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Ollama Local'));
+    await tester.tap(find.text('Ollama Local'));
+    await tester.pumpAndSettle();
+    final baseUrl = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, 'Base URL'),
+    );
+    expect(baseUrl.controller?.text, 'http://10.0.2.2:11434');
+    expect(baseUrl.enabled, isTrue);
+  });
+
   testWidgets(
     'ready device OAuth provider is actionable without GitHub hard-code',
     (tester) async {

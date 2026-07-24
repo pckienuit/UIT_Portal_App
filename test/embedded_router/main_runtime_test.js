@@ -1080,6 +1080,78 @@ test('nonstream text and HTML upstream errors are sanitized with upstream status
   assert.doesNotMatch(log, new RegExp(secret));
 });
 
+test('Ollama tags map live models from saved base URL', async (t) => {
+  const upstream = require('node:http').createServer((request, response) => {
+    assert.equal(request.url, '/api/tags');
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ models: [
+      { name: 'llama3:latest' },
+      { name: 'custom/saved-model' },
+    ] }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'ollama-tags-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const ollamaBaseUrl = `http://127.0.0.1:${upstream.address().port}`;
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'ollama-local', name: 'Ollama Local', presetId: 'ollama-local',
+    baseUrl: ollamaBaseUrl, modelId: 'saved-model', active: true,
+    transportKind: 'ollamaChat',
+    chatUrl: `${ollamaBaseUrl}/api/chat`,
+    modelsUrl: `${ollamaBaseUrl}/api/tags`,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.map((model) => model.id), [
+    'llama3:latest', 'custom/saved-model',
+  ]);
+});
+
+test('Ollama stalled stream returns sanitized terminal SSE error', async (t) => {
+  const upstream = require('node:http').createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/x-ndjson' });
+    response.write('{"model":"llama3","message":{"content":"first"},"done":false}\n');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'ollama-stall-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+    env: { ...process.env, OLLAMA_STREAM_TIMEOUT_MS: '50' },
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const ollamaBaseUrl = `http://127.0.0.1:${upstream.address().port}`;
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'ollama-stalled', name: 'Ollama Stalled', presetId: 'ollama-local',
+    baseUrl: ollamaBaseUrl, modelId: 'llama3', active: true,
+    transportKind: 'ollamaChat',
+    chatUrl: `${ollamaBaseUrl}/api/chat`, modelsUrl: `${ollamaBaseUrl}/api/tags`,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    stream: true, messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(response.status, 200);
+  const output = await response.text();
+  assert.match(output, /"content":"first"/);
+  assert.match(output, /"error":"upstream_stream_timeout"/);
+  assert.match(output, /data: \[DONE\]/);
+  assert.doesNotMatch(output, new RegExp(ollamaBaseUrl));
+});
+
 test('provider PATCH persists corrected runtime descriptor and models', async (t) => {
   const dataDir = tempDir();
   const port = await freePort();

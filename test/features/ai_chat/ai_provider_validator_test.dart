@@ -75,7 +75,7 @@ void main() {
           'http://10.0.2.2:20128/v1',
           debugMode: true,
         ),
-        contains('LAN'),
+        isNull,
       );
       expect(
         AiProviderValidator.validateBaseUrl(
@@ -83,6 +83,27 @@ void main() {
           debugMode: true,
         ),
         isNull,
+      );
+      expect(
+        AiProviderValidator.validateBaseUrl(
+          'http://172.16.0.1:11434',
+          debugMode: true,
+        ),
+        isNull,
+      );
+      expect(
+        AiProviderValidator.validateBaseUrl(
+          'http://10.255.255.255:11434',
+          debugMode: true,
+        ),
+        isNull,
+      );
+      expect(
+        AiProviderValidator.validateBaseUrl(
+          'http://172.32.0.1:11434',
+          debugMode: true,
+        ),
+        contains('LAN'),
       );
       expect(
         AiProviderValidator.validateBaseUrl(
@@ -114,6 +135,16 @@ void main() {
         'chat/completions',
       );
       expect(uri2.toString(), 'https://api.openai.com/v1/chat/completions');
+    });
+
+    test('debug local-provider validation accepts Android emulator host', () {
+      expect(
+        AiProviderValidator.validateBaseUrl(
+          'http://10.0.2.2:11434',
+          debugMode: true,
+        ),
+        isNull,
+      );
     });
   });
 }
