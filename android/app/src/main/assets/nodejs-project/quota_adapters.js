@@ -166,7 +166,7 @@ async function fetchQuota({
   now = () => new Date(),
   githubBaseUrl = process.env.GITHUB_QUOTA_BASE_URL || 'https://api.github.com',
 }) {
-  if (connection.providerId === 'gemini-cli') {
+  if (connection.providerId === 'gemini-cli' || connection.providerId === 'antigravity') {
     const payload = await retrieveGeminiQuota({
       baseUrl: connection.baseUrl,
       projectId: connection.projectId,
