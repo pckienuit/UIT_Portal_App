@@ -61,6 +61,7 @@ class ProviderCredentialBroker {
       final refreshed = config.copyWith(
         credentialKind: () => 'refreshToken',
         tokenExpiresAt: () => runtime.expiresAt,
+        accountId: () => runtime.accountId ?? config.accountId,
       );
       await repository.saveProvider(
         refreshed,

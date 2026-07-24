@@ -37,18 +37,32 @@ test('converts OpenAI Responses payload to OpenAI Chat Completions format', () =
   assert.equal(res.usage.completion_tokens, 25);
 });
 
-test('translates OpenAI Responses SSE stream to OpenAI SSE chunks', () => {
+test('translates Codex output_text deltas and completed Responses SSE stream', () => {
   const translator = createOpenAiResponsesSseTranslator('gpt-5.4');
-  const chunks1 = translator.push('data: {"type":"response.created","response":{"id":"resp_999"}}\n\n');
-  const chunks2 = translator.push('data: {"type":"response.text.delta","delta":"Hello "}\n\n');
-  const chunks3 = translator.push('data: {"type":"response.text.delta","delta":"world"}\n\n');
-  const chunks4 = translator.push('data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":20}}}\n\n');
+  translator.push('data: {"type":"response.created","response":{"id":"resp_999"}}\n\n');
+  const chunks = translator.push('data: {"type":"response.output_text.delta","delta":"Hello Codex"}\n\n');
+  translator.push('data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":20}}}\n\n');
   const terminal = translator.finish();
 
-  assert.equal(chunks2.length, 1);
-  assert.match(chunks2[0], /"content":"Hello "/);
-  assert.equal(chunks3.length, 1);
-  assert.match(chunks3[0], /"content":"world"/);
+  assert.equal(chunks.length, 1);
+  assert.match(chunks[0], /"content":"Hello Codex"/);
   assert.equal(terminal.usage.prompt_tokens, 10);
   assert.equal(terminal.usage.completion_tokens, 20);
+  assert.deepEqual(terminal.output, ['data: [DONE]\n\n']);
+});
+
+test('translates failed and prematurely ended Responses streams to sanitized terminals', () => {
+  const failed = createOpenAiResponsesSseTranslator('gpt-5.4');
+  failed.push('data: {"type":"response.failed","response":{"error":{"message":"secret"}}}\n\n');
+  assert.deepEqual(failed.finish().output, [
+    'data: {"error":"upstream_response_failed"}\n\n',
+    'data: [DONE]\n\n',
+  ]);
+
+  const incomplete = createOpenAiResponsesSseTranslator('gpt-5.4');
+  incomplete.push('data: {"type":"response.output_text.delta","delta":"partial"}\n\n');
+  assert.deepEqual(incomplete.finish().output, [
+    'data: {"error":"upstream_stream_incomplete"}\n\n',
+    'data: [DONE]\n\n',
+  ]);
 });

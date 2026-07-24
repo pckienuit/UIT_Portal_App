@@ -1209,3 +1209,45 @@ test('generic custom models persist across restart', async (t) => {
     'configured', 'manual/model-x',
   ]);
 });
+
+test('Codex Responses forces stream and sends upstream-only account metadata', async (t) => {
+  const seen = {};
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    Object.assign(seen, { url: request.url, headers: request.headers, body: JSON.parse(raw) });
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end('data: {"type":"response.output_text.delta","delta":"Codex"}\n\ndata: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1}}}\n\n');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'codex-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'codex-mobile', name: 'Codex', presetId: 'codex',
+    baseUrl: 'https://chatgpt.com/backend-api', modelId: 'catalog-model', active: true,
+    transportKind: 'openaiResponses', chatUrl: `http://127.0.0.1:${upstream.address().port}/backend-api/codex/responses`,
+    models: [{ id: 'catalog-model', name: 'Catalog Model' }],
+    apiKey: 'access-secret', sourceToken: 'refresh-secret', accountId: 'acct_123',
+  })).status, 201);
+  const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    stream: false, model: 'not-in-catalog', messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /"content":"Codex"/);
+  assert.equal(seen.url, '/backend-api/codex/responses');
+  assert.equal(seen.body.stream, true);
+  assert.equal(seen.body.model, 'catalog-model');
+  assert.match(seen.headers['user-agent'], /^codex_cli_rs\//);
+  assert.equal(seen.headers.originator, 'codex_cli_rs');
+  assert.match(seen.headers.session_id, /^[0-9a-f-]{36}$/);
+  assert.equal(seen.headers['chatgpt-account-id'], 'acct_123');
+  assert.equal(seen.headers.authorization, 'Bearer access-secret');
+  assert.equal(seen.headers.id, undefined);
+  assert.doesNotMatch(JSON.stringify(seen), /refresh-secret/);
+});

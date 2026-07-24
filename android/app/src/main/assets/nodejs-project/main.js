@@ -113,6 +113,9 @@ try {
         ...(connection.mobileMetadata?.projectId
           ? { projectId: connection.mobileMetadata.projectId }
           : {}),
+        ...(connection.mobileMetadata?.accountId
+          ? { accountId: connection.mobileMetadata.accountId }
+          : {}),
         ...(connection.mobileMetadata?.transportKind
           ? { transportKind: connection.mobileMetadata.transportKind }
           : {}),
@@ -163,6 +166,7 @@ try {
           baseUrl: provider.baseUrl,
           systemPrompt: provider.systemPrompt || '',
           projectId: provider.projectId || '',
+          accountId: provider.accountId || '',
           transportKind: provider.transportKind,
           chatUrl: provider.chatUrl,
           modelsUrl: provider.modelsUrl,
@@ -417,15 +421,22 @@ try {
         }
 
         let body = await parseJsonBody(request);
-        const requestedStream = body.stream === true;
+        const requestedStream = body.stream === true || activeProvider.presetId === 'codex';
         const rawModel = (typeof body.model === 'string' && body.model.trim()) ? body.model.trim() : '';
-        const selectedModel = (rawModel && rawModel !== 'ignored') ? rawModel : activeProvider.modelId;
+        const catalogModelIds = new Set((activeProvider.models || []).map((model) =>
+          typeof model === 'string' ? model : model?.id,
+        ));
+        const selectedModel = rawModel && rawModel !== 'ignored' &&
+          (activeProvider.presetId !== 'codex' || catalogModelIds.has(rawModel))
+          ? rawModel
+          : activeProvider.modelId;
         body.model = selectedModel;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
         const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
         const isOpenAiResponses = activeProvider.transportKind === 'openaiResponses';
+        const isCodex = activeProvider.presetId === 'codex';
 
         const headers = {
           'content-type': 'application/json',
@@ -457,6 +468,19 @@ try {
         }
         if (isOpenAiResponses) {
           body = openAiToOpenAiResponses(body, selectedModel);
+          if (isCodex) body.stream = true;
+        }
+
+        if (isCodex) {
+          Object.assign(headers, {
+            accept: 'text/event-stream',
+            'user-agent': 'codex_cli_rs/0.0.0',
+            originator: 'codex_cli_rs',
+            session_id: randomUUID(),
+          });
+          if (activeProvider.accountId) {
+            headers['chatgpt-account-id'] = activeProvider.accountId;
+          }
         }
 
         if (activeProvider.presetId === 'github') {
@@ -748,6 +772,7 @@ try {
           systemPrompt: data.systemPrompt || '',
           authMode: data.authMode || 'apiKey',
           projectId: data.projectId || '',
+          accountId: data.accountId || '',
           transportKind: data.transportKind,
           chatUrl: data.chatUrl,
           modelsUrl: data.modelsUrl,
@@ -784,6 +809,7 @@ try {
         if (data.modelId !== undefined) provider.modelId = data.modelId;
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
         if (data.projectId !== undefined) provider.projectId = data.projectId;
+        if (data.accountId !== undefined) provider.accountId = data.accountId;
         if (data.transportKind !== undefined) provider.transportKind = data.transportKind;
         if (data.chatUrl !== undefined) provider.chatUrl = data.chatUrl;
         if (data.modelsUrl !== undefined) provider.modelsUrl = data.modelsUrl;

@@ -55,6 +55,8 @@ function createOpenAiResponsesSseTranslator(model) {
   let buffer = '';
   let id = `chatcmpl-${Date.now()}`;
   let sentRole = false;
+  let completed = false;
+  let failed = false;
   let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
 
   return {
@@ -79,6 +81,7 @@ function createOpenAiResponsesSseTranslator(model) {
             id = `chatcmpl-${parsed.response.id}`;
           }
           if (parsed.type === 'response.completed' && parsed.response?.usage) {
+            completed = true;
             const u = parsed.response.usage;
             usage = {
               prompt_tokens: u.input_tokens || 0,
@@ -86,6 +89,8 @@ function createOpenAiResponsesSseTranslator(model) {
               total_tokens: (u.input_tokens || 0) + (u.output_tokens || 0),
             };
           }
+          if (parsed.type === 'response.completed') completed = true;
+          if (parsed.type === 'response.failed') failed = true;
           if (parsed.type === 'response.output_item.added' || parsed.type === 'response.content_part.added') {
             if (!sentRole) {
               output.push(`data: ${JSON.stringify({
@@ -98,7 +103,7 @@ function createOpenAiResponsesSseTranslator(model) {
               sentRole = true;
             }
           }
-          if (parsed.type === 'response.text.delta' && parsed.delta) {
+          if ((parsed.type === 'response.text.delta' || parsed.type === 'response.output_text.delta') && parsed.delta) {
             if (!sentRole) {
               sentRole = true;
             }
@@ -115,7 +120,10 @@ function createOpenAiResponsesSseTranslator(model) {
       return output;
     },
     finish() {
-      const output = [`data: [DONE]\n\n`];
+      const output = [];
+      if (failed) output.push('data: {"error":"upstream_response_failed"}\n\n');
+      else if (!completed) output.push('data: {"error":"upstream_stream_incomplete"}\n\n');
+      output.push('data: [DONE]\n\n');
       return { output, usage };
     },
   };

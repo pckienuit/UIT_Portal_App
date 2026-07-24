@@ -132,6 +132,35 @@ void main() {
     expect(refreshed.projectId, 'cloud-project');
     expect(await repository.getApiKey(config.id), 'google-access');
   });
+
+  test('keeps refreshed Codex account ID typed without OAuth token metadata',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = AiProviderRepository(
+      prefs: await SharedPreferences.getInstance(),
+      secureStorage: _FakeSecureStorage(),
+    );
+    final config = AiProviderConfig(
+      id: 'codex-1', name: 'Codex', kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://chatgpt.com/backend-api', modelId: 'gpt-5.4',
+      presetId: 'codex', authMode: 'oauth', credentialKind: 'refreshToken',
+      tokenExpiresAt: DateTime.utc(2026, 7, 22),
+    );
+    await repository.saveProvider(config, oauthRefreshToken: 'refresh-secret');
+    final refreshed = await ProviderCredentialBroker(
+      repository: repository,
+      exchangeGithubToken: (_) => throw StateError('not GitHub'),
+      refreshOAuthToken: (_, _) async => NativeOAuthCredential(
+        accessToken: 'access-secret', refreshToken: 'refresh-secret',
+        accountId: 'acct_123', expiresAt: DateTime.utc(2026, 7, 23),
+      ),
+      now: () => DateTime.utc(2026, 7, 22, 12),
+    ).ensureRuntimeCredential(config);
+
+    expect(refreshed.accountId, 'acct_123');
+    expect(await repository.getApiKey(config.id), 'access-secret');
+    expect(repository.listProviders().single.accountId, 'acct_123');
+  });
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {

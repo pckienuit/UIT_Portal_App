@@ -170,4 +170,18 @@ void main() {
     expect(unknown.transportKind, RouterTransportKind.unsupported);
     expect(unknown.mobileSupported, isFalse);
   });
+
+  test('serializes nonsecret Codex account ID without token fields', () {
+    const config = AiProviderConfig(
+      id: 'codex-1', name: 'Codex', kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://chatgpt.com/backend-api', modelId: 'gpt-5.4',
+      presetId: 'codex', accountId: 'acct_123',
+    );
+    final restored = AiProviderConfig.fromJson(config.toJson());
+
+    expect(restored.accountId, 'acct_123');
+    expect(config.toJson().containsKey('accessToken'), isFalse);
+    expect(config.toJson().containsKey('refreshToken'), isFalse);
+    expect(config.toJson().containsKey('idToken'), isFalse);
+  });
 }

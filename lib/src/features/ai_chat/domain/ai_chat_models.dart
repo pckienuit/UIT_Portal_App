@@ -31,6 +31,7 @@ class AiProviderConfig {
     this.authMode = 'apiKey',
     this.credentialKind,
     this.tokenExpiresAt,
+    this.accountId,
     this.projectId,
     this.transportKind,
     this.chatUrl,
@@ -52,6 +53,7 @@ class AiProviderConfig {
   final String authMode;
   final String? credentialKind;
   final DateTime? tokenExpiresAt;
+  final String? accountId;
   final String? projectId;
   final String? transportKind;
   final String? chatUrl;
@@ -73,6 +75,7 @@ class AiProviderConfig {
     'authMode': authMode,
     'credentialKind': credentialKind,
     'tokenExpiresAt': tokenExpiresAt?.toUtc().toIso8601String(),
+    'accountId': accountId,
     'projectId': projectId,
     'transportKind': transportKind,
     'chatUrl': chatUrl,
@@ -98,6 +101,7 @@ class AiProviderConfig {
         tokenExpiresAt: json['tokenExpiresAt'] == null
             ? null
             : DateTime.tryParse(json['tokenExpiresAt'] as String),
+        accountId: json['accountId'] as String?,
         projectId: json['projectId'] as String?,
         transportKind: json['transportKind'] as String?,
         chatUrl: json['chatUrl'] as String?,
@@ -140,6 +144,7 @@ class AiProviderConfig {
     String? authMode,
     String? Function()? credentialKind,
     DateTime? Function()? tokenExpiresAt,
+    String? Function()? accountId,
     String? Function()? projectId,
     String? Function()? transportKind,
     String? Function()? chatUrl,
@@ -165,6 +170,7 @@ class AiProviderConfig {
       tokenExpiresAt: tokenExpiresAt != null
           ? tokenExpiresAt()
           : this.tokenExpiresAt,
+      accountId: accountId != null ? accountId() : this.accountId,
       projectId: projectId != null ? projectId() : this.projectId,
       transportKind: transportKind != null
           ? transportKind()

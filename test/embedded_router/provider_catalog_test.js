@@ -186,3 +186,15 @@ test('generator fails closed when an upstream LLM provider is unclassified', () 
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('Codex catalog locks upstream Responses descriptor', () => {
+  const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));
+  const codex = support.oauth.codex;
+  const generated = loadCatalog().find((provider) => provider.id === 'codex');
+
+  assert.equal(codex.chatUrl, 'https://chatgpt.com/backend-api/codex/responses');
+  assert.equal(codex.modelsUrl, null);
+  assert.equal(generated.chatUrl, codex.chatUrl);
+  assert.equal(generated.modelsUrl, null);
+  assert.ok(generated.models.length > 0);
+});
