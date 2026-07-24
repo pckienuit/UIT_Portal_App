@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 
@@ -109,13 +110,10 @@ void main() {
 
     expect(adapter.requests.single.path, '/v1/models');
     expect(adapter.requests.single.queryParameters, {'connectionId': 'provider-antigravity'});
-    expect(models, const [
-      AiModelOption(
-        id: 'claude-sonnet-4-6',
-        name: 'Claude Sonnet 4.6 (Thinking)',
-        owner: 'antigravity',
-      ),
-    ]);
+    expect(models, hasLength(1));
+    expect(models.single.id, 'claude-sonnet-4-6');
+    expect(models.single.name, 'Claude Sonnet 4.6 (Thinking)');
+    expect(models.single.owner, 'antigravity');
   });
 
   test(

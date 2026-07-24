@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
@@ -35,11 +37,12 @@ void main() {
           'id': 'antigravity',
           'name': 'Antigravity',
           'category': 'oauth',
+          'disposition': 'ready',
           'mobileSupported': true,
           'androidAuth': 'loopback',
           'nativeStatus': 'experimental',
           'transportKind': 'geminiCli',
-          'chatUrl': 'https://example.test:streamGenerateContent?alt=sse',
+          'chatUrl': 'https://example.test/streamGenerateContent?alt=sse',
           'modelsUrl': 'https://example.test:fetchAvailableModels',
           'authHeader': 'Authorization',
           'authScheme': 'Bearer',
@@ -73,7 +76,7 @@ void main() {
     expect(hydrated.credentialKind, legacy.credentialKind);
     expect(hydrated.projectId, legacy.projectId);
     expect(hydrated.transportKind, 'geminiCli');
-    expect(hydrated.chatUrl, 'https://example.test:streamGenerateContent?alt=sse');
+    expect(hydrated.chatUrl, 'https://example.test/streamGenerateContent?alt=sse');
     expect(hydrated.modelsUrl, 'https://example.test:fetchAvailableModels');
     expect(hydrated.authHeader, 'Authorization');
     expect(hydrated.authScheme, 'Bearer');
