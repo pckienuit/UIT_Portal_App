@@ -39,15 +39,16 @@ class AiBackendFactory {
         exchangeGithubToken: oauth.exchangeCopilotToken,
       );
       config = await broker.ensureRuntimeCredential(config);
+      final apiKey = await repository.getApiKey(config.id);
       await (ref.read(routerAdminClientProvider) as RouterAdminClient)
-          .saveProvider(config, apiKey: *** repository.getApiKey(config.id));
+          .saveProvider(config, apiKey: apiKey);
     } else if (config.authMode == 'oauth') {
       final sourceToken = await repository.getOAuthSourceToken(config.id);
-      final accessToken = await repository.getOAuthAccessToken(config.id);
+      final accessToken = await repository.getApiKey(config.id);
       await (ref.read(routerAdminClientProvider) as RouterAdminClient)
           .saveProvider(
             config,
-            apiKey: ***
+            apiKey: accessToken,
             sourceToken: sourceToken,
           );
     }
@@ -56,7 +57,7 @@ class AiBackendFactory {
       return OpenAiCompatibleBackend(
         baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
         modelId: config.modelId,
-        apiKey: runtimeState.bearer!,
+        apiKey: runtimeState.bearerToken!,
       );
     }
 
