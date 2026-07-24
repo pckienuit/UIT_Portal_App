@@ -1,0 +1,84 @@
+{
+  "openaiRequest": {
+    "model": "gemini-2.5-flash",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello"
+      }
+    ]
+  },
+  "geminiRequest": {
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Hello"
+          }
+        ]
+      }
+    ],
+    "generationConfig": {},
+    "safetySettings": [
+      {
+        "category": "HARM_CATEGORY_HATE_SPEECH",
+        "threshold": "OFF"
+      },
+      {
+        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+        "threshold": "OFF"
+      },
+      {
+        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "threshold": "OFF"
+      },
+      {
+        "category": "HARM_CATEGORY_HARASSMENT",
+        "threshold": "OFF"
+      },
+      {
+        "category": "HARM_CATEGORY_CIVIC_INTEGRITY",
+        "threshold": "OFF"
+      }
+    ]
+  },
+  "geminiResponse": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Hi there!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP"
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 2,
+      "candidatesTokenCount": 3,
+      "totalTokenCount": 5
+    }
+  },
+  "openaiResponse": {
+    "choices": [
+      {
+        "message": {
+          "content": "Hi there!"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 2,
+      "completion_tokens": 3,
+      "total_tokens": 5
+    }
+  },
+  "sseFrames": [
+    "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Hi\"}], \"role\": \"model\"}}]}\n\n",
+    "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \" there!\"}], \"role\": \"model\"}}], \"usageMetadata\": {\"promptTokenCount\": 2, \"candidatesTokenCount\": 3, \"totalTokenCount\": 5}}\n\n"
+  ]
+}

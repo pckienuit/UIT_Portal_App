@@ -151,8 +151,14 @@
       "reason": "Not a supported mobile chat provider"
     },
     "openrouter": {
-      "disposition": "candidate",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "disposition": "ready",
+      "androidAuth": "apiKey",
+      "transportKind": "openaiChat",
+      "chatUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "modelsUrl": "https://openrouter.ai/api/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "defaultBaseUrl": "https://openrouter.ai/api/v1"
     },
     "searxng": {
       "disposition": "remove",
@@ -215,14 +221,14 @@
       "reason": "TTS-only provider excluded from Chat"
     },
     "cerebras": {
-      "disposition": "candidate",
+      "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "openaiChat",
       "chatUrl": "https://api.cerebras.ai/v1/chat/completions",
       "modelsUrl": "https://api.cerebras.ai/v1/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "defaultBaseUrl": "https://api.cerebras.ai/v1"
     },
     "chutes": {
       "disposition": "candidate",
@@ -241,14 +247,14 @@
       "reason": "Audio-only provider excluded from Chat"
     },
     "deepseek": {
-      "disposition": "candidate",
+      "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "openaiChat",
       "chatUrl": "https://api.deepseek.com/chat/completions",
       "modelsUrl": "https://api.deepseek.com/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "defaultBaseUrl": "https://api.deepseek.com"
     },
     "elevenlabs": {
       "disposition": "remove",
@@ -271,14 +277,14 @@
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "groq": {
-      "disposition": "candidate",
+      "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "openaiChat",
       "chatUrl": "https://api.groq.com/openai/v1/chat/completions",
       "modelsUrl": "https://api.groq.com/openai/v1/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "defaultBaseUrl": "https://api.groq.com/openai/v1"
     },
     "hyperbolic": {
       "disposition": "candidate",
@@ -297,14 +303,14 @@
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "mistral": {
-      "disposition": "candidate",
+      "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "openaiChat",
       "chatUrl": "https://api.mistral.ai/v1/chat/completions",
       "modelsUrl": "https://api.mistral.ai/v1/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "defaultBaseUrl": "https://api.mistral.ai/v1"
     },
     "mmf": {
       "disposition": "candidate",
@@ -315,17 +321,24 @@
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "ollama-local": {
-      "disposition": "candidate",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "disposition": "ready",
+      "androidAuth": "apiKey",
+      "transportKind": "ollamaChat",
+      "chatUrl": "https://localhost:11434/api/chat",
+      "modelsUrl": "https://localhost:11434/api/tags",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "defaultBaseUrl": "https://localhost:11434"
     },
     "openai": {
-      "disposition": "candidate",
+      "disposition": "ready",
       "androidAuth": "apiKey",
       "transportKind": "openaiChat",
       "chatUrl": "https://api.openai.com/v1/chat/completions",
+      "modelsUrl": "https://api.openai.com/v1/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "defaultBaseUrl": "https://api.openai.com/v1"
     },
     "opencode-go": {
       "disposition": "candidate",
