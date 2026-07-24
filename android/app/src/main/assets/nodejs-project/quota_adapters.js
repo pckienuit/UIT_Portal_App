@@ -63,25 +63,44 @@ async function retrieveGeminiQuota({ baseUrl, projectId, runtimeToken, fetchImpl
   return payload;
 }
 
+function antigravityHeaders(runtimeToken, includeClient = false) {
+  return {
+    authorization: `Bearer ${runtimeToken}`,
+    'content-type': 'application/json',
+    'user-agent': 'antigravity/ide/2.1.1 darwin/arm64',
+    ...(includeClient
+      ? { 'x-client-name': 'antigravity', 'x-client-version': '2.1.1' }
+      : {}),
+  };
+}
+
 async function retrieveAntigravityModels({ baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs }) {
   if (!runtimeToken) {
     throw new QuotaError('missing_credential', 401, 'Quota credential unavailable', 'error');
   }
+  const codeAssist = await fetchJson(`${baseUrl}:loadCodeAssist`, {
+    method: 'POST',
+    headers: antigravityHeaders(runtimeToken),
+    body: JSON.stringify({
+      metadata: { ideType: 9, platform: 2, pluginType: 2 },
+      mode: 1,
+    }),
+  }, fetchImpl, timeoutMs);
+  const resolvedProject = typeof codeAssist?.cloudaicompanionProject === 'string'
+    ? codeAssist.cloudaicompanionProject
+    : projectId;
   const payload = await fetchJson(`${baseUrl}:fetchAvailableModels`, {
     method: 'POST',
-    headers: {
-      authorization: `Bearer ${runtimeToken}`,
-      'content-type': 'application/json',
-      'user-agent': 'antigravity/ide/2.1.1 darwin/arm64',
-      'x-client-name': 'antigravity',
-      'x-client-version': '2.1.1',
-    },
-    body: JSON.stringify(projectId ? { project: projectId } : {}),
+    headers: antigravityHeaders(runtimeToken, true),
+    body: JSON.stringify(resolvedProject ? { project: resolvedProject } : {}),
   }, fetchImpl, timeoutMs);
   if (!payload || typeof payload.models !== 'object' || Array.isArray(payload.models)) {
     throw new QuotaError('malformed', 502, 'Quota payload malformed');
   }
-  return payload;
+  return {
+    payload,
+    plan: typeof codeAssist?.currentTier?.name === 'string' ? codeAssist.currentTier.name : null,
+  };
 }
 
 async function listGeminiModels({ baseUrl, projectId, runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
@@ -116,27 +135,38 @@ function normalizeGemini(connection, payload, now) {
   return snapshot(connection, payload.plan ?? null, entries, now);
 }
 
-function antigravityModels(payload) {
-  const models = Object.entries(payload.models)
-    .filter(([id, model]) => id && model && model.isInternal !== true && model.quotaInfo)
-    .map(([id, model]) => ({
-      id,
-      name: typeof model.displayName === 'string' && model.displayName ? model.displayName : id,
-      quotaInfo: model.quotaInfo,
-    }));
+function antigravityModels(payload, configuredModels) {
+  if (!Array.isArray(configuredModels) || configuredModels.length === 0) {
+    throw new QuotaError('missing_allowlist', 502, 'Antigravity model allowlist unavailable');
+  }
+  const models = configuredModels
+    .map((descriptor) => {
+      const id = typeof descriptor === 'string' ? descriptor : descriptor?.id;
+      const catalogName = typeof descriptor === 'object' ? descriptor?.name : null;
+      const model = typeof id === 'string' ? payload.models[id] : null;
+      if (!model || typeof model !== 'object' || model.isInternal === true || !model.quotaInfo) return null;
+      return {
+        id,
+        name: typeof model.displayName === 'string' && model.displayName
+          ? model.displayName
+          : catalogName || id,
+        quotaInfo: model.quotaInfo,
+      };
+    })
+    .filter(Boolean);
   if (models.length === 0) throw new QuotaError('malformed', 502, 'Quota payload malformed');
   return models;
 }
 
-async function listAntigravityModels({ baseUrl, projectId, runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
-  const payload = await retrieveAntigravityModels({
+async function listAntigravityModels({ baseUrl, projectId, runtimeToken, configuredModels, fetchImpl = fetch, timeoutMs = 10000 }) {
+  const result = await retrieveAntigravityModels({
     baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs,
   });
-  return antigravityModels(payload).map(({ id, name }) => ({ id, name }));
+  return antigravityModels(result.payload, configuredModels).map(({ id, name }) => ({ id, name }));
 }
 
-function normalizeAntigravity(connection, payload, now) {
-  const entries = antigravityModels(payload).map(({ id, name, quotaInfo }) => {
+function normalizeAntigravity(connection, result, now) {
+  const entries = antigravityModels(result.payload, connection.models).map(({ id, name, quotaInfo }) => {
     const fraction = numberOrNull(quotaInfo.remainingFraction);
     return {
       id,
@@ -152,7 +182,7 @@ function normalizeAntigravity(connection, payload, now) {
       unlimited: false,
     };
   });
-  return snapshot(connection, null, entries, now);
+  return snapshot(connection, result.plan, entries, now);
 }
 
 function normalizeGithub(connection, payload, now) {

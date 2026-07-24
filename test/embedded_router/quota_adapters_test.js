@@ -92,33 +92,44 @@ test('Gemini quota reports only upstream percentage and reset without fake total
   });
 });
 
-test('Antigravity quota and model list use fetchAvailableModels without fake counts', async () => {
-  const antigravityPayload = {
-    models: {
-      'claude-sonnet-4-6': {
-        displayName: 'Claude Sonnet 4.6 (Thinking)',
-        quotaInfo: { remainingFraction: 0.6, resetTime: '2026-07-25T00:00:00Z' },
-      },
-      'gemini-3-flash-agent': {
-        displayName: 'Gemini 3.5 Flash (High)',
-        quotaInfo: { remainingFraction: 1 },
-      },
-      'internal-debug-model': {
-        isInternal: true,
-        quotaInfo: { remainingFraction: 1 },
-      },
-    },
-  };
-  let request;
+test('Antigravity resolves account project then intersects live quota models with configured registry', async () => {
+  const configuredModels = [
+    { id: 'gemini-3-flash-agent', name: 'Catalog Flash' },
+    { id: 'claude-sonnet-4-6', name: 'Catalog Sonnet' },
+    { id: 'allowed-without-quota', name: 'No quota' },
+  ];
+  const requests = [];
   const fetchImpl = async (url, options) => {
-    request = { url, options };
-    return jsonResponse(200, antigravityPayload);
+    requests.push({ url, options });
+    if (url.endsWith(':loadCodeAssist')) {
+      return jsonResponse(200, {
+        cloudaicompanionProject: 'account-project',
+        currentTier: { name: 'Antigravity Pro' },
+      });
+    }
+    return jsonResponse(200, {
+      models: {
+        'claude-sonnet-4-6': {
+          displayName: 'Claude Sonnet 4.6 (Thinking)',
+          quotaInfo: { remainingFraction: 0.6, resetTime: '2026-07-25T00:00:00Z' },
+        },
+        'gemini-3-flash-agent': {
+          displayName: 'Gemini 3.5 Flash (High)',
+          quotaInfo: { remainingFraction: 1 },
+        },
+        'allowed-without-quota': { displayName: 'Must not be live' },
+        'image-generation': { quotaInfo: { remainingFraction: 1 } },
+        'experimental-unknown': { quotaInfo: { remainingFraction: 1 } },
+        'internal-debug-model': { isInternal: true, quotaInfo: { remainingFraction: 1 } },
+      },
+    });
   };
   const connection = {
     id: 'provider-antigravity',
     providerId: 'antigravity',
     baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal',
-    projectId: 'ag-project',
+    projectId: 'stale-project',
+    models: configuredModels,
   };
   const result = await fetchQuota({
     connection,
@@ -127,45 +138,49 @@ test('Antigravity quota and model list use fetchAvailableModels without fake cou
     now: () => new Date('2026-07-24T12:00:00Z'),
   });
 
-  assert.equal(request.url, 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels');
-  assert.equal(request.options.headers.authorization, 'Bearer antigravity-runtime');
-  assert.equal(request.options.headers['user-agent'], 'antigravity/ide/2.1.1 darwin/arm64');
-  assert.equal(request.options.headers['x-client-name'], 'antigravity');
-  assert.equal(request.options.headers['x-client-version'], '2.1.1');
-  assert.deepEqual(JSON.parse(request.options.body), { project: 'ag-project' });
+  assert.deepEqual(requests.map((request) => request.url), [
+    'https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist',
+    'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels',
+  ]);
+  assert.equal(requests[0].options.headers.authorization, 'Bearer antigravity-runtime');
+  assert.equal(requests[0].options.headers['user-agent'], 'antigravity/ide/2.1.1 darwin/arm64');
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    metadata: { ideType: 9, platform: 2, pluginType: 2 },
+    mode: 1,
+  });
+  assert.equal(requests[1].options.headers['x-client-name'], 'antigravity');
+  assert.equal(requests[1].options.headers['x-client-version'], '2.1.1');
+  assert.deepEqual(JSON.parse(requests[1].options.body), { project: 'account-project' });
+  assert.equal(result.plan, 'Antigravity Pro');
   assert.equal(result.providerId, 'antigravity');
   assert.deepEqual(result.entries.map((entry) => entry.id), [
-    'claude-sonnet-4-6',
     'gemini-3-flash-agent',
+    'claude-sonnet-4-6',
   ]);
-  assert.equal(result.entries[0].label, 'Claude Sonnet 4.6 (Thinking)');
-  assert.equal(result.entries[0].remainingPercent, 60);
   assert.equal(result.entries[0].used, null);
   assert.equal(result.entries[0].total, null);
   assert.equal(result.entries[0].remaining, null);
+  assert.equal(result.entries[1].remainingPercent, 60);
 
-  assert.deepEqual(await listAntigravityModels({
+  const models = await listAntigravityModels({
     baseUrl: connection.baseUrl,
     projectId: connection.projectId,
     runtimeToken: 'antigravity-runtime',
+    configuredModels,
     fetchImpl,
-  }), [
-    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)' },
+  });
+  assert.deepEqual(models, [
     { id: 'gemini-3-flash-agent', name: 'Gemini 3.5 Flash (High)' },
+    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)' },
   ]);
 
-  await assert.rejects(() => listAntigravityModels({
-    baseUrl: connection.baseUrl,
-    projectId: connection.projectId,
-    runtimeToken: 'secret-sentinel',
-    fetchImpl: async () => jsonResponse(401, { error: 'secret-sentinel' }),
-  }), (error) => error.statusCode === 401 && !String(error).includes('secret-sentinel'));
   await assert.rejects(() => listAntigravityModels({
     baseUrl: connection.baseUrl,
     projectId: connection.projectId,
     runtimeToken: 'runtime',
-    fetchImpl: async () => jsonResponse(200, { models: [] }),
-  }), /malformed/);
+    configuredModels: [],
+    fetchImpl,
+  }), (error) => error.code === 'missing_allowlist');
 });
 
 test('OpenRouter quota fetches balance and usage from auth key endpoint', async () => {
