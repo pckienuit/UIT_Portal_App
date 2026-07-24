@@ -26,9 +26,67 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal class OAuthTransportException(val code: String, message: String) : Exception(message)
 
+internal object OAuthAuthorizationContract {
+    fun authorizationUri(
+        provider: AuthorizationOAuthProvider,
+        redirectUri: String,
+        state: String,
+        codeVerifier: String?,
+    ): URI {
+        val fields = linkedMapOf(
+            "client_id" to provider.clientId,
+            "response_type" to "code",
+            "redirect_uri" to redirectUri,
+            "scope" to provider.scope,
+            "state" to state,
+        )
+        if (provider.usesPkce) {
+            fields["code_challenge"] = codeChallenge(requireNotNull(codeVerifier))
+            fields["code_challenge_method"] = "S256"
+        }
+        fields.putAll(provider.extraAuthorizationParams)
+        if (provider.extraAuthorizationParams.isEmpty()) {
+            fields["access_type"] = "offline"
+            fields["prompt"] = "consent"
+        }
+        return URI("${provider.authorizeUrl}?${fields.entries.joinToString("&") { (key, value) -> "${encode(key)}=${encode(value)}" }}")
+    }
+
+    fun tokenFields(
+        provider: AuthorizationOAuthProvider,
+        code: String,
+        redirectUri: String,
+        codeVerifier: String?,
+    ): MutableMap<String, String> = mutableMapOf(
+        "grant_type" to "authorization_code",
+        "client_id" to provider.clientId,
+        "code" to code,
+        "redirect_uri" to redirectUri,
+    ).also { fields ->
+        provider.clientSecret?.let { fields["client_secret"] = it }
+        if (provider.usesPkce) fields["code_verifier"] = requireNotNull(codeVerifier)
+    }
+
+    fun callbackPathMatches(path: String?, expectedPath: String): Boolean = path == expectedPath
+
+    fun accountIdFromIdToken(idToken: String?): String? = runCatching {
+        val payload = idToken?.split('.')?.getOrNull(1) ?: return null
+        Regex("\\\"sub\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
+            .find(String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8))
+            ?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+
+    private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+    private fun codeChallenge(verifier: String): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(StandardCharsets.US_ASCII))
+        )
+}
+
 internal class LoopbackAuthorizationListener(
     private val server: ServerSocket,
     private val expectedState: String,
+    private val expectedCallbackPath: String = "/callback",
     private val callback: CompletableFuture<Map<String, String>>,
     private val cancelled: AtomicBoolean = AtomicBoolean(false),
     private val timeoutMillis: Long = 300_000L,
@@ -63,7 +121,7 @@ internal class LoopbackAuthorizationListener(
                     )
                     val hasResult = params["code"]?.isNotBlank() == true ||
                         params["error"]?.isNotBlank() == true
-                    val valid = uri?.path == "/callback" && stateMatches && hasResult
+                    val valid = OAuthAuthorizationContract.callbackPathMatches(uri?.path, expectedCallbackPath) && stateMatches && hasResult
                     log(
                         "Callback path=${uri?.path} valid=$valid state_valid=$stateMatches " +
                             "code_present=${params["code"]?.isNotBlank() == true} " +
@@ -123,6 +181,8 @@ data class ActiveAuthorizationFlow(
     val provider: AuthorizationOAuthProvider,
     val state: String,
     val redirectUri: String,
+    val callbackPath: String,
+    val codeVerifier: String?,
     val server: ServerSocket,
     val cancelled: AtomicBoolean = AtomicBoolean(false),
     val callback: CompletableFuture<Map<String, String>> = CompletableFuture(),
@@ -300,30 +360,26 @@ class NativeOAuthCoordinator {
         }
         executor.execute {
             try {
+                val callbackHost = provider.callbackHost ?: "127.0.0.1"
+                val callbackPath = provider.callbackPath ?: "/callback"
                 val server = ServerSocket(
-                    0,
+                    provider.callbackPort ?: 0,
                     1,
-                    java.net.InetAddress.getByName("127.0.0.1"),
+                    java.net.InetAddress.getByName(callbackHost),
                 ).apply { soTimeout = 300_000 }
                 val flowId = UUID.randomUUID().toString()
                 val state = generateCodeVerifier()
-                val redirectUri = "http://127.0.0.1:${server.localPort}/callback"
-                val flow = ActiveAuthorizationFlow(provider, state, redirectUri, server)
+                val codeVerifier = provider.takeIf { it.usesPkce }?.let { generateCodeVerifier() }
+                val redirectUri = "http://$callbackHost:${server.localPort}$callbackPath"
+                val flow = ActiveAuthorizationFlow(provider, state, redirectUri, callbackPath, codeVerifier, server)
                 authorizationFlows[flowId] = flow
                 activeAuthFlowId = flowId
-                android.util.Log.i("NativeOAuth", "Started auth flow: $flowId on port ${server.localPort}")
                 executor.execute { receiveAuthorizationCallback(flowId, flow) }
-                val query = mapOf(
-                    "client_id" to provider.clientId,
-                    "response_type" to "code",
-                    "redirect_uri" to redirectUri,
-                    "scope" to provider.scope,
-                    "state" to state,
-                    "access_type" to "offline",
-                    "prompt" to "consent",
-                ).entries.joinToString("&") { (key, value) -> "${encode(key)}=${encode(value)}" }
                 result.success(
-                    NativeAuthorizationFlow(flowId, URI("${provider.authorizeUrl}?$query")).toMap()
+                    NativeAuthorizationFlow(
+                        flowId,
+                        OAuthAuthorizationContract.authorizationUri(provider, redirectUri, state, codeVerifier),
+                    ).toMap()
                 )
             } catch (_: Exception) {
                 result.error("oauth_transport", "Không thể bắt đầu OAuth Google", null)
@@ -335,6 +391,7 @@ class NativeOAuthCoordinator {
         LoopbackAuthorizationListener(
             server = flow.server,
             expectedState = flow.state,
+            expectedCallbackPath = flow.callbackPath,
             callback = flow.callback,
             cancelled = flow.cancelled,
         ).run()
@@ -351,22 +408,27 @@ class NativeOAuthCoordinator {
                 val callback = flow.callback.get()
                 callback["error"]?.let { throw OAuthTransportException(it, callback["error_description"] ?: it) }
                 val code = callback["code"]?.takeIf { it.isNotBlank() } ?: throw OAuthTransportException("invalid_response", "Google không trả authorization code")
-                val tokenFields = mutableMapOf(
-                    "grant_type" to "authorization_code",
-                    "client_id" to flow.provider.clientId,
-                    "code" to code,
-                    "redirect_uri" to flow.redirectUri,
+                val tokens = postForm(
+                    flow.provider.tokenUrl,
+                    OAuthAuthorizationContract.tokenFields(
+                        flow.provider,
+                        code,
+                        flow.redirectUri,
+                        flow.codeVerifier,
+                    ),
                 )
-                flow.provider.clientSecret?.let { tokenFields["client_secret"] = it }
-                val tokens = postForm(flow.provider.tokenUrl, tokenFields)
                 val accessToken = tokens.requireString("access_token")
-                val project = loadGeminiProject(accessToken)
+                val project = if (flow.provider.resolvesGoogleProject) loadGeminiProject(accessToken) else null
+                val accountId = OAuthAuthorizationContract.accountIdFromIdToken(
+                    tokens.optString("id_token").ifBlank { null },
+                )
                 result.success(NativeOAuthCredential(
                     accessToken = accessToken,
                     refreshToken = tokens.optString("refresh_token").ifBlank { null },
                     expiresAt = tokens.optLong("expires_in", 0).takeIf { it > 0 }?.let { Instant.now().plusSeconds(it).toString() },
                     scope = tokens.optString("scope").ifBlank { null },
                     projectId = project,
+                    accountId = accountId,
                 ).toMap())
             } catch (error: Exception) {
                 val oauth = error.cause as? OAuthTransportException ?: error as? OAuthTransportException

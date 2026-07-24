@@ -121,6 +121,7 @@ void main() {
         'expiresAt': '2026-07-22T17:00:00.000Z',
         'scope': 'cloud-platform',
         'projectId': 'cloud-project',
+        'accountId': 'acct_123',
         'email': 'user@example.com',
       };
     });
@@ -134,5 +135,6 @@ void main() {
 
     expect(flow.authorizationUri.scheme, 'https');
     expect(credential.projectId, 'cloud-project');
+    expect(credential.accountId, 'acct_123');
   });
 }

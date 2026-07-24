@@ -34,7 +34,17 @@ object OAuthProviderRegistry {
             clientSecret = null,
             authorizeUrl = java.net.URI("https://auth.openai.com/oauth/authorize"),
             tokenUrl = java.net.URI("https://auth.openai.com/oauth/token"),
-            scope = "openid profile email offline_access model.request",
+            scope = "openid profile email offline_access",
+            usesPkce = true,
+            callbackHost = "localhost",
+            callbackPort = 1455,
+            callbackPath = "/auth/callback",
+            extraAuthorizationParams = mapOf(
+                "id_token_add_organizations" to "true",
+                "codex_cli_simplified_flow" to "true",
+                "originator" to "codex_cli_rs",
+            ),
+            resolvesGoogleProject = false,
         ),
     )
 

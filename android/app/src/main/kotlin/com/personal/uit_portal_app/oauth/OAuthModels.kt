@@ -53,6 +53,12 @@ data class AuthorizationOAuthProvider(
     val authorizeUrl: URI,
     val tokenUrl: URI,
     val scope: String,
+    val usesPkce: Boolean = false,
+    val callbackHost: String? = null,
+    val callbackPort: Int? = null,
+    val callbackPath: String? = null,
+    val extraAuthorizationParams: Map<String, String> = emptyMap(),
+    val resolvesGoogleProject: Boolean = true,
 ) {
     init {
         require(id.isNotBlank()) { "Provider id is required" }
@@ -97,6 +103,7 @@ data class NativeOAuthCredential(
     val expiresAt: String?,
     val scope: String?,
     val projectId: String? = null,
+    val accountId: String? = null,
 ) {
     init {
         require(accessToken.isNotBlank()) { "OAuth access token is required" }
@@ -108,5 +115,6 @@ data class NativeOAuthCredential(
         "expiresAt" to expiresAt,
         "scope" to scope,
         "projectId" to projectId,
+        "accountId" to accountId,
     )
 }

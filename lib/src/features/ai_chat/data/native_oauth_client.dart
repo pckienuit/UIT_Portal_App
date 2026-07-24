@@ -75,6 +75,7 @@ class NativeOAuthCredential {
     this.expiresAt,
     this.scope,
     this.projectId,
+    this.accountId,
   });
 
   final String accessToken;
@@ -82,6 +83,7 @@ class NativeOAuthCredential {
   final DateTime? expiresAt;
   final String? scope;
   final String? projectId;
+  final String? accountId;
 
   factory NativeOAuthCredential.fromMap(Map<Object?, Object?> map) {
     final accessToken = map['accessToken'];
@@ -100,6 +102,7 @@ class NativeOAuthCredential {
       expiresAt: expiresAt,
       scope: map['scope'] as String?,
       projectId: map['projectId'] as String?,
+      accountId: map['accountId'] as String?,
     );
   }
 }
