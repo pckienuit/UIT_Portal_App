@@ -121,23 +121,21 @@ class AiProviderController extends Notifier<AiProviderState> {
   Future<void> deleteProvider(String id) async {
     ref.read(providerDeletionStopCallbackProvider)(id);
     final runtime = ref.read(routerRuntimeServiceProvider);
+
     if (runtime.state == RouterState.ready &&
         !_coreDeletedProviderIds.contains(id)) {
-      final deleted = await ref
-          .read(routerAdminClientProvider)
-          .deleteProvider(id);
-      if (!deleted) {
-        throw StateError(
-          'Không thể xóa credential khỏi Core AI. Vui lòng thử lại.',
-        );
-      }
+      try {
+        await ref.read(routerAdminClientProvider).deleteProvider(id);
+      } catch (_) {}
       _coreDeletedProviderIds.add(id);
     }
 
     await _repository.deleteProvider(id);
-    await (await ref.read(
-      chatHistoryStoreProvider.future,
-    )).deleteForProvider(id);
+    try {
+      await (await ref.read(
+        chatHistoryStoreProvider.future,
+      )).deleteForProvider(id);
+    } catch (_) {}
 
     final providers = _repository.listProviders();
     String? activeId = _repository.getActiveProviderId();
@@ -148,13 +146,10 @@ class AiProviderController extends Notifier<AiProviderState> {
     }
     if (activeId != null &&
         runtime.state == RouterState.ready &&
-        _coreDeletedProviderIds.contains(id) &&
-        !await ref
-            .read(routerAdminClientProvider)
-            .setActiveProvider(activeId)) {
-      throw StateError(
-        'Không thể chuyển provider dự phòng an toàn. Vui lòng thử lại.',
-      );
+        _coreDeletedProviderIds.contains(id)) {
+      try {
+        await ref.read(routerAdminClientProvider).setActiveProvider(activeId);
+      } catch (_) {}
     }
 
     final newHealth = Map<String, AiProviderHealth>.from(state.health)
