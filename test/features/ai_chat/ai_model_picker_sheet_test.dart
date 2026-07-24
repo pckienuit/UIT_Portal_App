@@ -131,6 +131,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Antigravity live error hides cached catalog but keeps retry and manual ID', (tester) async {
+    String? selected;
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        routerModelCatalogProvider('provider-antigravity').overrideWith(
+          (ref) async => throw StateError('upstream forbidden'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(aiProviderControllerProvider.notifier).updateProviderModels(
+      'provider-antigravity',
+      const [AiModelOption(id: 'catalog-only', name: 'Catalog only')],
+    );
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Scaffold(body: AiModelPickerSheet(
+        providerId: 'provider-antigravity',
+        currentModelId: 'catalog-only',
+        onModelSelected: (id) => selected = id,
+      ))),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Catalog only'), findsNothing);
+    expect(find.text('Không thể tải danh sách mô hình khả dụng.'), findsOneWidget);
+    expect(find.text('Thử lại'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Nhập Model ID thủ công'),
+      'manual-antigravity-id',
+    );
+    await tester.tap(find.text('Áp dụng'));
+    expect(selected, 'manual-antigravity-id');
+  });
+
   testWidgets('loads live models from embedded router', (tester) async {
     final container = ProviderContainer(
       overrides: [

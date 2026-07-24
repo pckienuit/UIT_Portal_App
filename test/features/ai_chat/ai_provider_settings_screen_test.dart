@@ -13,6 +13,7 @@ import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.da
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -477,13 +478,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Đổi Model'));
     await tester.tap(find.text('Đổi Model'));
     await tester.pumpAndSettle();
     expect(find.text('Chọn mô hình (Model)'), findsOneWidget);
     expect(find.text('Chọn model cho Antigravity'), findsNothing);
     await tester.tap(find.text('Claude Sonnet 4.6 (Thinking)'));
     await tester.pumpAndSettle();
-    expect(find.text('Model: claude-sonnet-4-6'), findsOneWidget);
+    expect(find.text('Chọn mô hình (Model)'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

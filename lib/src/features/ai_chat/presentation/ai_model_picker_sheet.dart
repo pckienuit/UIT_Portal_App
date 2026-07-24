@@ -45,7 +45,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final models = liveModels.when(
       data: (models) => models,
       loading: () => cachedModels,
-      error: (_, _) => cachedModels,
+      error: (_, _) => const <AiModelOption>[],
     );
 
     final filteredModels = models.where((model) {
@@ -71,10 +71,14 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Chọn mô hình (Model)',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      'Chọn mô hình (Model)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -165,24 +169,21 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               const Divider(),
               SizedBox(height: PortalSpacing.sm),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _customModelController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nhập Model ID thủ công',
-                        hintText: 'Ví dụ: deepseek-chat',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: PortalSpacing.md,
-                          vertical: PortalSpacing.sm,
-                        ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final field = TextField(
+                    controller: _customModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nhập Model ID thủ công',
+                      hintText: 'Ví dụ: deepseek-chat',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: PortalSpacing.md,
+                        vertical: PortalSpacing.sm,
                       ),
                     ),
-                  ),
-                  SizedBox(width: PortalSpacing.md),
-                  ElevatedButton(
+                  );
+                  final apply = ElevatedButton(
                     onPressed: () {
                       final val = _customModelController.text.trim();
                       if (val.isNotEmpty) {
@@ -191,8 +192,21 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                       }
                     },
                     child: const Text('Áp dụng'),
-                  ),
-                ],
+                  );
+                  if (constraints.maxWidth < 360) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [field, SizedBox(height: PortalSpacing.sm), apply],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: field),
+                      SizedBox(width: PortalSpacing.md),
+                      apply,
+                    ],
+                  );
+                },
               ),
             ],
           ),
