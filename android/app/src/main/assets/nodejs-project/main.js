@@ -22,6 +22,11 @@ const {
   createGeminiContentSseTranslator,
   buildGeminiContentUrl,
 } = require('./gemini_content_adapter');
+const {
+  openAiToOllamaChat,
+  ollamaChatResponseToOpenAi,
+  createOllamaChatStreamTranslator,
+} = require('./ollama_chat_adapter');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -322,6 +327,7 @@ try {
         const isGeminiCli = activeProvider.presetId === 'gemini-cli';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
+        const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
 
         const headers = {
           'content-type': 'application/json',
@@ -343,6 +349,9 @@ try {
         if (isGeminiContent) {
           headers.accept = requestedStream ? 'text/event-stream' : 'application/json';
           body = openAiToGeminiContent(body);
+        }
+        if (isOllamaChat) {
+          body = openAiToOllamaChat(body, activeProvider.modelId);
         }
 
         if (activeProvider.presetId === 'github') {
@@ -376,7 +385,7 @@ try {
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
           : isGeminiContent
             ? buildGeminiContentUrl(activeProvider.baseUrl, activeProvider.modelId, requestedStream, providerKey)
-            : ['openaiChat', 'anthropicMessages'].includes(activeProvider.transportKind) && activeProvider.chatUrl
+            : ['openaiChat', 'anthropicMessages', 'ollamaChat'].includes(activeProvider.transportKind) && activeProvider.chatUrl
               ? activeProvider.chatUrl
               : `${activeProvider.baseUrl}/chat/completions`;
 
@@ -436,13 +445,16 @@ try {
           const geminiContentTranslator = isGeminiContent
             ? createGeminiContentSseTranslator(activeProvider.modelId)
             : null;
+          const ollamaTranslator = isOllamaChat
+            ? createOllamaChatStreamTranslator(activeProvider.modelId)
+            : null;
           try {
             while (downstreamOpen) {
               const { done, value } = await reader.read();
               if (done) break;
               const chunk = decoder.decode(value, { stream: true });
-              if (geminiTranslator || anthropicTranslator || geminiContentTranslator) {
-                const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator;
+              if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator) {
+                const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator;
                 for (const translated of translator.push(chunk)) {
                   downstreamOpen = await writeWithBackpressure(response, translated);
                   if (!downstreamOpen) break;
@@ -461,8 +473,8 @@ try {
           }
           if (!downstreamOpen) return;
           let usage;
-          if (geminiTranslator || anthropicTranslator || geminiContentTranslator) {
-            const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator;
+          if (geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator) {
+            const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator || ollamaTranslator;
             const terminal = translator.finish();
             for (const translated of terminal.output) {
               downstreamOpen = await writeWithBackpressure(response, translated);
@@ -518,7 +530,9 @@ try {
               ? anthropicResponseToOpenAi(upstreamData, activeProvider.modelId)
               : isGeminiContent
                 ? geminiContentResponseToOpenAi(upstreamData, activeProvider.modelId)
-                : upstreamData;
+                : isOllamaChat
+                  ? ollamaChatResponseToOpenAi(upstreamData, activeProvider.modelId)
+                  : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
           if (upstreamResponse.ok) {
