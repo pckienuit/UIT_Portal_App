@@ -786,6 +786,13 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
     request.on('end', () => {
       requests.push({ url: request.url, headers: request.headers, body });
       response.writeHead(200, { 'content-type': 'application/json' });
+      if (request.url === '/v1internal:loadCodeAssist') {
+        response.end(JSON.stringify({
+          cloudaicompanionProject: 'account-antigravity-project',
+          currentTier: { name: 'Antigravity Pro' },
+        }));
+        return;
+      }
       response.end(JSON.stringify({
         models: {
           'claude-sonnet-4-6': {
@@ -795,6 +802,7 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
           'gemini-3-flash-agent': {
             displayName: 'Gemini 3.5 Flash (High)', quotaInfo: { remainingFraction: 1 },
           },
+          experimental: { quotaInfo: { remainingFraction: 1 } },
           hidden: { isInternal: true, quotaInfo: { remainingFraction: 1 } },
         },
       }));
@@ -821,7 +829,11 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
     id: 'provider-antigravity', name: 'Antigravity', presetId: 'antigravity',
     baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
     projectId: 'ag-project', modelId: 'claude-sonnet-4-6', apiKey: runtimeSecret,
-    models: [{ id: 'catalog-only', name: 'Wrong catalog fallback' }], active: false,
+    models: [
+      { id: 'claude-sonnet-4-6', name: 'Catalog Sonnet' },
+      { id: 'gemini-3-flash-agent', name: 'Catalog Flash' },
+      { id: 'catalog-only', name: 'Wrong catalog fallback' },
+    ], active: false,
   })).status, 201);
 
   const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
@@ -839,14 +851,53 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
   assert.equal(quotaBody.entries[0].label, 'Claude Sonnet 4.6 (Thinking)');
   assert.equal(quotaBody.entries[0].remainingPercent, 60);
   assert.equal(quotaBody.entries[0].used, null);
-  assert.ok(requests.length >= 2);
-  assert.ok(requests.every((item) => item.url === '/v1internal:fetchAvailableModels'));
+  assert.ok(requests.length >= 4);
   assert.ok(requests.every((item) => item.headers['user-agent'] === 'antigravity/ide/2.1.1 darwin/arm64'));
-  assert.ok(requests.every((item) => item.headers['x-client-name'] === 'antigravity'));
-  assert.ok(requests.every((item) => item.headers['x-client-version'] === '2.1.1'));
+  assert.equal(
+    requests.filter((item) => item.url === '/v1internal:loadCodeAssist').length,
+    2,
+  );
+  const availableRequests = requests.filter(
+    (item) => item.url === '/v1internal:fetchAvailableModels',
+  );
+  assert.equal(availableRequests.length, 2);
+  assert.ok(availableRequests.every((item) => item.headers['x-client-name'] === 'antigravity'));
+  assert.ok(availableRequests.every((item) => item.headers['x-client-version'] === '2.1.1'));
+  assert.ok(availableRequests.every(
+    (item) => JSON.parse(item.body).project === 'account-antigravity-project',
+  ));
 
   const persisted = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
   assert.doesNotMatch(persisted, new RegExp(runtimeSecret));
+});
+
+test('Antigravity model listing fails closed instead of returning configured models', async (t) => {
+  const upstream = require('node:http').createServer((_request, response) => {
+    response.writeHead(403, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ error: 'forbidden' }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'antigravity-fail-closed-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-antigravity', name: 'Antigravity', presetId: 'antigravity',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    projectId: 'ag-project', modelId: 'claude-sonnet-4-6', apiKey: 'runtime-secret', active: true,
+    models: [{ id: 'catalog-only', name: 'Must not be presented as live' }],
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: 'upstream_models_unavailable' });
+  const log = fs.readFileSync(path.join(dataDir, 'router_node.log'), 'utf8');
+  assert.doesNotMatch(log, /runtime-secret/);
 });
 
 test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => {

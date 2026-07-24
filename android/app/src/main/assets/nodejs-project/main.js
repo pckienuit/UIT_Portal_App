@@ -291,6 +291,7 @@ try {
             baseUrl: activeProvider.baseUrl,
             projectId: activeProvider.projectId,
             runtimeToken: activeProvider.apiKey,
+            configuredModels: activeProvider.models,
           });
           if (models.length > 0) {
             return sendJson(response, 200, {
@@ -302,8 +303,9 @@ try {
               })),
             });
           }
-        } catch {
-          // fallback to configured models below
+        } catch (error) {
+          const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
+          return sendJson(response, statusCode, { error: 'upstream_models_unavailable' });
         }
       }
       if (activeProvider.presetId === 'github' && activeProvider.apiKey) {
@@ -791,6 +793,7 @@ try {
             providerId: provider.presetId || provider.id,
             baseUrl: provider.baseUrl,
             projectId: provider.projectId,
+            models: provider.models,
           },
           secrets: runtimeSecrets.get(provider.id) || {},
         });
