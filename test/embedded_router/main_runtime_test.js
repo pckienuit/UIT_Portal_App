@@ -778,6 +778,77 @@ test('OpenAI Chat descriptor uses exact URL, auth, stream modes, sanitized error
   assert.doesNotMatch(log, /Bearer\s+/i);
 });
 
+test('Antigravity live models and quota never use Gemini CLI endpoint or catalog', async (t) => {
+  const requests = [];
+  const upstream = require('node:http').createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => { body += chunk; });
+    request.on('end', () => {
+      requests.push({ url: request.url, headers: request.headers, body });
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({
+        models: {
+          'claude-sonnet-4-6': {
+            displayName: 'Claude Sonnet 4.6 (Thinking)',
+            quotaInfo: { remainingFraction: 0.6, resetTime: '2026-07-25T00:00:00Z' },
+          },
+          'gemini-3-flash-agent': {
+            displayName: 'Gemini 3.5 Flash (High)', quotaInfo: { remainingFraction: 1 },
+          },
+          hidden: { isInternal: true, quotaInfo: { remainingFraction: 1 } },
+        },
+      }));
+    });
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'antigravity-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const runtimeSecret = 'antigravity-runtime-sentinel';
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-gemini-cli', name: 'Gemini CLI', presetId: 'gemini-cli',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    projectId: 'gemini-project', modelId: 'gemini-only', apiKey: 'gemini-runtime',
+    models: [{ id: 'gemini-only', name: 'Gemini only' }], active: true,
+  })).status, 201);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-antigravity', name: 'Antigravity', presetId: 'antigravity',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
+    projectId: 'ag-project', modelId: 'claude-sonnet-4-6', apiKey: runtimeSecret,
+    models: [{ id: 'catalog-only', name: 'Wrong catalog fallback' }], active: false,
+  })).status, 201);
+
+  const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
+  assert.equal(models.status, 200);
+  assert.deepEqual(await models.json(), { data: [
+    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', object: 'model', owned_by: 'antigravity' },
+    { id: 'gemini-3-flash-agent', name: 'Gemini 3.5 Flash (High)', object: 'model', owned_by: 'antigravity' },
+  ] });
+
+  const quota = await request(baseUrl, token, 'POST', '/internal/quota/provider-antigravity/refresh');
+  assert.equal(quota.status, 200);
+  const quotaBody = await quota.json();
+  assert.equal(quotaBody.providerId, 'antigravity');
+  assert.deepEqual(quotaBody.entries.map((entry) => entry.id), ['claude-sonnet-4-6', 'gemini-3-flash-agent']);
+  assert.equal(quotaBody.entries[0].label, 'Claude Sonnet 4.6 (Thinking)');
+  assert.equal(quotaBody.entries[0].remainingPercent, 60);
+  assert.equal(quotaBody.entries[0].used, null);
+  assert.ok(requests.length >= 2);
+  assert.ok(requests.every((item) => item.url === '/v1internal:fetchAvailableModels'));
+  assert.ok(requests.every((item) => item.headers['user-agent'] === 'antigravity/ide/2.1.1 darwin/arm64'));
+  assert.ok(requests.every((item) => item.headers['x-client-name'] === 'antigravity'));
+  assert.ok(requests.every((item) => item.headers['x-client-version'] === '2.1.1'));
+
+  const persisted = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  assert.doesNotMatch(persisted, new RegExp(runtimeSecret));
+});
+
 test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => {
   const secret = 'models-descriptor-secret';
   const upstream = require('node:http').createServer((request, response) => {

@@ -5,7 +5,7 @@ const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
 const { createSseUsageParser } = require('./sse_usage');
 const { waitForDrainOrClose, writeWithBackpressure } = require('./stream_backpressure');
-const { fetchQuota, listGeminiModels } = require('./quota_adapters');
+const { fetchQuota, listAntigravityModels, listGeminiModels } = require('./quota_adapters');
 const {
   openAiToGeminiCli,
   geminiResponseToOpenAi,
@@ -224,11 +224,18 @@ try {
 
   function configuredModels(provider) {
     const models = Array.isArray(provider.models) ? provider.models : [];
-    const ids = models
-      .map((model) => typeof model === 'string' ? model : model?.id)
-      .filter((id) => typeof id === 'string' && id.trim());
-    if (!ids.length && provider.modelId) ids.push(provider.modelId);
-    return ids.map((id) => ({ id, object: 'model', owned_by: provider.id }));
+    const entries = models
+      .map((model) => typeof model === 'string'
+        ? { id: model }
+        : { id: model?.id, name: model?.name })
+      .filter((model) => typeof model.id === 'string' && model.id.trim());
+    if (!entries.length && provider.modelId) entries.push({ id: provider.modelId });
+    return entries.map((model) => ({
+      id: model.id,
+      ...(typeof model.name === 'string' && model.name ? { name: model.name } : {}),
+      object: 'model',
+      owned_by: provider.id,
+    }));
   }
 
   const server = http.createServer(async (request, response) => {
@@ -262,7 +269,7 @@ try {
       if (!activeProvider) {
         return sendJson(response, 200, { data: [] });
       }
-      if ((activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity') && activeProvider.apiKey && activeProvider.projectId) {
+      if (activeProvider.presetId === 'gemini-cli' && activeProvider.apiKey && activeProvider.projectId) {
         try {
           const ids = await listGeminiModels({
             baseUrl: activeProvider.baseUrl,
@@ -271,7 +278,28 @@ try {
           });
           if (ids.length > 0) {
             return sendJson(response, 200, {
-              data: ids.map((id) => ({ id, object: 'model', owned_by: activeProvider.presetId })),
+              data: ids.map((id) => ({ id, object: 'model', owned_by: 'gemini-cli' })),
+            });
+          }
+        } catch {
+          // fallback to configured models below
+        }
+      }
+      if (activeProvider.presetId === 'antigravity' && activeProvider.apiKey) {
+        try {
+          const models = await listAntigravityModels({
+            baseUrl: activeProvider.baseUrl,
+            projectId: activeProvider.projectId,
+            runtimeToken: activeProvider.apiKey,
+          });
+          if (models.length > 0) {
+            return sendJson(response, 200, {
+              data: models.map((model) => ({
+                id: model.id,
+                name: model.name,
+                object: 'model',
+                owned_by: 'antigravity',
+              })),
             });
           }
         } catch {
