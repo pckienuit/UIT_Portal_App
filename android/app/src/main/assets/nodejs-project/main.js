@@ -16,6 +16,12 @@ const {
   anthropicResponseToOpenAi,
   createAnthropicSseTranslator,
 } = require('./anthropic_messages_adapter');
+const {
+  openAiToGeminiContent,
+  geminiContentResponseToOpenAi,
+  createGeminiContentSseTranslator,
+  buildGeminiContentUrl,
+} = require('./gemini_content_adapter');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -315,6 +321,7 @@ try {
         body.model = activeProvider.modelId;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
+        const isGeminiContent = activeProvider.transportKind === 'geminiContent';
 
         const headers = {
           'content-type': 'application/json',
@@ -332,6 +339,10 @@ try {
           headers['anthropic-version'] =
             activeProvider.staticHeaders?.['anthropic-version'] || '2023-06-01';
           body = openAiToAnthropic(body, activeProvider.modelId);
+        }
+        if (isGeminiContent) {
+          headers.accept = requestedStream ? 'text/event-stream' : 'application/json';
+          body = openAiToGeminiContent(body);
         }
 
         if (activeProvider.presetId === 'github') {
@@ -363,9 +374,11 @@ try {
         const startTime = Date.now();
         const targetUrl = isGeminiCli
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
-          : ['openaiChat', 'anthropicMessages'].includes(activeProvider.transportKind) && activeProvider.chatUrl
-            ? activeProvider.chatUrl
-            : `${activeProvider.baseUrl}/chat/completions`;
+          : isGeminiContent
+            ? buildGeminiContentUrl(activeProvider.baseUrl, activeProvider.modelId, requestedStream, providerKey)
+            : ['openaiChat', 'anthropicMessages'].includes(activeProvider.transportKind) && activeProvider.chatUrl
+              ? activeProvider.chatUrl
+              : `${activeProvider.baseUrl}/chat/completions`;
 
         if (requestedStream) {
           if (!isGeminiCli && !isAnthropicMessages) {
@@ -420,13 +433,16 @@ try {
           const anthropicTranslator = isAnthropicMessages
             ? createAnthropicSseTranslator(activeProvider.modelId)
             : null;
+          const geminiContentTranslator = isGeminiContent
+            ? createGeminiContentSseTranslator(activeProvider.modelId)
+            : null;
           try {
             while (downstreamOpen) {
               const { done, value } = await reader.read();
               if (done) break;
               const chunk = decoder.decode(value, { stream: true });
-              if (geminiTranslator || anthropicTranslator) {
-                const translator = geminiTranslator || anthropicTranslator;
+              if (geminiTranslator || anthropicTranslator || geminiContentTranslator) {
+                const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator;
                 for (const translated of translator.push(chunk)) {
                   downstreamOpen = await writeWithBackpressure(response, translated);
                   if (!downstreamOpen) break;
@@ -445,8 +461,9 @@ try {
           }
           if (!downstreamOpen) return;
           let usage;
-          if (geminiTranslator || anthropicTranslator) {
-            const terminal = (geminiTranslator || anthropicTranslator).finish();
+          if (geminiTranslator || anthropicTranslator || geminiContentTranslator) {
+            const translator = geminiTranslator || anthropicTranslator || geminiContentTranslator;
+            const terminal = translator.finish();
             for (const translated of terminal.output) {
               downstreamOpen = await writeWithBackpressure(response, translated);
               if (!downstreamOpen) break;
@@ -498,8 +515,10 @@ try {
           const resData = isGeminiCli
             ? geminiResponseToOpenAi(upstreamData, activeProvider.modelId)
             : isAnthropicMessages
-              ? anthropicResponseToOpenAi(upstreamData)
-              : upstreamData;
+              ? anthropicResponseToOpenAi(upstreamData, activeProvider.modelId)
+              : isGeminiContent
+                ? geminiContentResponseToOpenAi(upstreamData, activeProvider.modelId)
+                : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
           if (upstreamResponse.ok) {

@@ -16,6 +16,7 @@ const {
   anthropicResponseToOpenAi,
   createAnthropicSseTranslator,
 } = require('../../android/app/src/main/assets/nodejs-project/anthropic_messages_adapter');
+const root = path.resolve(__dirname, '../..');
 const mainPath = path.resolve(
   __dirname,
   '../../android/app/src/main/assets/nodejs-project/main.js',
@@ -232,6 +233,7 @@ test('runtime routes exact Anthropic URL, headers, conversions, stream, fallback
   const streamed = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', {
     ...fixture.openAiRequest, stream: true,
   });
+  assert.equal(streamed.status, 200);
   const streamText = await streamed.text();
   assert.match(streamText, /\"content\":\"Hello\"/);
   assert.match(streamText, /data: \[DONE\]/);
