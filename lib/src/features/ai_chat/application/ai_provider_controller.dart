@@ -120,6 +120,45 @@ class AiProviderController extends Notifier<AiProviderState> {
     );
   }
 
+  Future<bool> addCustomModel(
+    String connectionId,
+    String id, {
+    Set<String>? allowedAntigravityIds,
+  }) async {
+    final modelId = id.trim();
+    if (modelId.isEmpty ||
+        modelId.length > 200 ||
+        RegExp(r'[\x00-\x1F\x7F]').hasMatch(modelId)) {
+      return false;
+    }
+    final index = state.providers.indexWhere((item) => item.id == connectionId);
+    if (index < 0) return false;
+    final config = state.providers[index];
+    final lockedAntigravityIds = {
+      ...config.models.map((model) => model.id),
+      ...?RouterCatalog.byId(
+        config.presetId ?? '',
+      )?.models.map((model) => model.id),
+    };
+    final isAllowedAntigravityModel =
+        config.presetId != 'antigravity' ||
+        (allowedAntigravityIds?.contains(modelId) ?? false) &&
+            lockedAntigravityIds.contains(modelId);
+    if (!isAllowedAntigravityModel ||
+        config.customModels.any((model) => model.id == modelId)) {
+      return false;
+    }
+    await saveProvider(
+      config.copyWith(
+        customModels: [
+          ...config.customModels,
+          AiProviderModelDescriptor(id: modelId, name: modelId),
+        ],
+      ),
+    );
+    return true;
+  }
+
   Future<void> deleteProvider(String id) async {
     ref.read(providerDeletionStopCallbackProvider)(id);
     final runtime = ref.read(routerRuntimeServiceProvider);

@@ -1115,3 +1115,25 @@ test('provider PATCH persists corrected runtime descriptor and models', async (t
     corrected,
   );
 });
+
+test('generic custom models persist across restart', async (t) => {
+  const dataDir = tempDir();
+  const token = 'custom-models-core-token';
+  let port = await freePort();
+  let baseUrl = `http://127.0.0.1:${port}`;
+  let child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'generic-custom', name: 'Generic', presetId: 'custom', baseUrl: 'https://example.test/v1',
+    modelId: 'configured', models: [{ id: 'configured' }], customModels: [{ id: 'manual/model-x' }], active: true,
+  })).status, 201);
+  child.kill();
+  port = await freePort();
+  baseUrl = `http://127.0.0.1:${port}`;
+  child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.deepEqual((await (await request(baseUrl, token, 'GET', '/v1/models')).json()).data.map((model) => model.id), [
+    'configured', 'manual/model-x',
+  ]);
+});

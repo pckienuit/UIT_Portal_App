@@ -4,6 +4,7 @@ import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
 import '../data/router_admin_client.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/router_catalog.dart';
 
 class AiModelPickerSheet extends ConsumerStatefulWidget {
   const AiModelPickerSheet({
@@ -15,7 +16,7 @@ class AiModelPickerSheet extends ConsumerStatefulWidget {
 
   final String providerId;
   final String currentModelId;
-  final void Function(String modelId) onModelSelected;
+  final Future<void> Function(String modelId) onModelSelected;
 
   @override
   ConsumerState<AiModelPickerSheet> createState() => _AiModelPickerSheetState();
@@ -42,11 +43,45 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final cachedModels =
         providerState.models[widget.providerId] ?? const <AiModelOption>[];
     final liveModels = ref.watch(routerModelCatalogProvider(widget.providerId));
-    final models = liveModels.when(
+    final config = providerState.providers
+        .where((provider) => provider.id == widget.providerId)
+        .firstOrNull;
+    final isAntigravity = config?.presetId == 'antigravity';
+    final live = liveModels.when(
       data: (models) => models,
-      loading: () => cachedModels,
+      loading: () => const <AiModelOption>[],
       error: (_, _) => const <AiModelOption>[],
     );
+    final lockedAntigravityIds = {
+      ...?config?.models.map((model) => model.id),
+      ...?RouterCatalog.byId(
+        config?.presetId ?? '',
+      )?.models.map((model) => model.id),
+    };
+    final allowedLive = isAntigravity
+        ? live
+              .where((model) => lockedAntigravityIds.contains(model.id))
+              .toList(growable: false)
+        : live;
+    final fallback = isAntigravity
+        ? const <AiModelOption>[]
+        : config?.models
+                  .map((model) => AiModelOption(id: model.id, name: model.name))
+                  .toList() ??
+              cachedModels;
+    final custom = isAntigravity
+        ? const <AiModelOption>[]
+        : config?.customModels
+                  .map((model) => AiModelOption(id: model.id, name: model.name))
+                  .toList() ??
+              const <AiModelOption>[];
+    final seenIds = <String>{};
+    final models =
+        (liveModels.hasError
+                ? const <AiModelOption>[]
+                : [...allowedLive, ...fallback, ...custom])
+            .where((model) => seenIds.add(model.id.trim()))
+            .toList();
 
     final filteredModels = models.where((model) {
       final query = _searchQuery.toLowerCase();
@@ -156,9 +191,9 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                             trailing: isSelected
                                 ? Icon(Icons.check, color: colorScheme.primary)
                                 : null,
-                            onTap: () {
-                              widget.onModelSelected(model.id);
-                              Navigator.of(context).pop();
+                            onTap: () async {
+                              await widget.onModelSelected(model.id);
+                              if (context.mounted) Navigator.of(context).pop();
                             },
                           );
                         },
@@ -184,11 +219,23 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                     ),
                   );
                   final apply = ElevatedButton(
-                    onPressed: () {
-                      final val = _customModelController.text.trim();
-                      if (val.isNotEmpty) {
-                        widget.onModelSelected(val);
-                        Navigator.of(context).pop();
+                    onPressed: () async {
+                      final saved = await ref
+                          .read(aiProviderControllerProvider.notifier)
+                          .addCustomModel(
+                            widget.providerId,
+                            _customModelController.text,
+                            allowedAntigravityIds: isAntigravity
+                                ? liveModels.asData?.value
+                                      .map((model) => model.id)
+                                      .toSet()
+                                : null,
+                          );
+                      if (saved) {
+                        await widget.onModelSelected(
+                          _customModelController.text.trim(),
+                        );
+                        if (context.mounted) Navigator.of(context).pop();
                       }
                     },
                     child: const Text('Áp dụng'),
@@ -196,7 +243,11 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                   if (constraints.maxWidth < 360) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [field, SizedBox(height: PortalSpacing.sm), apply],
+                      children: [
+                        field,
+                        SizedBox(height: PortalSpacing.sm),
+                        apply,
+                      ],
                     );
                   }
                   return Row(

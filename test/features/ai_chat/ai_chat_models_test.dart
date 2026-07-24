@@ -26,17 +26,39 @@ void main() {
       expect(decoded.systemPrompt, config.systemPrompt);
     });
 
-    test('Backward compatibility config JSON v1 maps missing presetId to custom/null', () {
-      final json = {
-        'id': 'legacy',
-        'name': 'Legacy Config',
-        'kind': 'openAiCompatible',
-        'baseUrl': 'https://api.openai.com/v1',
-        'modelId': 'gpt-4o-mini',
-      };
+    test(
+      'Backward compatibility config JSON v1 maps missing presetId to custom/null',
+      () {
+        final json = {
+          'id': 'legacy',
+          'name': 'Legacy Config',
+          'kind': 'openAiCompatible',
+          'baseUrl': 'https://api.openai.com/v1',
+          'modelId': 'gpt-4o-mini',
+        };
 
-      final decoded = AiProviderConfig.fromJson(json);
-      expect(decoded.presetId, isNull);
+        final decoded = AiProviderConfig.fromJson(json);
+        expect(decoded.presetId, isNull);
+        expect(decoded.customModels, isEmpty);
+      },
+    );
+
+    test('round-trip retains custom model descriptors', () {
+      const config = AiProviderConfig(
+        id: 'custom-models',
+        name: 'Custom models',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'manual-a',
+        customModels: [
+          AiProviderModelDescriptor(id: 'manual-a', name: 'manual-a'),
+        ],
+      );
+
+      final decoded = AiProviderConfig.fromJson(config.toJson());
+
+      expect(decoded.customModels.map((model) => model.id), ['manual-a']);
+      expect(decoded.copyWith().customModels, decoded.customModels);
     });
 
     test('Round-trip AiChatMessage', () {
@@ -54,7 +76,10 @@ void main() {
       expect(decoded.id, message.id);
       expect(decoded.role, message.role);
       expect(decoded.content, message.content);
-      expect(decoded.createdAt.millisecondsSinceEpoch, message.createdAt.millisecondsSinceEpoch);
+      expect(
+        decoded.createdAt.millisecondsSinceEpoch,
+        message.createdAt.millisecondsSinceEpoch,
+      );
       expect(decoded.status, message.status);
     });
 
@@ -78,7 +103,7 @@ void main() {
             content: 'Hi there',
             createdAt: DateTime.now(),
             status: AiMessageStatus.complete,
-          )
+          ),
         ],
         updatedAt: DateTime.now(),
       );
@@ -92,7 +117,10 @@ void main() {
       expect(decoded.modelId, conversation.modelId);
       expect(decoded.messages.length, conversation.messages.length);
       expect(decoded.messages.first.content, 'Hello');
-      expect(decoded.updatedAt.millisecondsSinceEpoch, conversation.updatedAt.millisecondsSinceEpoch);
+      expect(
+        decoded.updatedAt.millisecondsSinceEpoch,
+        conversation.updatedAt.millisecondsSinceEpoch,
+      );
     });
   });
 }

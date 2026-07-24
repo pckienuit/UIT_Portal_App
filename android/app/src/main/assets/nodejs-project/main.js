@@ -131,6 +131,9 @@ try {
         ...(connection.mobileMetadata?.models?.length
           ? { models: connection.mobileMetadata.models }
           : {}),
+        ...(connection.mobileMetadata?.customModels?.length
+          ? { customModels: connection.mobileMetadata.customModels }
+          : {}),
         ...(connection.mobileMetadata?.staticHeaders &&
         Object.keys(connection.mobileMetadata.staticHeaders).length
           ? { staticHeaders: connection.mobileMetadata.staticHeaders }
@@ -166,6 +169,7 @@ try {
           authHeader: provider.authHeader,
           authScheme: provider.authScheme,
           models: Array.isArray(provider.models) ? provider.models : [],
+          customModels: Array.isArray(provider.customModels) ? provider.customModels : [],
           staticHeaders: provider.staticHeaders && typeof provider.staticHeaders === 'object'
             ? provider.staticHeaders
             : {},
@@ -246,14 +250,17 @@ try {
   }
 
   function configuredModels(provider) {
-    const models = Array.isArray(provider.models) ? provider.models : [];
+    const models = provider.presetId === 'antigravity'
+      ? (Array.isArray(provider.models) ? provider.models : [])
+      : [...(Array.isArray(provider.models) ? provider.models : []), ...(Array.isArray(provider.customModels) ? provider.customModels : [])];
     const entries = models
       .map((model) => typeof model === 'string'
         ? { id: model }
         : { id: model?.id, name: model?.name })
       .filter((model) => typeof model.id === 'string' && model.id.trim());
     if (!entries.length && provider.modelId) entries.push({ id: provider.modelId });
-    return entries.map((model) => ({
+    const ids = new Set();
+    return entries.filter((model) => ids.add(model.id.trim())).map((model) => ({
       id: model.id,
       ...(typeof model.name === 'string' && model.name ? { name: model.name } : {}),
       object: 'model',
@@ -308,7 +315,10 @@ try {
           // fallback to configured models below
         }
       }
-      if (activeProvider.presetId === 'antigravity' && activeProvider.apiKey) {
+      if (activeProvider.presetId === 'antigravity') {
+        if (!activeProvider.apiKey) {
+          return sendJson(response, 502, { error: 'upstream_models_unavailable' });
+        }
         try {
           const models = await listAntigravityModels({
             baseUrl: activeProvider.baseUrl,
@@ -672,6 +682,7 @@ try {
           authHeader: data.authHeader,
           authScheme: data.authScheme,
           models: Array.isArray(data.models) ? data.models : [],
+          customModels: Array.isArray(data.customModels) ? data.customModels : [],
           staticHeaders: data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders
             : {},
@@ -707,6 +718,7 @@ try {
         if (data.authHeader !== undefined) provider.authHeader = data.authHeader;
         if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
         if (data.models !== undefined) provider.models = Array.isArray(data.models) ? data.models : [];
+        if (data.customModels !== undefined) provider.customModels = Array.isArray(data.customModels) ? data.customModels : [];
         if (data.staticHeaders !== undefined) {
           provider.staticHeaders = data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders

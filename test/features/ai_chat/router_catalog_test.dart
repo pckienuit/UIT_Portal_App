@@ -30,62 +30,74 @@ void main() {
 
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('hydrates known OAuth config with catalog transport descriptor', () async {
-    await RouterCatalog.load(jsonEncode({
-      'providers': [
-        {
-          'id': 'antigravity',
-          'name': 'Antigravity',
-          'category': 'oauth',
-          'disposition': 'ready',
-          'mobileSupported': true,
-          'androidAuth': 'loopback',
-          'nativeStatus': 'experimental',
-          'transportKind': 'geminiCli',
-          'chatUrl': 'https://example.test/streamGenerateContent?alt=sse',
-          'modelsUrl': 'https://example.test:fetchAvailableModels',
-          'authHeader': 'Authorization',
-          'authScheme': 'Bearer',
-          'staticHeaders': {'x-client-name': 'antigravity'},
-          'models': [
-            {'id': 'allowed-first', 'name': 'Allowed first'},
-            {'id': 'allowed-second', 'name': 'Allowed second'},
+  test(
+    'hydrates known OAuth config with catalog transport descriptor',
+    () async {
+      await RouterCatalog.load(
+        jsonEncode({
+          'providers': [
+            {
+              'id': 'antigravity',
+              'name': 'Antigravity',
+              'category': 'oauth',
+              'disposition': 'ready',
+              'mobileSupported': true,
+              'androidAuth': 'loopback',
+              'nativeStatus': 'experimental',
+              'transportKind': 'geminiCli',
+              'chatUrl': 'https://example.test/streamGenerateContent?alt=sse',
+              'modelsUrl': 'https://example.test:fetchAvailableModels',
+              'authHeader': 'Authorization',
+              'authScheme': 'Bearer',
+              'staticHeaders': {'x-client-name': 'antigravity'},
+              'models': [
+                {'id': 'allowed-first', 'name': 'Allowed first'},
+                {'id': 'allowed-second', 'name': 'Allowed second'},
+              ],
+            },
           ],
-        },
-      ],
-    }));
-    const legacy = AiProviderConfig(
-      id: 'provider-antigravity',
-      name: 'Personal Antigravity',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://legacy.test',
-      modelId: 'allowed-second',
-      presetId: 'antigravity',
-      authMode: 'oauth',
-      credentialKind: 'refreshToken',
-      projectId: 'personal-project',
-    );
+        }),
+      );
+      const legacy = AiProviderConfig(
+        id: 'provider-antigravity',
+        name: 'Personal Antigravity',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://legacy.test',
+        modelId: 'allowed-second',
+        presetId: 'antigravity',
+        authMode: 'oauth',
+        credentialKind: 'refreshToken',
+        projectId: 'personal-project',
+        customModels: [
+          AiProviderModelDescriptor(id: 'manual-model', name: 'manual-model'),
+        ],
+      );
 
-    final hydrated = RouterCatalog.hydrateConfig(legacy);
+      final hydrated = RouterCatalog.hydrateConfig(legacy);
 
-    expect(hydrated.id, legacy.id);
-    expect(hydrated.name, legacy.name);
-    expect(hydrated.baseUrl, legacy.baseUrl);
-    expect(hydrated.modelId, legacy.modelId);
-    expect(hydrated.authMode, legacy.authMode);
-    expect(hydrated.credentialKind, legacy.credentialKind);
-    expect(hydrated.projectId, legacy.projectId);
-    expect(hydrated.transportKind, 'geminiCli');
-    expect(hydrated.chatUrl, 'https://example.test/streamGenerateContent?alt=sse');
-    expect(hydrated.modelsUrl, 'https://example.test:fetchAvailableModels');
-    expect(hydrated.authHeader, 'Authorization');
-    expect(hydrated.authScheme, 'Bearer');
-    expect(hydrated.staticHeaders, {'x-client-name': 'antigravity'});
-    expect(hydrated.models.map((model) => model.id), [
-      'allowed-first',
-      'allowed-second',
-    ]);
-  });
+      expect(hydrated.id, legacy.id);
+      expect(hydrated.name, legacy.name);
+      expect(hydrated.baseUrl, legacy.baseUrl);
+      expect(hydrated.modelId, legacy.modelId);
+      expect(hydrated.authMode, legacy.authMode);
+      expect(hydrated.credentialKind, legacy.credentialKind);
+      expect(hydrated.projectId, legacy.projectId);
+      expect(hydrated.transportKind, 'geminiCli');
+      expect(
+        hydrated.chatUrl,
+        'https://example.test/streamGenerateContent?alt=sse',
+      );
+      expect(hydrated.modelsUrl, 'https://example.test:fetchAvailableModels');
+      expect(hydrated.authHeader, 'Authorization');
+      expect(hydrated.authScheme, 'Bearer');
+      expect(hydrated.staticHeaders, {'x-client-name': 'antigravity'});
+      expect(hydrated.models.map((model) => model.id), [
+        'allowed-first',
+        'allowed-second',
+      ]);
+      expect(hydrated.customModels.map((model) => model.id), ['manual-model']);
+    },
+  );
 
   test('does not mutate config without a catalog preset', () {
     const config = AiProviderConfig(

@@ -243,36 +243,130 @@ void main() {
     expect(stopped, ['p1']);
   });
 
-  test('save injects runtime and source OAuth credentials into Core RAM', () async {
-    final admin = _FakeRouterAdminClient();
-    final container = ProviderContainer(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-        secureStorageProvider.overrideWithValue(fakeSecureStorage),
-        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
-        routerAdminClientProvider.overrideWithValue(admin),
-      ],
-    );
-    addTearDown(container.dispose);
-    const config = AiProviderConfig(
-      id: 'github-1',
-      name: 'GitHub',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://api.githubcopilot.com',
-      modelId: 'gpt-5.4',
-      presetId: 'github',
-      authMode: 'oauth',
-    );
+  test(
+    'save injects runtime and source OAuth credentials into Core RAM',
+    () async {
+      final admin = _FakeRouterAdminClient();
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+          routerAdminClientProvider.overrideWithValue(admin),
+        ],
+      );
+      addTearDown(container.dispose);
+      const config = AiProviderConfig(
+        id: 'github-1',
+        name: 'GitHub',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://api.githubcopilot.com',
+        modelId: 'gpt-5.4',
+        presetId: 'github',
+        authMode: 'oauth',
+      );
 
-    await container.read(aiProviderControllerProvider.notifier).saveProvider(
-      config,
-      oauthAccessToken: 'runtime-token',
-      oauthSourceToken: 'source-token',
-    );
+      await container
+          .read(aiProviderControllerProvider.notifier)
+          .saveProvider(
+            config,
+            oauthAccessToken: 'runtime-token',
+            oauthSourceToken: 'source-token',
+          );
 
-    expect(admin.savedRuntimeToken, 'runtime-token');
-    expect(admin.savedSourceToken, 'source-token');
-  });
+      expect(admin.savedRuntimeToken, 'runtime-token');
+      expect(admin.savedSourceToken, 'source-token');
+    },
+  );
+
+  test(
+    'Antigravity stores a manual model only from live locked intersection',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        ],
+      );
+      addTearDown(container.dispose);
+      const config = AiProviderConfig(
+        id: 'antigravity-provider',
+        name: 'Antigravity',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'locked-model',
+        presetId: 'antigravity',
+        models: [
+          AiProviderModelDescriptor(id: 'locked-model', name: 'Locked model'),
+        ],
+      );
+      final controller = container.read(aiProviderControllerProvider.notifier);
+      await controller.saveProvider(config);
+
+      expect(
+        await controller.addCustomModel(
+          config.id,
+          'locked-model',
+          allowedAntigravityIds: {'locked-model'},
+        ),
+        isTrue,
+      );
+      expect(
+        await controller.addCustomModel(
+          config.id,
+          'unknown-model',
+          allowedAntigravityIds: {'unknown-model'},
+        ),
+        isFalse,
+      );
+      expect(
+        await controller.addCustomModel(config.id, 'locked-model'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'custom model survives SharedPreferences restart exactly once',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        ],
+      );
+      addTearDown(container.dispose);
+      const config = AiProviderConfig(
+        id: 'manual-provider',
+        name: 'Manual',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'base',
+        presetId: 'custom',
+      );
+      final controller = container.read(aiProviderControllerProvider.notifier);
+      await controller.saveProvider(config);
+
+      expect(
+        await controller.addCustomModel(config.id, '  manual/model-x  '),
+        isTrue,
+      );
+      expect(
+        await controller.addCustomModel(config.id, 'manual/model-x'),
+        isFalse,
+      );
+      final restarted = AiProviderRepository(
+        prefs: prefs,
+        secureStorage: fakeSecureStorage,
+      );
+      expect(
+        restarted.listProviders().single.customModels.map((model) => model.id),
+        ['manual/model-x'],
+      );
+    },
+  );
 }
 
 class _ReadyRouterRuntimeService extends RouterRuntimeService {

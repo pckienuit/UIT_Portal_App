@@ -38,6 +38,7 @@ class AiProviderConfig {
     this.authHeader,
     this.authScheme,
     this.models = const [],
+    this.customModels = const [],
     this.staticHeaders = const {},
   });
 
@@ -58,6 +59,7 @@ class AiProviderConfig {
   final String? authHeader;
   final String? authScheme;
   final List<AiProviderModelDescriptor> models;
+  final List<AiProviderModelDescriptor> customModels;
   final Map<String, String> staticHeaders;
 
   Map<String, dynamic> toJson() => {
@@ -78,6 +80,7 @@ class AiProviderConfig {
     'authHeader': authHeader,
     'authScheme': authScheme,
     'models': models.map((model) => model.toJson()).toList(),
+    'customModels': customModels.map((model) => model.toJson()).toList(),
     'staticHeaders': staticHeaders,
   };
 
@@ -111,7 +114,18 @@ class AiProviderConfig {
                 )
                 .toList(growable: false) ??
             const [],
-        staticHeaders: (json['staticHeaders'] as Map?)?.map(
+        customModels:
+            (json['customModels'] as List<dynamic>?)
+                ?.whereType<Map>()
+                .map(
+                  (model) => AiProviderModelDescriptor.fromJson(
+                    Map<String, dynamic>.from(model),
+                  ),
+                )
+                .toList(growable: false) ??
+            const [],
+        staticHeaders:
+            (json['staticHeaders'] as Map?)?.map(
               (key, value) => MapEntry(key.toString(), value.toString()),
             ) ??
             const {},
@@ -133,6 +147,7 @@ class AiProviderConfig {
     String? Function()? authHeader,
     String? Function()? authScheme,
     List<AiProviderModelDescriptor>? models,
+    List<AiProviderModelDescriptor>? customModels,
     Map<String, String>? staticHeaders,
   }) {
     return AiProviderConfig(
@@ -159,6 +174,7 @@ class AiProviderConfig {
       authHeader: authHeader != null ? authHeader() : this.authHeader,
       authScheme: authScheme != null ? authScheme() : this.authScheme,
       models: models ?? this.models,
+      customModels: customModels ?? this.customModels,
       staticHeaders: staticHeaders ?? this.staticHeaders,
     );
   }
