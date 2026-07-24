@@ -57,7 +57,7 @@ class AiBackendFactory {
       return OpenAiCompatibleBackend(
         baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
         modelId: config.modelId,
-        apiKey: runtimeState.bearerToken!,
+        apiKey: runtimeState.bearer!,
       );
     }
 
