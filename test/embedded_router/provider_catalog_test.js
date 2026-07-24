@@ -85,6 +85,29 @@ test('generated catalog excludes candidate and removed providers', () => {
   }
 });
 
+test('quota-enabled providers keep their own documented adapter contract', () => {
+  const byId = new Map(loadCatalog().map((provider) => [provider.id, provider]));
+
+  assert.deepEqual(
+    {
+      adapter: byId.get('antigravity').quotaAdapter,
+      modelsUrl: byId.get('antigravity').modelsUrl,
+      quotaSupported: byId.get('antigravity').quotaSupported,
+    },
+    {
+      adapter: 'antigravity',
+      modelsUrl: 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels',
+      quotaSupported: true,
+    },
+  );
+  for (const id of ['gemini-cli', 'github', 'openrouter']) {
+    assert.equal(byId.get(id).quotaSupported, true, id);
+  }
+  for (const id of ['codex', 'grok-cli', 'openai', 'deepseek', 'groq', 'mistral']) {
+    assert.equal(byId.get(id).quotaSupported, false, id);
+  }
+});
+
 test('straightforward OpenAI Chat candidates lock exact upstream descriptors', () => {
   const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));
   const expected = {

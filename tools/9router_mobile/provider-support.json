@@ -5,10 +5,10 @@
       "androidAuth": "loopback",
       "transportKind": "geminiCli",
       "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
-      "modelsUrl": "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+      "modelsUrl": "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
-      "quotaAdapter": "geminiCli",
+      "quotaAdapter": "antigravity",
       "nativeStatus": "experimental",
       "tokenRefresh": "refreshToken",
       "defaultBaseUrl": "https://cloudcode-pa.googleapis.com/v1internal"
