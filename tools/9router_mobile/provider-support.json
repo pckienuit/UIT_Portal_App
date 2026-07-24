@@ -21,8 +21,15 @@
       "reason": "Desktop-only utility authentication"
     },
     "codex": {
-      "disposition": "candidate",
-      "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
+      "disposition": "ready",
+      "androidAuth": "loopback",
+      "transportKind": "openaiResponses",
+      "chatUrl": "https://chatgpt.com/backend-api/conversation",
+      "modelsUrl": "https://chatgpt.com/backend-api/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://chatgpt.com/backend-api"
     },
     "cursor": {
       "disposition": "remove",
@@ -46,8 +53,15 @@
       "reason": "Requires desktop token flow"
     },
     "grok-cli": {
-      "disposition": "candidate",
-      "reason": "Requires local CLI configuration path access"
+      "disposition": "ready",
+      "androidAuth": "device",
+      "transportKind": "openaiResponses",
+      "chatUrl": "https://cli-chat-proxy.grok.com/v1/responses",
+      "modelsUrl": "https://cli-chat-proxy.grok.com/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://cli-chat-proxy.grok.com/v1"
     },
     "iflow": {
       "disposition": "remove",
@@ -158,6 +172,7 @@
       "modelsUrl": "https://openrouter.ai/api/v1/models",
       "authHeader": "Authorization",
       "authScheme": "Bearer",
+      "quotaAdapter": "openrouter",
       "defaultBaseUrl": "https://openrouter.ai/api/v1"
     },
     "searxng": {

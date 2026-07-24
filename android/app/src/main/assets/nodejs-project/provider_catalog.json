@@ -1,6 +1,90 @@
 {
   "providers": [
     {
+      "id": "codex",
+      "name": "OpenAI Codex",
+      "category": "oauth",
+      "color": "#3B82F6",
+      "icon": "code",
+      "disposition": "ready",
+      "mobileSupported": true,
+      "unsupportedReason": null,
+      "hasOAuth": true,
+      "quotaSupported": false,
+      "quotaAdapter": null,
+      "androidAuth": "loopback",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://chatgpt.com/backend-api",
+      "transportKind": "openaiResponses",
+      "chatUrl": "https://chatgpt.com/backend-api/conversation",
+      "modelsUrl": "https://chatgpt.com/backend-api/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "requiredFields": [],
+      "staticHeaders": {},
+      "models": [
+        {
+          "id": "gpt-5.6-sol",
+          "name": "GPT 5.6 Sol"
+        },
+        {
+          "id": "gpt-5.6-sol-review",
+          "name": "GPT 5.6 Sol Review"
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "name": "GPT 5.6 Terra"
+        },
+        {
+          "id": "gpt-5.6-terra-review",
+          "name": "GPT 5.6 Terra Review"
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "name": "GPT 5.6 Luna"
+        },
+        {
+          "id": "gpt-5.6-luna-review",
+          "name": "GPT 5.6 Luna Review"
+        },
+        {
+          "id": "gpt-5.5",
+          "name": "GPT 5.5"
+        },
+        {
+          "id": "gpt-5.5-review",
+          "name": "GPT 5.5 Review"
+        },
+        {
+          "id": "gpt-5.4",
+          "name": "GPT 5.4"
+        },
+        {
+          "id": "gpt-5.4-review",
+          "name": "GPT 5.4 Review"
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "name": "GPT 5.4 Mini"
+        },
+        {
+          "id": "gpt-5.4-mini-review",
+          "name": "GPT 5.4 Mini Review"
+        },
+        {
+          "id": "gpt-5.3-codex-spark",
+          "name": "GPT 5.3 Codex Spark"
+        },
+        {
+          "id": "gpt-5.3-codex-spark-review",
+          "name": "GPT 5.3 Codex Spark Review"
+        }
+      ]
+    },
+    {
       "id": "github",
       "name": "GitHub Copilot",
       "category": "oauth",
@@ -97,6 +181,50 @@
       ]
     },
     {
+      "id": "grok-cli",
+      "name": "Grok CLI (Grok Build)",
+      "category": "oauth",
+      "color": "#1DA1F2",
+      "icon": "auto_awesome",
+      "disposition": "ready",
+      "mobileSupported": true,
+      "unsupportedReason": null,
+      "hasOAuth": true,
+      "quotaSupported": false,
+      "quotaAdapter": null,
+      "androidAuth": "device",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "refreshToken",
+      "defaultBaseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "transportKind": "openaiResponses",
+      "chatUrl": "https://cli-chat-proxy.grok.com/v1/responses",
+      "modelsUrl": "https://cli-chat-proxy.grok.com/v1/models",
+      "authHeader": "Authorization",
+      "authScheme": "Bearer",
+      "requiredFields": [],
+      "staticHeaders": {},
+      "models": [
+        {
+          "id": "grok-4.5",
+          "name": "Grok 4.5"
+        },
+        {
+          "id": "grok-4.5-high",
+          "name": "Grok 4.5 (High)"
+        },
+        {
+          "id": "grok-4.5-medium",
+          "name": "Grok 4.5 (Medium)"
+        },
+        {
+          "id": "grok-4.5-low",
+          "name": "Grok 4.5 (Low)"
+        }
+      ]
+    },
+    {
       "id": "gemini-cli",
       "name": "Gemini CLI",
       "category": "free",
@@ -162,8 +290,8 @@
       "mobileSupported": true,
       "unsupportedReason": null,
       "hasOAuth": false,
-      "quotaSupported": false,
-      "quotaAdapter": null,
+      "quotaSupported": true,
+      "quotaAdapter": "openrouter",
       "androidAuth": "apiKey",
       "gatewayFallback": false,
       "nativeStatus": "ready",

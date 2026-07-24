@@ -91,6 +91,53 @@ test('Gemini quota reports only upstream percentage and reset without fake total
   });
 });
 
+test('OpenRouter quota fetches balance and usage from auth key endpoint', async () => {
+  let request;
+  const result = await fetchQuota({
+    connection: {
+      id: 'provider-openrouter',
+      providerId: 'openrouter',
+      baseUrl: 'https://openrouter.ai/api/v1',
+    },
+    secrets: { runtimeToken: 'sk-or-v1-test' },
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return jsonResponse(200, {
+        data: {
+          label: 'Test Key',
+          usage: 2.5,
+          limit: 10.0,
+          is_free_tier: false,
+        },
+      });
+    },
+    now: () => new Date('2026-07-24T12:00:00Z'),
+  });
+
+  assert.equal(request.url, 'https://openrouter.ai/api/v1/auth/key');
+  assert.equal(request.options.headers.authorization, 'Bearer sk-or-v1-test');
+  assert.deepEqual(parseDartQuotaSchema(result), {
+    status: 'fresh',
+    connectionId: 'provider-openrouter',
+    providerId: 'openrouter',
+    plan: 'paid',
+    fetchedAt: '2026-07-24T12:00:00.000Z',
+    entries: [
+      {
+        id: 'credits',
+        label: 'Test Key',
+        used: 2.5,
+        total: 10,
+        remaining: 7.5,
+        remainingPercent: 75,
+        unit: 'usd',
+        resetAt: null,
+        unlimited: false,
+      },
+    ],
+  });
+});
+
 test('GitHub quota uses source OAuth token and keeps unknown numbers null', async () => {
   let authorization;
   const result = await fetchQuota({

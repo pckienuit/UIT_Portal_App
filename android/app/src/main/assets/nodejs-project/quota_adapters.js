@@ -118,6 +118,35 @@ function normalizeGithub(connection, payload, now) {
   return snapshot(connection, payload.copilot_plan ?? null, buckets, now);
 }
 
+function normalizeOpenRouter(connection, payload, now) {
+  const data = payload?.data;
+  if (!data || typeof data !== 'object') {
+    throw new QuotaError('malformed', 502, 'Quota payload malformed');
+  }
+  const usage = numberOrNull(data.usage);
+  const limit = numberOrNull(data.limit);
+  const remaining = limit != null && usage != null ? Math.max(0, limit - usage) : null;
+  const remainingPercent = limit != null && limit > 0 && remaining != null
+    ? Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)))
+    : null;
+
+  const entries = [
+    {
+      id: 'credits',
+      label: data.label || 'OpenRouter Credits',
+      used: usage,
+      total: limit,
+      remaining,
+      remainingPercent,
+      unit: 'usd',
+      resetAt: null,
+      unlimited: limit == null,
+    },
+  ];
+
+  return snapshot(connection, data.is_free_tier ? 'free_tier' : 'paid', entries, now);
+}
+
 function snapshot(connection, plan, entries, now) {
   return {
     status: 'fresh',
@@ -160,6 +189,19 @@ async function fetchQuota({
       },
     }, fetchImpl, timeoutMs);
     return normalizeGithub(connection, payload, now);
+  }
+  if (connection.providerId === 'openrouter') {
+    const token = secrets.runtimeToken || secrets.sourceToken;
+    if (!token) {
+      throw new QuotaError('missing_credential', 401, 'Quota credential unavailable', 'error');
+    }
+    const payload = await fetchJson('https://openrouter.ai/api/v1/auth/key', {
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/json',
+      },
+    }, fetchImpl, timeoutMs);
+    return normalizeOpenRouter(connection, payload, now);
   }
   throw new QuotaError('unsupported', 501, 'Quota is not available for this provider');
 }

@@ -14,6 +14,14 @@ object OAuthProviderRegistry {
                 "https://www.googleapis.com/auth/userinfo.profile",
             ).joinToString(" "),
         ),
+        "codex" to AuthorizationOAuthProvider(
+            id = "codex",
+            clientId = "app-4f89d5a7",
+            clientSecret = "",
+            authorizeUrl = java.net.URI("https://auth.openai.com/authorize"),
+            tokenUrl = java.net.URI("https://auth.openai.com/oauth/token"),
+            scope = "openid profile email offline_access model.request",
+        ),
     )
 
     private val deviceProviders = mapOf(
@@ -23,6 +31,13 @@ object OAuthProviderRegistry {
             deviceCodeUrl = "https://github.com/login/device/code",
             tokenUrl = "https://github.com/login/oauth/access_token",
             scope = "read:user",
+        ),
+        "grok-cli" to DeviceOAuthProvider(
+            id = "grok-cli",
+            clientId = "b1a00492-073a-47ea-816f-4c329264a828",
+            deviceCodeUrl = "https://auth.x.ai/oauth2/device/code",
+            tokenUrl = "https://auth.x.ai/oauth2/token",
+            scope = "openid profile email offline_access grok-cli:access api:access",
         ),
     )
 
