@@ -1,16 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
+
 import 'local_model_catalog.dart';
 
-enum LocalModelStatus {
-  notDownloaded,
-  downloading,
-  verifying,
-  ready,
-  error
-}
+enum LocalModelStatus { notDownloaded, downloading, verifying, ready, error }
 
 class LocalModelProgress {
   const LocalModelProgress({
@@ -25,131 +22,152 @@ class LocalModelProgress {
 }
 
 class LocalModelManager {
-  LocalModelManager({required this.directory});
+  LocalModelManager({required this.directory, Dio? dio}) : _dio = dio ?? Dio();
 
   final Directory directory;
-  final Dio _dio = Dio();
-  CancelToken? _cancelToken;
+  final Dio _dio;
+  final Map<String, CancelToken> _downloadCancels = {};
+  final Set<String> _activeDownloads = {};
 
-  File _modelFile(LocalModelInfo model) => File(p.join(directory.path, model.fileName));
-  File _partFile(LocalModelInfo model) => File(p.join(directory.path, '${model.fileName}.part'));
+  File _modelFile(LocalModelInfo model) =>
+      File(p.join(directory.path, model.fileName));
+  File _partFile(LocalModelInfo model) =>
+      File(p.join(directory.path, '${model.fileName}.part'));
 
   Future<bool> checkModelExists(LocalModelInfo model) async {
     final file = _modelFile(model);
-    if (!await file.exists()) return false;
-    final size = await file.length();
-    return size == model.sizeBytes;
+    return await file.exists() &&
+        await file.length() == model.sizeBytes &&
+        await _sha256(file) == model.sha256.toLowerCase();
   }
 
   Stream<LocalModelProgress> downloadModel(
     LocalModelInfo model, {
     void Function()? onComplete,
   }) {
+    if (!_activeDownloads.add(model.id)) {
+      return Stream.value(
+        const LocalModelProgress(
+          status: LocalModelStatus.error,
+          errorMessage: 'Mô hình này đang được tải xuống.',
+        ),
+      );
+    }
     final controller = StreamController<LocalModelProgress>();
-    _cancelToken = CancelToken();
+    final cancelToken = CancelToken();
+    _downloadCancels[model.id] = cancelToken;
 
     Future<void> run() async {
       final partFile = _partFile(model);
       final finalFile = _modelFile(model);
-
+      IOSink? outputSink;
       try {
         await directory.create(recursive: true);
-
-        controller.add(const LocalModelProgress(
-          status: LocalModelStatus.downloading,
-          progressPercent: 0.0,
-        ));
-
-        // Hỗ trợ resume download nếu file tạm tồn tại
-        int startBytes = 0;
-        if (await partFile.exists()) {
-          startBytes = await partFile.length();
-          if (startBytes >= model.sizeBytes) {
-            startBytes = 0;
-            await partFile.delete();
-          }
+        controller.add(
+          const LocalModelProgress(status: LocalModelStatus.downloading),
+        );
+        var startBytes = await partFile.exists() ? await partFile.length() : 0;
+        if (startBytes >= model.sizeBytes) {
+          await partFile.delete();
+          startBytes = 0;
         }
-
         final response = await _dio.get<ResponseBody>(
           model.sourceUrl,
           options: Options(
             responseType: ResponseType.stream,
             headers: startBytes > 0 ? {'Range': 'bytes=$startBytes-'} : null,
           ),
-          cancelToken: _cancelToken,
+          cancelToken: cancelToken,
         );
-
-        final mode = startBytes > 0 ? FileMode.append : FileMode.write;
-        final outputSink = partFile.openWrite(mode: mode);
-
-        int downloadedBytes = startBytes;
-        final completer = Completer<void>();
-
-        _cancelToken!.whenCancel.then((_) {
-          outputSink.close();
-          if (!completer.isCompleted) completer.completeError(CanceledError());
-        });
-
-        StreamSubscription? sub;
-        sub = response.data!.stream.listen(
+        outputSink = partFile.openWrite(
+          mode: startBytes > 0 ? FileMode.append : FileMode.write,
+        );
+        var downloadedBytes = startBytes;
+        final completed = Completer<void>();
+        late final StreamSubscription<List<int>> subscription;
+        subscription = response.data!.stream.listen(
           (chunk) {
-            outputSink.add(chunk);
+            outputSink!.add(chunk);
             downloadedBytes += chunk.length;
-            final percent = (downloadedBytes / model.sizeBytes) * 100;
-            controller.add(LocalModelProgress(
-              status: LocalModelStatus.downloading,
-              progressPercent: percent.clamp(0.0, 100.0),
-            ));
+            controller.add(
+              LocalModelProgress(
+                status: LocalModelStatus.downloading,
+                progressPercent: (downloadedBytes / model.sizeBytes * 100)
+                    .clamp(0.0, 100.0),
+              ),
+            );
           },
-          onError: (err) {
-            outputSink.close();
-            if (!completer.isCompleted) completer.completeError(err);
-          },
-          onDone: () {
-            outputSink.close();
-            if (!completer.isCompleted) completer.complete();
-          },
+          onError: completed.completeError,
+          onDone: completed.complete,
           cancelOnError: true,
         );
-
-        sub.cancel();
-
-        controller.add(const LocalModelProgress(status: LocalModelStatus.verifying));
-
-        // Kiểm tra size thực tế
-        final tempSize = await partFile.length();
-        if (tempSize != model.sizeBytes) {
-          throw Exception('Download chưa hoàn tất (Kỳ vọng ${model.sizeBytes} bytes, nhận được $tempSize bytes)');
-        }
-
-        // Đổi tên atomic
-        await partFile.rename(finalFile.path);
-        
-        controller.add(const LocalModelProgress(status: LocalModelStatus.ready, progressPercent: 100.0));
-        onComplete?.call();
-        await controller.close();
-      } catch (e) {
-        if (!controller.isClosed) {
-          if (e is CanceledError) {
-            controller.add(const LocalModelProgress(status: LocalModelStatus.notDownloaded));
-          } else {
-            controller.add(LocalModelProgress(
-              status: LocalModelStatus.error,
-              errorMessage: e.toString(),
-            ));
+        cancelToken.whenCancel.then((_) {
+          if (!completed.isCompleted) {
+            completed.completeError(const CanceledError());
           }
-          await controller.close();
+          unawaited(subscription.cancel());
+        });
+        await completed.future;
+        await outputSink.flush();
+        await outputSink.close();
+        outputSink = null;
+        if (cancelToken.isCancelled) throw const CanceledError();
+
+        controller.add(
+          const LocalModelProgress(status: LocalModelStatus.verifying),
+        );
+        if (await partFile.length() != model.sizeBytes) {
+          throw Exception('Download chưa hoàn tất hoặc sai kích thước.');
         }
+        if (await _sha256(partFile) != model.sha256.toLowerCase()) {
+          throw Exception('Kiểm tra SHA-256 thất bại. File tải xuống bị hỏng.');
+        }
+        if (await finalFile.exists()) await finalFile.delete();
+        await partFile.rename(finalFile.path);
+        controller.add(
+          const LocalModelProgress(
+            status: LocalModelStatus.ready,
+            progressPercent: 100.0,
+          ),
+        );
+        onComplete?.call();
+      } catch (error) {
+        if (outputSink != null) {
+          await outputSink.flush();
+          await outputSink.close();
+        }
+        if (error is! CanceledError &&
+            !(error is DioException && CancelToken.isCancel(error))) {
+          controller.add(
+            LocalModelProgress(
+              status: LocalModelStatus.error,
+              errorMessage: error.toString(),
+            ),
+          );
+        } else {
+          controller.add(
+            const LocalModelProgress(status: LocalModelStatus.notDownloaded),
+          );
+        }
+      } finally {
+        _downloadCancels.remove(model.id);
+        _activeDownloads.remove(model.id);
+        await controller.close();
       }
     }
 
-    run();
+    unawaited(run());
     return controller.stream;
   }
 
-  void cancelDownload() {
-    _cancelToken?.cancel();
-    _cancelToken = null; // Reset cancel token
+  void cancelDownload([String? modelId]) {
+    if (modelId != null) {
+      _downloadCancels[modelId]?.cancel();
+      return;
+    }
+    for (final token in _downloadCancels.values) {
+      token.cancel();
+    }
   }
 
   Future<void> deleteModel(LocalModelInfo model) async {
@@ -158,9 +176,14 @@ class LocalModelManager {
     if (await file.exists()) await file.delete();
     if (await part.exists()) await part.delete();
   }
+
+  Future<String> _sha256(File file) async =>
+      sha256.bind(file.openRead()).first.then((digest) => digest.toString());
 }
 
 class CanceledError implements Exception {
+  const CanceledError();
+
   @override
   String toString() => 'CanceledError: Tải xuống bị hủy bởi người dùng';
 }

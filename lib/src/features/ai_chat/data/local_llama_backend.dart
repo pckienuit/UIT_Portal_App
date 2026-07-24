@@ -1,101 +1,170 @@
 import 'dart:async';
+
 import 'package:llamadart/llamadart.dart';
+
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+
+typedef LocalTokenStreamFactory =
+    Future<Stream<String>> Function(AiChatRequest request);
+
+class LocalFirstTokenTimeoutException implements Exception {
+  @override
+  String toString() =>
+      'LocalFirstTokenTimeoutException: Không nhận được token đầu tiên từ model local.';
+}
+
+class LocalGenerationStallTimeoutException implements Exception {
+  @override
+  String toString() =>
+      'LocalGenerationStallTimeoutException: Model local ngừng phản hồi giữa chừng.';
+}
 
 class LocalLlamaBackend implements AiChatBackend {
   LocalLlamaBackend({
     required this.modelPath,
+    this.tokenStreamFactory,
+    this.cancelGenerationOverride,
+    this.firstTokenTimeout = const Duration(seconds: 45),
+    this.stallTimeout = const Duration(seconds: 30),
   });
 
   final String modelPath;
+  final LocalTokenStreamFactory? tokenStreamFactory;
+  final void Function()? cancelGenerationOverride;
+  final Duration firstTokenTimeout;
+  final Duration stallTimeout;
   LlamaEngine? _engine;
   StreamController<AiStreamEvent>? _streamController;
+  StreamIterator<String>? _activeIterator;
+  var _generationEpoch = 0;
+  var _generating = false;
 
   @override
-  Future<AiConnectionResult> testConnection() async {
-    // Với model local, kết nối thành công khi file model sẵn sàng
-    return const AiConnectionResult(success: true);
-  }
+  Future<AiConnectionResult> testConnection() async =>
+      const AiConnectionResult(success: true);
 
   @override
-  Future<List<AiModelOption>> listModels() async {
-    return [
-      const AiModelOption(id: 'local-gguf', name: 'Model cục bộ (GGUF)'),
-    ];
-  }
+  Future<List<AiModelOption>> listModels() async => [
+    const AiModelOption(id: 'local-gguf', name: 'Model cục bộ (GGUF)'),
+  ];
 
   @override
   Stream<AiStreamEvent> streamChat(AiChatRequest request) {
-    _streamController = StreamController<AiStreamEvent>();
-    
-    Future<void> run() async {
-      try {
-        if (_engine == null) {
-          final backend = LlamaBackend();
-          _engine = LlamaEngine(backend);
-          
-          await _engine!.loadModel(
-            modelPath,
-            modelParams: const ModelParams(
-              contextSize: 2048,
-              gpuLayers: 0, // Fallback CPU an toàn nhất trên mobile devices
-            ),
+    if (_generating) {
+      return Stream.value(
+        const AiStreamEvent(
+          type: AiStreamEventType.error,
+          errorMessage: 'Model local đang sinh phản hồi khác.',
+        ),
+      );
+    }
+    final controller = StreamController<AiStreamEvent>();
+    _streamController = controller;
+    final epoch = ++_generationEpoch;
+    _generating = true;
+    unawaited(_run(request, controller, epoch));
+    return controller.stream;
+  }
+
+  Future<void> _run(
+    AiChatRequest request,
+    StreamController<AiStreamEvent> controller,
+    int epoch,
+  ) async {
+    try {
+      final iterator = StreamIterator(await _tokensFor(request));
+      _activeIterator = iterator;
+      var receivedToken = false;
+      while (epoch == _generationEpoch) {
+        final hasNext = await iterator.moveNext().timeout(
+          receivedToken ? stallTimeout : firstTokenTimeout,
+          onTimeout: () => throw receivedToken
+              ? LocalGenerationStallTimeoutException()
+              : LocalFirstTokenTimeoutException(),
+        );
+        if (!hasNext || epoch != _generationEpoch) break;
+        receivedToken = true;
+        final content = iterator.current;
+        if (content.isNotEmpty && epoch == _generationEpoch) {
+          controller.add(
+            AiStreamEvent(type: AiStreamEventType.chunk, content: content),
           );
         }
-
-        final systemPrompt = request.context != null
-            ? '${request.context!.buildSystemInstruction()}\n\nSystem prompt: ${request.config.systemPrompt ?? "You are a helpful assistant"}'
-            : (request.config.systemPrompt ?? "You are a helpful assistant");
-
-        final chatMessages = [
-          LlamaChatMessage.fromText(role: LlamaChatRole.system, text: systemPrompt),
-          ...request.messages.map((m) => LlamaChatMessage.fromText(
-                role: m.role == AiMessageRole.assistant ? LlamaChatRole.assistant : LlamaChatRole.user,
-                text: m.content,
-              )),
-        ];
-
-        final stream = _engine!.create(
-          chatMessages,
-          params: const GenerationParams(
-            maxTokens: 4096, // Increase from 512 to prevent cutoffs
-            temp: 0.7,
+      }
+      if (epoch == _generationEpoch) {
+        controller.add(const AiStreamEvent(type: AiStreamEventType.done));
+      }
+    } catch (error) {
+      if (epoch == _generationEpoch && !controller.isClosed) {
+        controller.add(
+          AiStreamEvent(
+            type: AiStreamEventType.error,
+            errorMessage: error.toString(),
           ),
         );
-
-        await for (final chunk in stream) {
-          final content = chunk.choices.first.delta.content;
-          if (content != null && content.isNotEmpty) {
-            _streamController?.add(AiStreamEvent(type: AiStreamEventType.chunk, content: content));
-          }
-        }
-        _streamController?.add(const AiStreamEvent(type: AiStreamEventType.done));
-        await _streamController?.close();
-      } catch (e) {
-        if (_streamController != null && !_streamController!.isClosed) {
-          _streamController?.add(AiStreamEvent(type: AiStreamEventType.error, errorMessage: e.toString()));
-          await _streamController?.close();
-        }
       }
+    } finally {
+      if (identical(_activeIterator, _activeIterator)) _activeIterator = null;
+      if (epoch == _generationEpoch) _generating = false;
+      if (!controller.isClosed) await controller.close();
     }
+  }
 
-    run();
-    return _streamController!.stream;
+  Future<Stream<String>> _tokensFor(AiChatRequest request) async {
+    final factory = tokenStreamFactory;
+    if (factory != null) return factory(request);
+    if (_engine == null) {
+      final backend = LlamaBackend();
+      _engine = LlamaEngine(backend);
+      await _engine!.loadModel(
+        modelPath,
+        modelParams: const ModelParams(contextSize: 2048, gpuLayers: 0),
+      );
+    }
+    final systemPrompt = request.context != null
+        ? '${request.context!.buildSystemInstruction()}\n\nSystem prompt: ${request.config.systemPrompt ?? "You are a helpful assistant"}'
+        : (request.config.systemPrompt ?? 'You are a helpful assistant');
+    final messages = [
+      LlamaChatMessage.fromText(role: LlamaChatRole.system, text: systemPrompt),
+      ...request.messages.map(
+        (message) => LlamaChatMessage.fromText(
+          role: message.role == AiMessageRole.assistant
+              ? LlamaChatRole.assistant
+              : LlamaChatRole.user,
+          text: message.content,
+        ),
+      ),
+    ];
+    return _engine!
+        .create(
+          messages,
+          params: const GenerationParams(maxTokens: 4096, temp: 0.7),
+        )
+        .map((chunk) => chunk.choices.first.delta.content ?? '');
   }
 
   @override
   Future<void> cancel() async {
-    // llamadart dispose sẽ tự động đóng các handle active streams
-    try {
-      await _engine?.unloadModel();
-      await _engine?.dispose();
-    } catch (_) {}
-    _engine = null;
+    if (!_generating) return;
+    ++_generationEpoch;
+    _generating = false;
+    cancelGenerationOverride?.call();
+    _engine?.cancelGeneration();
+    await _activeIterator?.cancel();
+    _activeIterator = null;
+    final controller = _streamController;
+    if (controller != null && !controller.isClosed) await controller.close();
   }
 
   @override
   Future<void> dispose() async {
     await cancel();
+    try {
+      await _engine?.unloadModel();
+      await _engine?.dispose();
+    } finally {
+      _engine = null;
+    }
   }
 }
