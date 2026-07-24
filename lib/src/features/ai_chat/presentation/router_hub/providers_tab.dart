@@ -356,6 +356,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       modelsUrl: definition.modelsUrl,
       authHeader: definition.authHeader,
       authScheme: definition.authScheme,
+      staticHeaders: definition.staticHeaders,
       models: definition.models
           .map(
             (model) =>

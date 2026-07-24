@@ -38,6 +38,7 @@ class AiProviderConfig {
     this.authHeader,
     this.authScheme,
     this.models = const [],
+    this.staticHeaders = const {},
   });
 
   final String id;
@@ -57,6 +58,7 @@ class AiProviderConfig {
   final String? authHeader;
   final String? authScheme;
   final List<AiProviderModelDescriptor> models;
+  final Map<String, String> staticHeaders;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -76,6 +78,7 @@ class AiProviderConfig {
     'authHeader': authHeader,
     'authScheme': authScheme,
     'models': models.map((model) => model.toJson()).toList(),
+    'staticHeaders': staticHeaders,
   };
 
   factory AiProviderConfig.fromJson(Map<String, dynamic> json) =>
@@ -108,6 +111,10 @@ class AiProviderConfig {
                 )
                 .toList(growable: false) ??
             const [],
+        staticHeaders: (json['staticHeaders'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ) ??
+            const {},
       );
 
   AiProviderConfig copyWith({
@@ -126,6 +133,7 @@ class AiProviderConfig {
     String? Function()? authHeader,
     String? Function()? authScheme,
     List<AiProviderModelDescriptor>? models,
+    Map<String, String>? staticHeaders,
   }) {
     return AiProviderConfig(
       id: id,
@@ -151,6 +159,7 @@ class AiProviderConfig {
       authHeader: authHeader != null ? authHeader() : this.authHeader,
       authScheme: authScheme != null ? authScheme() : this.authScheme,
       models: models ?? this.models,
+      staticHeaders: staticHeaders ?? this.staticHeaders,
     );
   }
 }

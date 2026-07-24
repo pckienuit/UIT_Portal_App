@@ -142,6 +142,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       modelsUrl: widget.preset.modelsUrl,
       authHeader: widget.preset.authHeader,
       authScheme: widget.preset.authScheme,
+      staticHeaders: widget.preset.staticHeaders,
       models: widget.preset.models,
     );
 

@@ -182,6 +182,16 @@
     },
     "anthropic": {
       "disposition": "candidate",
+      "androidAuth": "apiKey",
+      "transportKind": "anthropicMessages",
+      "chatUrl": "https://api.anthropic.com/v1/messages",
+      "modelsUrl": null,
+      "defaultBaseUrl": "https://api.anthropic.com",
+      "authHeader": "x-api-key",
+      "authScheme": "",
+      "staticHeaders": {
+        "anthropic-version": "2023-06-01"
+      },
       "reason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass"
     },
     "assemblyai": {

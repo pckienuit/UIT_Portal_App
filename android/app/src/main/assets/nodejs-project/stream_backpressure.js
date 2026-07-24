@@ -20,4 +20,9 @@ function waitForDrainOrClose(response) {
   });
 }
 
-module.exports = { waitForDrainOrClose };
+async function writeWithBackpressure(response, value) {
+  if (response.destroyed || response.writableEnded) return false;
+  return response.write(value) || waitForDrainOrClose(response);
+}
+
+module.exports = { waitForDrainOrClose, writeWithBackpressure };

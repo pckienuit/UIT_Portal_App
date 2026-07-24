@@ -58,6 +58,26 @@ void main() {
     );
   });
 
+  test('Anthropic static version header survives config serialization', () {
+    const config = AiProviderConfig(
+      id: 'anthropic-1',
+      name: 'Anthropic',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://api.anthropic.com',
+      modelId: 'claude-sonnet-4-20250514',
+      transportKind: 'anthropicMessages',
+      chatUrl: 'https://api.anthropic.com/v1/messages',
+      authHeader: 'x-api-key',
+      authScheme: '',
+      staticHeaders: {'anthropic-version': '2023-06-01'},
+    );
+
+    final restored = AiProviderConfig.fromJson(config.toJson());
+
+    expect(restored.staticHeaders, {'anthropic-version': '2023-06-01'});
+    expect(restored.authScheme, '');
+  });
+
   test(
     'quota client targets connection and parses typed non-2xx body',
     () async {

@@ -4,13 +4,18 @@ const path = require('node:path');
 const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
 const { createSseUsageParser } = require('./sse_usage');
-const { waitForDrainOrClose } = require('./stream_backpressure');
+const { waitForDrainOrClose, writeWithBackpressure } = require('./stream_backpressure');
 const { fetchQuota, listGeminiModels } = require('./quota_adapters');
 const {
   openAiToGeminiCli,
   geminiResponseToOpenAi,
   createGeminiSseTranslator,
 } = require('./gemini_cli_adapter');
+const {
+  openAiToAnthropic,
+  anthropicResponseToOpenAi,
+  createAnthropicSseTranslator,
+} = require('./anthropic_messages_adapter');
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
@@ -87,6 +92,10 @@ try {
         ...(connection.mobileMetadata?.models?.length
           ? { models: connection.mobileMetadata.models }
           : {}),
+        ...(connection.mobileMetadata?.staticHeaders &&
+        Object.keys(connection.mobileMetadata.staticHeaders).length
+          ? { staticHeaders: connection.mobileMetadata.staticHeaders }
+          : {}),
         authMode: connection.authMode || 'apiKey',
         active: connection.id === activeConnectionId,
         apiKey: runtimeSecrets.get(connection.id)?.runtimeToken || '',
@@ -118,6 +127,9 @@ try {
           authHeader: provider.authHeader,
           authScheme: provider.authScheme,
           models: Array.isArray(provider.models) ? provider.models : [],
+          staticHeaders: provider.staticHeaders && typeof provider.staticHeaders === 'object'
+            ? provider.staticHeaders
+            : {},
         },
         createdAt: provider.createdAt || timestamp,
         updatedAt: timestamp,
@@ -302,6 +314,7 @@ try {
         const requestedStream = body.stream === true;
         body.model = activeProvider.modelId;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli';
+        const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
 
         const headers = {
           'content-type': 'application/json',
@@ -313,6 +326,12 @@ try {
             'x-goog-api-client': 'google-genai-sdk/1.41.0 gl-node/v22.19.0',
           });
           body = openAiToGeminiCli(body, activeProvider.modelId, activeProvider.projectId);
+        }
+        if (isAnthropicMessages) {
+          headers.accept = requestedStream ? 'text/event-stream' : 'application/json';
+          headers['anthropic-version'] =
+            activeProvider.staticHeaders?.['anthropic-version'] || '2023-06-01';
+          body = openAiToAnthropic(body, activeProvider.modelId);
         }
 
         if (activeProvider.presetId === 'github') {
@@ -344,21 +363,34 @@ try {
         const startTime = Date.now();
         const targetUrl = isGeminiCli
           ? `${activeProvider.baseUrl}:${requestedStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
-          : activeProvider.transportKind === 'openaiChat' && activeProvider.chatUrl
+          : ['openaiChat', 'anthropicMessages'].includes(activeProvider.transportKind) && activeProvider.chatUrl
             ? activeProvider.chatUrl
             : `${activeProvider.baseUrl}/chat/completions`;
 
         if (requestedStream) {
-          if (!isGeminiCli) {
+          if (!isGeminiCli && !isAnthropicMessages) {
             body.stream_options = { ...(body.stream_options || {}), include_usage: true };
           }
+          const upstreamController = new AbortController();
+          let downstreamOpen = true;
+          let reader;
+          const closeDownstream = () => {
+            downstreamOpen = false;
+            upstreamController.abort();
+            reader?.cancel().catch(() => {});
+          };
+          response.once('close', closeDownstream);
+          response.once('error', closeDownstream);
           const upstreamResponse = await fetch(targetUrl, {
             method: 'POST',
             headers,
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal: upstreamController.signal,
           });
 
           if (!upstreamResponse.ok) {
+            response.removeListener('close', closeDownstream);
+            response.removeListener('error', closeDownstream);
             const errorBody = Buffer.from(await upstreamResponse.arrayBuffer());
             sendSanitizedUpstreamError(response, upstreamResponse, errorBody, activeProvider);
             db.usage.push({
@@ -379,31 +411,25 @@ try {
             'connection': 'keep-alive',
           });
 
-          const reader = upstreamResponse.body.getReader();
+          reader = upstreamResponse.body.getReader();
           const decoder = new TextDecoder();
           const usageParser = createSseUsageParser();
           const geminiTranslator = isGeminiCli
             ? createGeminiSseTranslator(activeProvider.modelId)
             : null;
-          let downstreamOpen = true;
-          const closeDownstream = () => {
-            downstreamOpen = false;
-            reader.cancel().catch(() => {});
-          };
-          response.once('close', closeDownstream);
-          response.once('error', closeDownstream);
-
+          const anthropicTranslator = isAnthropicMessages
+            ? createAnthropicSseTranslator(activeProvider.modelId)
+            : null;
           try {
             while (downstreamOpen) {
               const { done, value } = await reader.read();
               if (done) break;
               const chunk = decoder.decode(value, { stream: true });
-              if (geminiTranslator) {
-                for (const translated of geminiTranslator.push(chunk)) {
-                  if (!response.write(translated)) {
-                    downstreamOpen = await waitForDrainOrClose(response);
-                    if (!downstreamOpen) break;
-                  }
+              if (geminiTranslator || anthropicTranslator) {
+                const translator = geminiTranslator || anthropicTranslator;
+                for (const translated of translator.push(chunk)) {
+                  downstreamOpen = await writeWithBackpressure(response, translated);
+                  if (!downstreamOpen) break;
                 }
               } else {
                 usageParser.push(chunk);
@@ -419,9 +445,13 @@ try {
           }
           if (!downstreamOpen) return;
           let usage;
-          if (geminiTranslator) {
-            const terminal = geminiTranslator.finish();
-            for (const translated of terminal.output) response.write(translated);
+          if (geminiTranslator || anthropicTranslator) {
+            const terminal = (geminiTranslator || anthropicTranslator).finish();
+            for (const translated of terminal.output) {
+              downstreamOpen = await writeWithBackpressure(response, translated);
+              if (!downstreamOpen) break;
+            }
+            if (!downstreamOpen) return;
             usage = {
               promptTokens: terminal.usage.prompt_tokens,
               completionTokens: terminal.usage.completion_tokens,
@@ -467,7 +497,9 @@ try {
           const upstreamData = JSON.parse(upstreamBody.toString('utf8'));
           const resData = isGeminiCli
             ? geminiResponseToOpenAi(upstreamData, activeProvider.modelId)
-            : upstreamData;
+            : isAnthropicMessages
+              ? anthropicResponseToOpenAi(upstreamData)
+              : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
           if (upstreamResponse.ok) {
@@ -532,6 +564,9 @@ try {
           authHeader: data.authHeader,
           authScheme: data.authScheme,
           models: Array.isArray(data.models) ? data.models : [],
+          staticHeaders: data.staticHeaders && typeof data.staticHeaders === 'object'
+            ? data.staticHeaders
+            : {},
           active: !!data.active,
           apiKey: data.apiKey || '',
           sourceToken: data.sourceToken || ''
@@ -564,6 +599,11 @@ try {
         if (data.authHeader !== undefined) provider.authHeader = data.authHeader;
         if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
         if (data.models !== undefined) provider.models = Array.isArray(data.models) ? data.models : [];
+        if (data.staticHeaders !== undefined) {
+          provider.staticHeaders = data.staticHeaders && typeof data.staticHeaders === 'object'
+            ? data.staticHeaders
+            : {};
+        }
         if (data.apiKey !== undefined) provider.apiKey = data.apiKey;
         if (data.sourceToken !== undefined) provider.sourceToken = data.sourceToken;
         if (data.active !== undefined) {

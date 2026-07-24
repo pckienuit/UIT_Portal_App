@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { waitForDrainOrClose } = require('../../android/app/src/main/assets/nodejs-project/stream_backpressure');
+const {
+  waitForDrainOrClose,
+  writeWithBackpressure,
+} = require('../../android/app/src/main/assets/nodejs-project/stream_backpressure');
 
 test('resolves when downstream drains', async () => {
   const response = new EventEmitter();
@@ -37,4 +40,18 @@ test('does not wait when downstream is already destroyed', async () => {
   assert.equal(response.listenerCount('drain'), 0);
   assert.equal(response.listenerCount('close'), 0);
   assert.equal(response.listenerCount('error'), 0);
+});
+
+test('writes immediately or waits for drain through one helper', async () => {
+  const response = new EventEmitter();
+  const writes = [];
+  response.write = (value) => { writes.push(value); return false; };
+  const pending = writeWithBackpressure(response, 'data');
+  response.emit('drain');
+  assert.equal(await pending, true);
+  assert.deepEqual(writes, ['data']);
+
+  response.destroyed = true;
+  assert.equal(await writeWithBackpressure(response, 'ignored'), false);
+  assert.deepEqual(writes, ['data']);
 });

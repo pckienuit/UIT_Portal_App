@@ -17,6 +17,7 @@ class AiProviderPreset {
     this.authHeader,
     this.authScheme,
     this.models = const [],
+    this.staticHeaders = const {},
   });
 
   final String id;
@@ -32,6 +33,7 @@ class AiProviderPreset {
   final String? authHeader;
   final String? authScheme;
   final List<AiProviderModelDescriptor> models;
+  final Map<String, String> staticHeaders;
 }
 
 class AiProviderCatalog {

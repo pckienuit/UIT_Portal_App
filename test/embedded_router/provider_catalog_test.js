@@ -107,6 +107,22 @@ test('straightforward OpenAI Chat candidates lock exact upstream descriptors', (
   }
 });
 
+test('Anthropic candidate locks exact Messages descriptor but remains hidden', () => {
+  const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));
+  const anthropic = support.apikey.anthropic;
+
+  assert.equal(anthropic.disposition, 'candidate');
+  assert.equal(anthropic.transportKind, 'anthropicMessages');
+  assert.equal(anthropic.chatUrl, 'https://api.anthropic.com/v1/messages');
+  assert.equal(anthropic.modelsUrl, null);
+  assert.equal(anthropic.authHeader, 'x-api-key');
+  assert.equal(anthropic.authScheme, '');
+  assert.deepEqual(anthropic.staticHeaders, {
+    'anthropic-version': '2023-06-01',
+  });
+  assert.equal(loadCatalog().some((provider) => provider.id === 'anthropic'), false);
+});
+
 test('generator fails closed when an upstream LLM provider is unclassified', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'uit-catalog-'));
   const support = JSON.parse(fs.readFileSync(supportPath, 'utf8'));

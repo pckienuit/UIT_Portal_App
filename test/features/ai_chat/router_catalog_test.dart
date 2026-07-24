@@ -4,6 +4,27 @@ import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 
 void main() {
+  test('parses Anthropic Messages descriptor static headers', () {
+    final definition = RouterProviderDefinition.fromJson({
+      'id': 'anthropic',
+      'name': 'Anthropic',
+      'category': 'apikey',
+      'mobileSupported': true,
+      'androidAuth': 'apiKey',
+      'nativeStatus': 'ready',
+      'transportKind': 'anthropicMessages',
+      'chatUrl': 'https://api.anthropic.com/v1/messages',
+      'authHeader': 'x-api-key',
+      'authScheme': '',
+      'staticHeaders': {'anthropic-version': '2023-06-01'},
+      'models': <Object>[],
+    });
+
+    expect(definition.transportKind, RouterTransportKind.anthropicMessages);
+    expect(definition.authScheme, '');
+    expect(definition.staticHeaders, {'anthropic-version': '2023-06-01'});
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('bundled catalog exposes supported provider categories', () async {

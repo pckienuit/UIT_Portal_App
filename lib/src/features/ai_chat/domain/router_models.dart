@@ -188,6 +188,7 @@ class RouterProviderDefinition {
     this.modelsUrl,
     this.authHeader,
     this.authScheme,
+    this.staticHeaders = const {},
   });
 
   final String id;
@@ -210,6 +211,7 @@ class RouterProviderDefinition {
   final String? modelsUrl;
   final String? authHeader;
   final String? authScheme;
+  final Map<String, String> staticHeaders;
 
   factory RouterProviderDefinition.fromJson(Map<String, dynamic> json) {
     final catStr = json['category'] as String;
@@ -294,6 +296,10 @@ class RouterProviderDefinition {
       modelsUrl: json['modelsUrl'] as String?,
       authHeader: json['authHeader'] as String?,
       authScheme: json['authScheme'] as String?,
+      staticHeaders: (json['staticHeaders'] as Map?)?.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          ) ??
+          const {},
     );
   }
 }

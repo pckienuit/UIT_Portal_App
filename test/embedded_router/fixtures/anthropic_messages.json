@@ -1,0 +1,47 @@
+{
+  "openAiRequest": {
+    "model": "ignored",
+    "messages": [
+      { "role": "system", "content": "Be concise." },
+      { "role": "user", "content": "Hello" },
+      { "role": "assistant", "content": "Hi" },
+      { "role": "user", "content": "Continue" }
+    ],
+    "max_tokens": 64,
+    "temperature": 0.2,
+    "stream": false
+  },
+  "anthropicRequest": {
+    "model": "claude-sonnet-4-20250514",
+    "system": "Be concise.",
+    "messages": [
+      { "role": "user", "content": "Hello" },
+      { "role": "assistant", "content": "Hi" },
+      { "role": "user", "content": "Continue" }
+    ],
+    "max_tokens": 64,
+    "temperature": 0.2,
+    "stream": false
+  },
+  "anthropicResponse": {
+    "id": "msg_fixture",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-20250514",
+    "content": [{ "type": "text", "text": "Done" }],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 7, "output_tokens": 2 }
+  },
+  "openAiResponse": {
+    "id": "msg_fixture",
+    "object": "chat.completion",
+    "model": "claude-sonnet-4-20250514",
+    "choices": [{
+      "index": 0,
+      "message": { "role": "assistant", "content": "Done" },
+      "finish_reason": "stop"
+    }],
+    "usage": { "prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9 }
+  },
+  "anthropicStream": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_stream\",\"model\":\"claude-sonnet-4-20250514\",\"usage\":{\"input_tokens\":3,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+}
