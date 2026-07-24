@@ -16,8 +16,8 @@ object OAuthProviderRegistry {
         ),
         "antigravity" to AuthorizationOAuthProvider(
             id = "antigravity",
-            clientId = "108493108920-lksbd0b3v54mbfp4b21650r39v03d274.apps.googleusercontent.com",
-            clientSecret = "GOCSPX-d16c5n2-uX2W7g5P7L4i_63Y",
+            clientId = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
+            clientSecret = "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",
             authorizeUrl = java.net.URI("https://accounts.google.com/o/oauth2/v2/auth"),
             tokenUrl = java.net.URI("https://oauth2.googleapis.com/token"),
             scope = listOf(
