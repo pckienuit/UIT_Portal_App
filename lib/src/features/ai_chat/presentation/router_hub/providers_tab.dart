@@ -312,6 +312,15 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
               spacing: PortalSpacing.sm,
               children: [
                 TextButton(
+                  onPressed: () => _showModelSelectionDialog(
+                    context,
+                    definition,
+                    config,
+                    notifier,
+                  ),
+                  child: const Text('Đổi Model'),
+                ),
+                TextButton(
                   onPressed: removeConnection,
                   child: const Text('Đăng xuất'),
                 ),
@@ -385,6 +394,92 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
     if (definition.id == 'custom') return true;
     final preset = AiProviderCatalog.byId(definition.id);
     return (definition.defaultBaseUrl ?? preset?.baseUrl ?? '').isNotEmpty;
+  }
+
+  Future<void> _showModelSelectionDialog(
+    BuildContext context,
+    RouterProviderDefinition definition,
+    AiProviderConfig config,
+    AiProviderController notifier,
+  ) async {
+    final controller = TextEditingController(text: config.modelId);
+    String selectedModel = config.modelId;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Chọn model cho ${definition.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (definition.models.isNotEmpty) ...[
+                    const Text('Chọn từ danh sách khả dụng:'),
+                    const SizedBox(height: 8),
+                    DropdownButton<String>(
+                      isExpanded: true,
+                      value: definition.models.any((m) => m.id == selectedModel)
+                          ? selectedModel
+                          : null,
+                      hint: const Text('Chọn model'),
+                      items: definition.models
+                          .map(
+                            (m) => DropdownMenuItem(
+                              value: m.id,
+                              child: Text('${m.name} (${m.id})'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedModel = val;
+                            controller.text = val;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  const Text('Hoặc nhập mã Model ID thủ công:'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Model ID',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) {
+                      selectedModel = val.trim();
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Hủy'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    final newModel = controller.text.trim();
+                    if (newModel.isNotEmpty) {
+                      final updatedConfig = config.copyWith(modelId: newModel);
+                      await notifier.saveProvider(updatedConfig);
+                      if (context.mounted) Navigator.pop(dialogContext);
+                    }
+                  },
+                  child: const Text('Lưu'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
 

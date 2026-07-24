@@ -149,11 +149,16 @@ function run() {
     const modelsBlockMatch = content.match(/\bmodels\s*:\s*\[([\s\S]*?)\]\s*(?:,|\n|})/);
     if (modelsBlockMatch) {
       const modelsStr = modelsBlockMatch[1];
-      const modelRegex = /\{\s*id\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']([^}]*)\}/g;
+      const modelRegex = /\{\s*id\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["'][\s\S]*?\}/g;
       let m;
       while ((m = modelRegex.exec(modelsStr)) !== null) {
-        if (/\bkind\s*:\s*["'](?!llm["'])/.test(m[3])) continue;
-        models.push({ id: m[1], name: m[2] });
+        const idMatch = m[0].match(/\bid\s*:\s*["']([^"']+)["']/);
+        const nameMatch = m[0].match(/\bname\s*:\s*["']([^"']+)["']/);
+        const kindMatch = m[0].match(/\bkind\s*:\s*["']([^"']+)["']/);
+        if (kindMatch && kindMatch[1] !== 'llm') continue;
+        if (idMatch && nameMatch) {
+          models.push({ id: idMatch[1], name: nameMatch[1] });
+        }
       }
       if (id === 'gemini-cli') {
         const preferred = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
