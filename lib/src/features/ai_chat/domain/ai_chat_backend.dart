@@ -38,23 +38,23 @@ class AiPortalContextSnapshot {
     sb.writeln('\nQuy tắc quan trọng:');
     sb.writeln('1. Chỉ dựa trên thông tin được cung cấp ở trên để trả lời về các vấn đề cá nhân của sinh viên.');
     sb.writeln('2. Nếu thông tin không có hoặc thiếu, hãy nói rõ "Không tìm thấy dữ liệu trên hệ thống", tuyệt đối không tự bịa thông tin.');
-    sb.writeln('3. Bạn chỉ có quyền ĐỌC dữ liệu, không có quyền THAY ĐỔI, ĐĂNG KÝ môn học, hay ĐÓNG học phí. Không hứa với sinh viên rằng bạn sẽ thực hiện các hành động này.');
-    
     return sb.toString();
   }
 }
 
 class AiChatRequest {
   const AiChatRequest({
-    required this.config,
     required this.apiKey,
     required this.messages,
     this.context,
+    this.modelId,
+    this.config,
   });
 
   final String apiKey;
   final List<AiChatMessage> messages;
   final AiPortalContextSnapshot? context;
+  final String? modelId;
   final dynamic config; // Để tránh dependency cycle hoặc dynamic reference
 }
 
@@ -88,25 +88,40 @@ class AiModelOption {
   final AiModelCapabilities capabilities;
 }
 
-class AiConnectionResult {
-  const AiConnectionResult({required this.success, this.errorMessage});
-  final bool success;
-  final String? errorMessage;
-}
-
 enum AiStreamEventType { chunk, done, error }
 
 class AiStreamEvent {
-  const AiStreamEvent({required this.type, this.content, this.errorMessage});
+  const AiStreamEvent({
+    required this.type,
+    this.content,
+    this.errorMessage,
+  });
+
   final AiStreamEventType type;
   final String? content;
   final String? errorMessage;
 }
 
-abstract interface class AiChatBackend {
-  Future<AiConnectionResult> testConnection();
-  Future<List<AiModelOption>> listModels();
-  Stream<AiStreamEvent> streamChat(AiChatRequest request);
-  Future<void> cancel();
+abstract class AiChatBackend {
   Future<void> dispose();
+  Future<void> cancel();
+
+  /// Thử kết nối, ví dụ gọi test api keys, trả về object `AiConnectionResult`
+  Future<AiConnectionResult> testConnection();
+
+  /// Nạp các model hiện có
+  Future<List<AiModelOption>> listModels();
+
+  /// Chat với stream response
+  Stream<AiStreamEvent> streamChat(AiChatRequest request);
+}
+
+class AiConnectionResult {
+  const AiConnectionResult({
+    required this.success,
+    this.errorMessage,
+  });
+
+  final bool success;
+  final String? errorMessage;
 }

@@ -343,12 +343,16 @@ try {
           'content-type': 'application/json',
         };
         if (isGeminiCli) {
+          const isAntigravityMode = activeProvider.presetId === 'antigravity';
           Object.assign(headers, {
             'accept': requestedStream ? 'text/event-stream' : 'application/json',
-            'user-agent': `GeminiCLI/0.34.0/${selectedModel} (android; arm64)`,
-            'x-goog-api-client': 'google-genai-sdk/1.41.0 gl-node/v22.19.0',
+            'user-agent': isAntigravityMode ? `antigravity/ide/2.1.1 darwin/arm64` : `GeminiCLI/0.34.0/${selectedModel} (android; arm64)`,
+            'x-goog-api-client': isAntigravityMode ? 'google-cloud-sdk vscode_cloudshelleditor/0.1' : 'google-genai-sdk/1.41.0 gl-node/v22.19.0',
           });
-          body = openAiToGeminiCli(body, selectedModel, activeProvider.projectId);
+          if (isAntigravityMode) {
+            headers['client-metadata'] = JSON.stringify({ ideType: 9, platform: 2, pluginType: 2 });
+          }
+          body = openAiToGeminiCli(body, selectedModel, activeProvider.projectId, isAntigravityMode);
         }
         if (isAnthropicMessages) {
           headers.accept = requestedStream ? 'text/event-stream' : 'application/json';

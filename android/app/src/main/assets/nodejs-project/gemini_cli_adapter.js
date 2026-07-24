@@ -21,7 +21,7 @@ function textParts(content) {
   });
 }
 
-function openAiToGeminiCli(body, model, projectId) {
+function openAiToGeminiCli(body, model, projectId, isAntigravity = false) {
   if (!projectId) throw new Error('Gemini CLI requires projectId');
   const contents = [];
   const system = [];
@@ -35,15 +35,26 @@ function openAiToGeminiCli(body, model, projectId) {
   if (body.temperature !== undefined) generationConfig.temperature = body.temperature;
   if (body.top_p !== undefined) generationConfig.topP = body.top_p;
   if (body.max_tokens !== undefined) generationConfig.maxOutputTokens = body.max_tokens;
-  const request = { contents, generationConfig, safetySettings: SAFETY_SETTINGS };
+  
+  const request = { contents, generationConfig };
+  if (!isAntigravity) {
+    request.safetySettings = SAFETY_SETTINGS;
+  }
   if (system.length) request.systemInstruction = { role: 'user', parts: system };
-  return {
+  
+  const envelope = {
     project: projectId,
     model,
-    userAgent: 'gemini-cli',
+    userAgent: isAntigravity ? 'antigravity' : 'gemini-cli',
     requestId: `agent-${randomUUID()}`,
     request,
   };
+  
+  if (isAntigravity) {
+    envelope.requestType = 'agent';
+  }
+  
+  return envelope;
 }
 
 function usageFrom(response) {

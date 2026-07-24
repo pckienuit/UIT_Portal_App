@@ -133,7 +133,7 @@ class OpenAiCompatibleBackend implements AiChatBackend {
     ];
 
     final body = {
-      'model': modelId,
+      'model': request.modelId ?? modelId,
       'messages': messagesPayload,
       'stream': true,
     };
