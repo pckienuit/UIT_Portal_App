@@ -8,7 +8,12 @@ import 'ai_model_picker_sheet.dart';
 class AiProviderSwitcherSheet extends ConsumerWidget {
   const AiProviderSwitcherSheet({super.key});
 
-  void _openModelPicker(BuildContext context, WidgetRef ref, String providerId, String currentModelId) {
+  void _openModelPicker(
+    BuildContext context,
+    WidgetRef ref,
+    String providerId,
+    String currentModelId,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -16,11 +21,25 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
         providerId: providerId,
         currentModelId: currentModelId,
         onModelSelected: (modelId) async {
+          if (ref.read(aiChatControllerProvider).isGenerating) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Vui lòng dừng trả lời hiện tại trước khi đổi model.',
+                ),
+              ),
+            );
+            return;
+          }
           final providerState = ref.read(aiProviderControllerProvider);
-          final config = providerState.providers.firstWhere((e) => e.id == providerId);
-          
+          final config = providerState.providers.firstWhere(
+            (e) => e.id == providerId,
+          );
+
           final updatedConfig = config.copyWith(modelId: modelId);
-          await ref.read(aiChatControllerProvider.notifier).switchProvider(updatedConfig);
+          await ref
+              .read(aiChatControllerProvider.notifier)
+              .switchProvider(updatedConfig);
         },
       ),
     );
@@ -46,7 +65,9 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
               children: [
                 Text(
                   'Chọn Trợ lý AI',
-                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -56,13 +77,15 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
             ),
             const Divider(),
             SizedBox(height: PortalSpacing.sm),
-            
+
             if (providerState.providers.isEmpty)
               Padding(
                 padding: EdgeInsets.symmetric(vertical: PortalSpacing.lg),
                 child: Text(
                   'Chưa cấu hình dịch vụ AI nào. Vui lòng bấm vào nút Cấu hình ở góc trên màn hình chat.',
-                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               )
@@ -79,12 +102,16 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
                       title: Text(
                         config.name,
                         style: TextStyle(
-                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isActive
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                       subtitle: Text(
                         'Model: ${config.modelId}',
-                        style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       leading: Icon(
                         isActive ? Icons.assistant : Icons.assistant_outlined,
@@ -98,11 +125,18 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
                           else
                             const SizedBox.shrink(),
                           IconButton(
-                            icon: const Icon(Icons.settings_input_composite_outlined),
+                            icon: const Icon(
+                              Icons.settings_input_composite_outlined,
+                            ),
                             tooltip: 'Chọn Model',
                             onPressed: () {
                               Navigator.of(context).pop();
-                              _openModelPicker(context, ref, config.id, config.modelId);
+                              _openModelPicker(
+                                context,
+                                ref,
+                                config.id,
+                                config.modelId,
+                              );
                             },
                           ),
                         ],
@@ -110,7 +144,11 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
                       onTap: () async {
                         if (chatState.isGenerating) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng dừng trả lời hiện tại trước khi chuyển đổi provider.')),
+                            const SnackBar(
+                              content: Text(
+                                'Vui lòng dừng trả lời hiện tại trước khi chuyển đổi provider.',
+                              ),
+                            ),
                           );
                           return;
                         }

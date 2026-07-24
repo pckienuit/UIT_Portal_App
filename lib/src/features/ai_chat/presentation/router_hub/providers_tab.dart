@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/foundations/portal_spacing.dart';
+import '../../application/ai_chat_controller.dart';
 import '../../application/ai_provider_controller.dart';
 
 import '../../data/local_model_catalog.dart';
@@ -320,7 +321,19 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                       providerId: config.id,
                       currentModelId: config.modelId,
                       onModelSelected: (modelId) async {
-                        await notifier.saveProvider(config.copyWith(modelId: modelId));
+                        if (ref.read(aiChatControllerProvider).isGenerating) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Vui lòng dừng trả lời hiện tại trước khi đổi model.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        await notifier.saveProvider(
+                          config.copyWith(modelId: modelId),
+                        );
                       },
                     ),
                   ),

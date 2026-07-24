@@ -143,6 +143,67 @@ void main() {
     expect(state.conversations, hasLength(1));
   });
 
+  test(
+    'same-connection model switch keeps active conversation instead of old model history',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+        ],
+      );
+      addTearDown(container.dispose);
+      const config = AiProviderConfig(
+        id: 'same-connection',
+        name: 'Same connection',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'model-a',
+      );
+      final repo = container.read(aiProviderRepositoryProvider);
+      await repo.saveProvider(config);
+      await repo.setActiveProviderId(config.id);
+      await ChatHistoryStore(directory: tempDir).writeHistory([
+        AiConversation(
+          id: 'conversation-a',
+          title: 'Keep me',
+          providerId: config.id,
+          modelId: 'model-a',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 24),
+        ),
+        AiConversation(
+          id: 'old-conversation-b',
+          title: 'Do not open me',
+          providerId: config.id,
+          modelId: 'model-b',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 23),
+        ),
+      ]);
+
+      container.read(aiProviderControllerProvider);
+      container.read(aiChatControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(
+        container.read(aiChatControllerProvider).activeConversation?.id,
+        'conversation-a',
+      );
+
+      await container
+          .read(aiProviderControllerProvider.notifier)
+          .saveProvider(config.copyWith(modelId: 'model-b'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final state = container.read(aiChatControllerProvider);
+      expect(state.activeProvider?.modelId, 'model-b');
+      expect(state.activeConversation?.id, 'conversation-a');
+      expect(state.activeConversation?.modelId, 'model-b');
+    },
+  );
+
   test('sends only complete messages to provider', () {
     final messages = [
       AiChatMessage(

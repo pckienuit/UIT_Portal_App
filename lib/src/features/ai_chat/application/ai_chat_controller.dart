@@ -63,8 +63,13 @@ class AiChatController extends Notifier<AiChatState> {
     });
 
     ref.listen<AiProviderState>(aiProviderControllerProvider, (prev, next) {
-      if (prev?.activeProviderId != next.activeProviderId) {
+      final previousConfig = prev == null ? null : _getActiveConfig(prev);
+      final nextConfig = _getActiveConfig(next);
+      if (previousConfig?.id != nextConfig?.id) {
         _handleActiveProviderChanged(next);
+      } else if (previousConfig?.modelId != nextConfig?.modelId &&
+          nextConfig != null) {
+        _handleActiveModelChanged(nextConfig);
       }
     });
 
@@ -150,6 +155,38 @@ class AiChatController extends Notifier<AiChatState> {
       await _activeBackend?.dispose();
       _activeBackend = null;
     }
+  }
+
+  Future<void> _handleActiveModelChanged(AiProviderConfig activeConfig) async {
+    final current = state.activeConversation;
+    AiConversation? updatedConversation;
+    var conversations = state.conversations;
+    if (current != null) {
+      updatedConversation = AiConversation(
+        id: current.id,
+        title: current.title,
+        providerId: activeConfig.id,
+        modelId: activeConfig.modelId,
+        messages: current.messages,
+        updatedAt: current.updatedAt,
+      );
+      conversations = List<AiConversation>.from(state.conversations);
+      final index = conversations.indexWhere((item) => item.id == current.id);
+      if (index >= 0) {
+        conversations[index] = updatedConversation;
+      }
+    }
+    state = state.copyWith(
+      activeProvider: () => activeConfig,
+      activeConversation: () => updatedConversation,
+      conversations: conversations,
+      errorMessage: () => null,
+    );
+    if (updatedConversation != null) {
+      final store = await ref.read(chatHistoryStoreProvider.future);
+      await store.writeHistory(conversations);
+    }
+    await _loadBackend(activeConfig);
   }
 
   Future<void> _loadBackend(AiProviderConfig config) async {
