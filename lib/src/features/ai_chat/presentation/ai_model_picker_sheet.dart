@@ -1,22 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
+import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
 import '../data/router_admin_client.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/router_catalog.dart';
 
+class GlobalModelOption {
+  const GlobalModelOption({
+    required this.providerId,
+    required this.providerName,
+    required this.modelId,
+    required this.modelName,
+    this.capabilities = const AiModelCapabilities(),
+  });
+
+  final String providerId;
+  final String providerName;
+  final String modelId;
+  final String modelName;
+  final AiModelCapabilities capabilities;
+}
+
 class AiModelPickerSheet extends ConsumerStatefulWidget {
   const AiModelPickerSheet({
     super.key,
-    required this.providerId,
+    this.providerId,
     required this.currentModelId,
     required this.onModelSelected,
   });
 
-  final String providerId;
+  final String? providerId;
   final String currentModelId;
-  final Future<void> Function(String modelId) onModelSelected;
+  final Future<void> Function(String modelId, String? providerId) onModelSelected;
 
   @override
   ConsumerState<AiModelPickerSheet> createState() => _AiModelPickerSheetState();
@@ -26,6 +43,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
   final _searchController = TextEditingController();
   final _customModelController = TextEditingController();
   String _searchQuery = '';
+  GlobalModelOption? _selectedOption;
 
   @override
   void dispose() {
@@ -40,53 +58,91 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final colorScheme = Theme.of(context).colorScheme;
 
     final providerState = ref.watch(aiProviderControllerProvider);
-    final cachedModels =
-        providerState.models[widget.providerId] ?? const <AiModelOption>[];
-    final liveModels = ref.watch(routerModelCatalogProvider(widget.providerId));
-    final config = providerState.providers
-        .where((provider) => provider.id == widget.providerId)
-        .firstOrNull;
-    final isAntigravity = config?.presetId == 'antigravity';
-    final live = liveModels.when(
-      data: (models) => models,
-      loading: () => const <AiModelOption>[],
-      error: (_, _) => const <AiModelOption>[],
-    );
-    final lockedAntigravityIds = {
-      ...?config?.models.map((model) => model.id),
-      ...?RouterCatalog.byId(
-        config?.presetId ?? '',
-      )?.models.map((model) => model.id),
-    };
-    final allowedLive = isAntigravity
-        ? live
-              .where((model) => lockedAntigravityIds.contains(model.id))
-              .toList(growable: false)
-        : live;
-    final fallback = isAntigravity
-        ? const <AiModelOption>[]
-        : config?.models
-                  .map((model) => AiModelOption(id: model.id, name: model.name))
-                  .toList() ??
-              cachedModels;
-    final custom = isAntigravity
-        ? const <AiModelOption>[]
-        : config?.customModels
-                  .map((model) => AiModelOption(id: model.id, name: model.name))
-                  .toList() ??
-              const <AiModelOption>[];
-    final seenIds = <String>{};
-    final models =
-        (liveModels.hasError
-                ? const <AiModelOption>[]
-                : [...allowedLive, ...fallback, ...custom])
-            .where((model) => seenIds.add(model.id.trim()))
+    final chatState = ref.watch(aiChatControllerProvider);
+    final activeProvider = chatState.activeProvider;
+
+    final isGlobal = widget.providerId == null || widget.providerId!.isEmpty;
+    final providers = isGlobal
+        ? providerState.providers
+        : providerState.providers
+            .where((p) => p.id == widget.providerId)
             .toList();
 
-    final filteredModels = models.where((model) {
+    final allOptions = <GlobalModelOption>[];
+
+    for (final config in providers) {
+      final isLocal = config.presetId == 'local_qwen' ||
+          config.id.contains('local') ||
+          config.kind.name == 'localGguf';
+      final cachedModels =
+          providerState.models[config.id] ?? const <AiModelOption>[];
+      final liveModels = isLocal
+          ? const AsyncValue<List<AiModelOption>>.data([])
+          : ref.watch(routerModelCatalogProvider(config.id));
+      final isAntigravity = config.presetId == 'antigravity';
+      final live = liveModels.when(
+        data: (models) => models,
+        loading: () => const <AiModelOption>[],
+        error: (_, _) => const <AiModelOption>[],
+      );
+      final lockedAntigravityIds = {
+        ...config.models.map((model) => model.id),
+        ...?RouterCatalog.byId(
+          config.presetId ?? '',
+        )?.models.map((model) => model.id),
+      };
+      final allowedLive = isAntigravity
+          ? live
+                .where((model) => lockedAntigravityIds.contains(model.id))
+                .toList(growable: false)
+          : live;
+      final fallback = isAntigravity
+          ? const <AiModelOption>[]
+          : config.models.isNotEmpty
+              ? config.models
+                    .map((model) => AiModelOption(id: model.id, name: model.name))
+                    .toList()
+              : cachedModels.isNotEmpty
+                  ? cachedModels
+                  : [
+                      AiModelOption(
+                        id: config.modelId,
+                        name: config.modelId,
+                      ),
+                    ];
+      final custom = isAntigravity
+          ? const <AiModelOption>[]
+          : config.customModels
+                    .map((model) => AiModelOption(id: model.id, name: model.name))
+                    .toList() ??
+                const <AiModelOption>[];
+
+      final seenIds = <String>{};
+      final models =
+          (liveModels.hasError
+                  ? const <AiModelOption>[]
+                  : [...allowedLive, ...fallback, ...custom])
+              .where((model) => model.id.trim().isNotEmpty && seenIds.add(model.id.trim()))
+              .toList();
+
+      for (final model in models) {
+        allOptions.add(
+          GlobalModelOption(
+            providerId: config.id,
+            providerName: config.name,
+            modelId: model.id,
+            modelName: model.name,
+            capabilities: model.capabilities,
+          ),
+        );
+      }
+    }
+
+    final filteredOptions = allOptions.where((option) {
       final query = _searchQuery.toLowerCase();
-      return model.id.toLowerCase().contains(query) ||
-          model.name.toLowerCase().contains(query);
+      return option.modelId.toLowerCase().contains(query) ||
+          option.modelName.toLowerCase().contains(query) ||
+          option.providerName.toLowerCase().contains(query);
     }).toList();
 
     return Padding(
@@ -96,9 +152,9 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
       child: SafeArea(
         child: Container(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
           ),
-          padding: EdgeInsets.all(PortalSpacing.lg),
+          padding: const EdgeInsets.all(PortalSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,7 +164,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Chọn mô hình (Model)',
+                      isGlobal ? 'Chọn mô hình AI khả dụng' : 'Chọn mô hình (Model)',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleMedium?.copyWith(
@@ -123,7 +179,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                 ],
               ),
               const Divider(),
-              SizedBox(height: PortalSpacing.sm),
+              const SizedBox(height: PortalSpacing.sm),
 
               TextField(
                 controller: _searchController,
@@ -142,30 +198,30 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                   });
                 },
               ),
-              SizedBox(height: PortalSpacing.md),
+              const SizedBox(height: PortalSpacing.md),
 
               Expanded(
-                child: liveModels.isLoading && models.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : liveModels.hasError && models.isEmpty
-                    ? _buildLoadError(context)
-                    : models.isEmpty
-                    ? _buildEmptyOrCustomFallback(context)
-                    : filteredModels.isEmpty
+                child: filteredOptions.isEmpty
                     ? Center(
                         child: Text(
-                          'Không tìm thấy mô hình nào khớp: "$_searchQuery"',
+                          _searchQuery.isNotEmpty
+                              ? 'Không tìm thấy mô hình nào khớp: "$_searchQuery"'
+                              : 'Chưa có mô hình AI nào khả dụng.',
                         ),
                       )
                     : ListView.builder(
-                        itemCount: filteredModels.length,
+                        itemCount: filteredOptions.length,
                         itemBuilder: (context, index) {
-                          final model = filteredModels[index];
-                          final isSelected = model.id == widget.currentModelId;
+                          final option = filteredOptions[index];
+                          final isSelected = _selectedOption != null
+                              ? (_selectedOption!.providerId == option.providerId &&
+                                  _selectedOption!.modelId == option.modelId)
+                              : (activeProvider?.id == option.providerId &&
+                                  activeProvider?.modelId == option.modelId);
 
                           return ListTile(
                             title: Text(
-                              model.name,
+                              option.modelName,
                               style: TextStyle(
                                 fontWeight: isSelected
                                     ? FontWeight.bold
@@ -176,15 +232,16 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  model.id,
+                                  isGlobal
+                                      ? '${option.modelId} • Provider: ${option.providerName}'
+                                      : option.modelId,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-
                                 _buildCapabilitiesChips(
                                   context,
-                                  model.capabilities,
+                                  option.capabilities,
                                 ),
                               ],
                             ),
@@ -192,22 +249,28 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                                 ? Icon(Icons.check, color: colorScheme.primary)
                                 : null,
                             onTap: () async {
-                              await widget.onModelSelected(model.id);
+                              setState(() {
+                                _selectedOption = option;
+                              });
                               if (context.mounted) {
                                 final navigator = Navigator.of(context);
                                 if (navigator.canPop()) {
                                   navigator.pop();
                                 }
                               }
+                              await widget.onModelSelected(
+                                option.modelId,
+                                option.providerId,
+                              );
                             },
                           );
                         },
                       ),
               ),
 
-              SizedBox(height: PortalSpacing.md),
+              const SizedBox(height: PortalSpacing.md),
               const Divider(),
-              SizedBox(height: PortalSpacing.sm),
+              const SizedBox(height: PortalSpacing.sm),
 
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -225,20 +288,39 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                   );
                   final apply = ElevatedButton(
                     onPressed: () async {
-                      final saved = await ref
-                          .read(aiProviderControllerProvider.notifier)
-                          .addCustomModel(
-                            widget.providerId,
-                            _customModelController.text,
-                            allowedAntigravityIds: isAntigravity
-                                ? liveModels.asData?.value
-                                      .map((model) => model.id)
-                                      .toSet()
-                                : null,
-                          );
-                      if (saved) {
+                      final customText = _customModelController.text.trim();
+                      if (customText.isNotEmpty) {
+                        final targetProviderId =
+                            widget.providerId ?? activeProvider?.id ?? '';
+                        if (targetProviderId.isNotEmpty) {
+                          final saved = await ref
+                              .read(aiProviderControllerProvider.notifier)
+                              .addCustomModel(
+                                targetProviderId,
+                                customText,
+                              );
+                          if (saved) {
+                            await widget.onModelSelected(
+                              customText,
+                              targetProviderId,
+                            );
+                            if (context.mounted) {
+                              final navigator = Navigator.of(context);
+                              if (navigator.canPop()) {
+                                navigator.pop();
+                              }
+                            }
+                          }
+                        }
+                      } else {
+                        final opt = _selectedOption;
+                        final modelToApply =
+                            opt?.modelId ?? widget.currentModelId;
+                        final providerToApply =
+                            opt?.providerId ?? widget.providerId;
                         await widget.onModelSelected(
-                          _customModelController.text.trim(),
+                          modelToApply,
+                          providerToApply,
                         );
                         if (context.mounted) {
                           final navigator = Navigator.of(context);
@@ -255,7 +337,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         field,
-                        SizedBox(height: PortalSpacing.sm),
+                        const SizedBox(height: PortalSpacing.sm),
                         apply,
                       ],
                     );
@@ -263,7 +345,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                   return Row(
                     children: [
                       Expanded(child: field),
-                      SizedBox(width: PortalSpacing.md),
+                      const SizedBox(width: PortalSpacing.md),
                       apply,
                     ],
                   );
@@ -272,49 +354,6 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyOrCustomFallback(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(PortalSpacing.lg),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.info_outline, size: 48, color: Colors.grey),
-            SizedBox(height: PortalSpacing.sm),
-            const Text(
-              'Không tìm thấy danh sách mô hình từ máy chủ hoặc chưa đồng bộ.',
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: PortalSpacing.xs),
-            Text(
-              'Bạn có thể nhập trực tiếp tên mô hình ở ô phía dưới.',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadError(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('Không thể tải danh sách mô hình khả dụng.'),
-          const SizedBox(height: PortalSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: () =>
-                ref.invalidate(routerModelCatalogProvider(widget.providerId)),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Thử lại'),
-          ),
-        ],
       ),
     );
   }

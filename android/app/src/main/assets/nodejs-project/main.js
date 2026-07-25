@@ -69,6 +69,7 @@ try {
     antigravity: 'antigravity.fetchAvailableModels',
     github: 'github.copilot_internal/user',
     openrouter: 'openrouter.auth/key',
+    codex: 'codex.unsupported',
   };
 
   function quotaState(status, connection = null, details = {}) {
@@ -236,9 +237,9 @@ try {
   }
 
   function sendSanitizedUpstreamError(response, upstreamResponse, _errorBody, provider) {
-    // Upstream-controlled error fields may echo credentials. Log metadata only.
+    const errorDetail = _errorBody ? _errorBody.toString('utf8') : '';
     logToFile(
-      `Upstream ${provider.presetId || provider.id} HTTP ${upstreamResponse.status}`,
+      `Upstream ${provider.presetId || provider.id} HTTP ${upstreamResponse.status} detail: ${errorDetail}`,
       'ERROR',
     );
     return sendJson(response, upstreamResponse.status, { error: 'upstream_request_failed' });
@@ -300,8 +301,17 @@ try {
 
     if (request.method === 'GET' && url.pathname === '/v1/models') {
       const requestedConnectionId = url.searchParams.get('connectionId');
+      if (requestedConnectionId) {
+        const targetProvider = db.providers.find(p => p.id === requestedConnectionId || p.presetId === requestedConnectionId);
+        if (!targetProvider) {
+          return sendJson(response, 200, { data: [] });
+        }
+        return sendJson(response, 200, {
+          data: configuredModels(targetProvider),
+        });
+      }
+
       const activeProvider =
-        (requestedConnectionId && db.providers.find(p => p.id === requestedConnectionId)) ||
         db.providers.find(p => p.active) ||
         db.providers[0];
       if (!activeProvider) {
@@ -435,8 +445,8 @@ try {
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
         const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
-        const isOpenAiResponses = activeProvider.transportKind === 'openaiResponses';
-        const isCodex = activeProvider.presetId === 'codex';
+        const isCodex = activeProvider.presetId === 'codex' || (typeof selectedModel === 'string' && selectedModel.toLowerCase().includes('codex'));
+        const isOpenAiResponses = activeProvider.transportKind === 'openaiResponses' || isCodex;
 
         const headers = {
           'content-type': 'application/json',
@@ -474,12 +484,12 @@ try {
         if (isCodex) {
           Object.assign(headers, {
             accept: 'text/event-stream',
-            'user-agent': 'codex_cli_rs/0.0.0',
+            'user-agent': 'codex_cli_rs/0.136.0',
             originator: 'codex_cli_rs',
             session_id: randomUUID(),
           });
           if (activeProvider.accountId) {
-            headers['chatgpt-account-id'] = activeProvider.accountId;
+            headers['ChatGPT-Account-ID'] = activeProvider.accountId;
           }
         }
 
@@ -521,7 +531,7 @@ try {
               : `${activeProvider.baseUrl}/chat/completions`;
 
         if (requestedStream) {
-          if (!isGeminiCli && !isAnthropicMessages) {
+          if (!isGeminiCli && !isAnthropicMessages && !isOpenAiResponses) {
             body.stream_options = { ...(body.stream_options || {}), include_usage: true };
           }
           const upstreamController = new AbortController();

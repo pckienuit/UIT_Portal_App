@@ -159,6 +159,7 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
           credentialKind: credentialKind,
           tokenExpiresAt: runtimeExpiry,
           projectId: oauth.projectId,
+          accountId: oauth.accountId,
         ),
       );
       await ref

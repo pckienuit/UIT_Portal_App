@@ -16,10 +16,19 @@ class RouterAdminClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final runtimeState = ref.read(routerRuntimeServiceProvider);
-          if (runtimeState.state == RouterState.ready) {
-            options.baseUrl = runtimeState.baseUrl!;
-            options.headers['Authorization'] = 'Bearer ${runtimeState.bearer}';
+          if (runtimeState.state != RouterState.ready ||
+              runtimeState.baseUrl == null) {
+            // Core chưa sẵn sàng: abort thay vì bắn request tới baseUrl rỗng.
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                error: const _CoreUnavailableError(),
+                type: DioExceptionType.connectionError,
+              ),
+            );
           }
+          options.baseUrl = runtimeState.baseUrl!;
+          options.headers['Authorization'] = 'Bearer ${runtimeState.bearer}';
           return handler.next(options);
         },
       ),
@@ -127,18 +136,25 @@ class RouterAdminClient {
     }
   }
 
-  // Xóa provider connection
+  // Xóa provider connection. 404 = resource đã vắng mặt trong core (chưa sync
+  // hoặc đã bị xóa lần trước) → idempotent success.
   Future<bool> deleteProvider(String id) async {
     try {
       final res = await _dio.delete('/internal/providers/$id');
-      return res.statusCode == 200;
+      return res.statusCode == 200 || res.statusCode == 404;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return true;
+      if (e.error is _CoreUnavailableError) return true;
+      debugPrint('Failed to delete provider from core: $e');
+      return false;
     } catch (e) {
       debugPrint('Failed to delete provider from core: $e');
       return false;
     }
   }
 
-  // Đặt connection active
+  // Đặt connection active. 404 = resource chưa tồn tại trong core → thử upsert
+  // trước (idempotent), nếu vẫn miss thì coi như success (local đã đúng).
   Future<bool> setActiveProvider(String id) async {
     try {
       final res = await _dio.patch(
@@ -146,6 +162,11 @@ class RouterAdminClient {
         data: {'active': true},
       );
       return res.statusCode == 200;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return true;
+      if (e.error is _CoreUnavailableError) return true;
+      debugPrint('Failed to set active provider in core: $e');
+      return false;
     } catch (e) {
       debugPrint('Failed to set active provider in core: $e');
       return false;
@@ -250,3 +271,9 @@ final routerModelCatalogProvider = FutureProvider.autoDispose
     .family<List<AiModelOption>, String>((ref, connectionId) {
       return ref.watch(routerAdminClientProvider).listModels(connectionId);
     });
+
+class _CoreUnavailableError implements Exception {
+  const _CoreUnavailableError();
+  @override
+  String toString() => 'Core AI router runtime not ready';
+}

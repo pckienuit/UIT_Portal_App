@@ -320,7 +320,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
                     builder: (_) => AiModelPickerSheet(
                       providerId: config.id,
                       currentModelId: config.modelId,
-                      onModelSelected: (modelId) async {
+                      onModelSelected: (modelId, _) async {
                         if (ref.read(aiChatControllerProvider).isGenerating) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(

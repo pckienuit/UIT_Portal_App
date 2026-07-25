@@ -1,16 +1,120 @@
 'use strict';
 
-function openAiToOpenAiResponses(body, model) {
-  const input = (body.messages || []).map((msg) => ({
-    role: msg.role === 'assistant' ? 'assistant' : msg.role === 'system' ? 'system' : 'user',
-    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-  }));
+const CODEX_DEFAULT_INSTRUCTIONS =
+  'You are an expert software engineer. Follow the user instructions carefully.';
 
-  return {
-    model: model || body.model,
+const RESPONSES_API_ALLOWLIST = new Set([
+  'model',
+  'input',
+  'instructions',
+  'tools',
+  'tool_choice',
+  'stream',
+  'store',
+  'reasoning',
+  'service_tier',
+  'include',
+  'prompt_cache_key',
+  'client_metadata',
+  'text',
+]);
+
+function openAiToOpenAiResponses(body, model) {
+  let resolvedModel = model || body.model;
+  const isCodex = resolvedModel && /codex/i.test(resolvedModel);
+
+  let effortFromModel = null;
+  if (isCodex) {
+    const effortLevels = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+    for (const level of effortLevels) {
+      if (resolvedModel.endsWith(`-${level}`)) {
+        effortFromModel = level;
+        resolvedModel = resolvedModel.replace(`-${level}`, '');
+        break;
+      }
+    }
+  }
+
+  const input = [];
+  let instructions = typeof body.instructions === 'string' ? body.instructions : '';
+  let hasSystemMessage = instructions.trim().length > 0;
+
+  for (const msg of body.messages || []) {
+    const role = msg.role;
+    let contentText = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+
+    if (role === 'system') {
+      if (!hasSystemMessage) {
+        instructions = contentText;
+        hasSystemMessage = true;
+      } else {
+        input.push({
+          type: 'message',
+          role: 'developer',
+          content: [{ type: 'input_text', text: contentText }],
+        });
+      }
+      continue;
+    }
+
+    if (role === 'user' || role === 'assistant') {
+      const contentType = role === 'user' ? 'input_text' : 'output_text';
+      input.push({
+        type: 'message',
+        role: role === 'assistant' ? 'assistant' : 'user',
+        content: [{ type: contentType, text: contentText }],
+      });
+    }
+  }
+
+  if (input.length === 0) {
+    input.push({
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text: '...' }],
+    });
+  }
+
+  const out = {
+    model: resolvedModel,
     input,
     stream: body.stream === true,
+    store: false,
   };
+
+  if (instructions.trim()) {
+    out.instructions = instructions;
+  }
+
+  if (isCodex) {
+    out.store = false;
+    if (!out.instructions || !out.instructions.trim()) {
+      out.instructions = CODEX_DEFAULT_INSTRUCTIONS;
+    }
+    if (!body.reasoning) {
+      let effort = typeof body.reasoning_effort === 'string' && body.reasoning_effort
+        ? body.reasoning_effort
+        : (effortFromModel || 'low');
+      if (effort === 'max') effort = 'xhigh';
+      out.reasoning = { effort, summary: 'auto' };
+      out.include = ['reasoning.encrypted_content'];
+    } else {
+      out.reasoning = body.reasoning;
+      if (out.reasoning.effort === 'max') out.reasoning.effort = 'xhigh';
+      if (out.reasoning.effort && out.reasoning.effort !== 'none') {
+        out.include = body.include || ['reasoning.encrypted_content'];
+      }
+    }
+    delete body.reasoning_effort;
+    out.prompt_cache_key = body.prompt_cache_key || `codex-${resolvedModel}`;
+
+    // Clean disallowed keys
+    for (const key of Object.keys(out)) {
+      if (!RESPONSES_API_ALLOWLIST.has(key)) delete out[key];
+    }
+  }
+
+  return out;
 }
 
 function openAiResponsesResponseToOpenAi(payload, model) {

@@ -69,7 +69,7 @@ void main() {
               body: AiModelPickerSheet(
                 providerId: 'p1',
                 currentModelId: 'model-a',
-                onModelSelected: (_) async {},
+                onModelSelected: (_, __) async {},
               ),
             ),
           ),
@@ -125,7 +125,7 @@ void main() {
             body: AiModelPickerSheet(
               providerId: 'provider-antigravity',
               currentModelId: 'claude-sonnet-4-6',
-              onModelSelected: (modelId) async => selected = modelId,
+              onModelSelected: (modelId, _) async => selected = modelId,
             ),
           ),
         ),
@@ -169,7 +169,7 @@ void main() {
               body: AiModelPickerSheet(
                 providerId: 'provider-antigravity',
                 currentModelId: 'catalog-only',
-                onModelSelected: (id) async => selected = id,
+                onModelSelected: (id, _) async => selected = id,
               ),
             ),
           ),
@@ -252,7 +252,7 @@ void main() {
               body: AiModelPickerSheet(
                 providerId: 'provider-antigravity',
                 currentModelId: 'locked-model',
-                onModelSelected: (id) async => selected = id,
+                onModelSelected: (id, _) async => selected = id,
               ),
             ),
           ),
@@ -320,7 +320,7 @@ void main() {
             body: AiModelPickerSheet(
               providerId: 'provider-gemini-cli',
               currentModelId: 'gemini-2.5-flash',
-              onModelSelected: (_) async {},
+              onModelSelected: (_, __) async {},
             ),
           ),
         ),

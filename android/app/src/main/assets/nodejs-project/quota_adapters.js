@@ -304,6 +304,10 @@ async function fetchQuota({
     }, fetchImpl, timeoutMs);
     return normalizeOpenRouter(connection, payload, now);
   }
+  if (connection.providerId === 'codex') {
+    // Codex usage is reported by the upstream ChatGPT client, not this router.
+    throw new QuotaError('unsupported', 501, 'Codex usage is reported by the upstream client, not the router.');
+  }
   throw new QuotaError('unsupported', 501, 'Quota is not available for this provider');
 }
 

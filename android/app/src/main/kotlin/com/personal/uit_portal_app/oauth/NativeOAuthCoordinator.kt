@@ -71,9 +71,16 @@ internal object OAuthAuthorizationContract {
 
     fun accountIdFromIdToken(idToken: String?): String? = runCatching {
         val payload = idToken?.split('.')?.getOrNull(1) ?: return null
-        Regex("\\\"sub\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
-            .find(String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8))
-            ?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+        val b64 = payload.replace('-', '+').replace('_', '/')
+        val pad = (4 - (b64.length % 4)) % 4
+        val decoded = String(Base64.getUrlDecoder().decode(b64 + "=".repeat(pad)), StandardCharsets.UTF_8)
+        val json = JSONObject(decoded)
+        if (json.has("https://api.openai.com/auth")) {
+            val authObj = json.optJSONObject("https://api.openai.com/auth")
+            val chatgptAccId = authObj?.optString("chatgpt_account_id")
+            if (!chatgptAccId.isNullOrEmpty()) return chatgptAccId
+        }
+        json.optString("sub").trim().takeIf { it.isNotEmpty() }
     }.getOrNull()
 
     private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())

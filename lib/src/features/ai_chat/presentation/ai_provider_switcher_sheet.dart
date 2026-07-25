@@ -20,7 +20,7 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
       builder: (context) => AiModelPickerSheet(
         providerId: providerId,
         currentModelId: currentModelId,
-        onModelSelected: (modelId) async {
+        onModelSelected: (modelId, pId) async {
           if (ref.read(aiChatControllerProvider).isGenerating) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -31,15 +31,10 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
             );
             return;
           }
-          final providerState = ref.read(aiProviderControllerProvider);
-          final config = providerState.providers.firstWhere(
-            (e) => e.id == providerId,
-          );
-
-          final updatedConfig = config.copyWith(modelId: modelId);
+          final targetProviderId = pId ?? providerId;
           await ref
               .read(aiChatControllerProvider.notifier)
-              .switchProvider(updatedConfig);
+              .selectGlobalModel(targetProviderId, modelId);
         },
       ),
     );

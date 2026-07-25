@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_provider_validator.dart';
 import 'sse_decoder.dart';
@@ -246,7 +247,10 @@ class OpenAiCompatibleBackend implements AiChatBackend {
         if (code == 429) {
           return 'Đã vượt quá giới hạn số lượng yêu cầu (Rate Limit).';
         }
-        return 'Lỗi từ máy chủ AI (Mã ${e.response!.statusCode}).';
+        if (e.response?.data != null) {
+          debugPrint('AI Server Error Data: ${e.response!.data}');
+        }
+        return 'Lỗi từ máy chủ AI (Mã ${e.response!.statusCode}). Data: ${e.response!.data}';
       }
     }
     return 'Lỗi kết nối máy chủ AI. Vui lòng kiểm tra mạng.';

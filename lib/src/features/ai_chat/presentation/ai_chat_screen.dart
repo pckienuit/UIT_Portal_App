@@ -7,6 +7,7 @@ import '../application/ai_chat_controller.dart';
 import '../application/ai_portal_context_builder.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_context_consent_sheet.dart';
+import 'ai_model_picker_sheet.dart';
 import 'ai_provider_settings_screen.dart';
 import 'ai_provider_switcher_sheet.dart';
 
@@ -73,10 +74,32 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  void _showProviderSwitcher() {
+  void _showModelPicker() {
+    final activeProvider = ref.read(aiChatControllerProvider).activeProvider;
     showModalBottomSheet(
       context: context,
-      builder: (context) => const AiProviderSwitcherSheet(),
+      isScrollControlled: true,
+      builder: (context) => AiModelPickerSheet(
+        providerId: null, // Global mode: hiển thị tất cả model khả dụng của tất cả provider
+        currentModelId: activeProvider?.modelId ?? '',
+        onModelSelected: (modelId, providerId) async {
+          if (ref.read(aiChatControllerProvider).isGenerating) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Vui lòng dừng trả lời hiện tại trước khi đổi model.',
+                ),
+              ),
+            );
+            return;
+          }
+          if (providerId != null && providerId.isNotEmpty) {
+            await ref
+                .read(aiChatControllerProvider.notifier)
+                .selectGlobalModel(providerId, modelId);
+          }
+        },
+      ),
     );
   }
 
@@ -133,7 +156,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 10), // reduced size
                   ),
-                  onPressed: _showProviderSwitcher,
+                  onPressed: _showModelPicker,
                 ),
               ),
             ),

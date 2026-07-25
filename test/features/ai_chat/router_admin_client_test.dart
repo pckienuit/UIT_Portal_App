@@ -54,6 +54,27 @@ class _QuotaAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _StatusAdapter implements HttpClientAdapter {
+  _StatusAdapter(this.statusCode);
+  final int statusCode;
+  final requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return ResponseBody.fromString('{"error":"not_found"}', statusCode, headers: {
+      Headers.contentTypeHeader: ['application/json'],
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   test('provider config serializes runtime descriptor models for PATCH', () {
     final config = AiProviderConfig(
@@ -132,4 +153,36 @@ void main() {
       expect(snapshot.message, 'Quota unavailable');
     },
   );
+
+  test('deleteProvider treats 404 as already-deleted success', () async {
+    final adapter = _StatusAdapter(404);
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+    final client = RouterAdminClient.forTest(dio);
+
+    expect(await client.deleteProvider('missing-p'), isTrue);
+    expect(adapter.requests.single.method, 'DELETE');
+    expect(adapter.requests.single.path, '/internal/providers/missing-p');
+  });
+
+  test('setActiveProvider treats 404 as already-absent success', () async {
+    final adapter = _StatusAdapter(404);
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+    final client = RouterAdminClient.forTest(dio);
+
+    expect(await client.setActiveProvider('missing-p'), isTrue);
+    expect(adapter.requests.single.method, 'PATCH');
+    expect(adapter.requests.single.path, '/internal/providers/missing-p');
+    expect(adapter.requests.single.data, {'active': true});
+  });
+
+  test('deleteProvider still surfaces 500 as failure', () async {
+    final adapter = _StatusAdapter(500);
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+    final client = RouterAdminClient.forTest(dio);
+
+    expect(await client.deleteProvider('p'), isFalse);
+  });
 }

@@ -105,12 +105,7 @@ class AiChatController extends Notifier<AiChatState> {
           conversations: history,
           activeConversation: () => activeProvider == null
               ? null
-              : history.cast<AiConversation?>().firstWhere(
-                  (conversation) =>
-                      conversation != null &&
-                      _matchesProvider(conversation, activeProvider),
-                  orElse: () => null,
-                ),
+              : (history.isNotEmpty ? history.first : null),
         );
       }
     });
@@ -137,18 +132,40 @@ class AiChatController extends Notifier<AiChatState> {
     AiProviderState providerState,
   ) async {
     final activeConfig = _getActiveConfig(providerState);
+    final current = state.activeConversation;
+    AiConversation? updatedConversation = current;
+    var conversations = state.conversations;
+
+    if (activeConfig != null && current != null) {
+      updatedConversation = AiConversation(
+        id: current.id,
+        title: current.title,
+        providerId: activeConfig.id,
+        modelId: activeConfig.modelId,
+        messages: current.messages,
+        updatedAt: DateTime.now(),
+      );
+      conversations = List<AiConversation>.from(state.conversations);
+      final index = conversations.indexWhere((item) => item.id == current.id);
+      if (index >= 0) {
+        conversations[index] = updatedConversation;
+      }
+    } else if (activeConfig != null && conversations.isNotEmpty) {
+      updatedConversation = conversations.first;
+    }
+
     state = state.copyWith(
       activeProvider: () => activeConfig,
-      activeConversation: () => activeConfig == null
-          ? null
-          : state.conversations.cast<AiConversation?>().firstWhere(
-              (conversation) =>
-                  conversation != null &&
-                  _matchesProvider(conversation, activeConfig),
-              orElse: () => null,
-            ),
+      activeConversation: () => updatedConversation,
+      conversations: conversations,
       errorMessage: () => null,
     );
+
+    if (updatedConversation != null) {
+      final store = await ref.read(chatHistoryStoreProvider.future);
+      await store.writeHistory(conversations);
+    }
+
     if (activeConfig != null) {
       await _loadBackend(activeConfig);
     } else {
@@ -159,9 +176,16 @@ class AiChatController extends Notifier<AiChatState> {
 
   Future<void> _handleActiveModelChanged(AiProviderConfig activeConfig) async {
     final current = state.activeConversation;
-    AiConversation? updatedConversation;
+    final currentProviderId = state.activeProvider?.id;
+    AiConversation? updatedConversation = current;
     var conversations = state.conversations;
-    if (current != null) {
+
+    // Changing a model's provider connection MUST NOT yank the user's current
+    // conversation. Only mutate the active conversation when the user is editing
+    // the model for the provider they're already chatting with.
+    final editsActiveProvider = currentProviderId == activeConfig.id;
+
+    if (editsActiveProvider && current != null) {
       updatedConversation = AiConversation(
         id: current.id,
         title: current.title,
@@ -178,11 +202,11 @@ class AiChatController extends Notifier<AiChatState> {
     }
     state = state.copyWith(
       activeProvider: () => activeConfig,
-      activeConversation: () => updatedConversation,
+      activeConversation: () => editsActiveProvider ? updatedConversation : current,
       conversations: conversations,
       errorMessage: () => null,
     );
-    if (updatedConversation != null) {
+    if (editsActiveProvider && updatedConversation != null) {
       final store = await ref.read(chatHistoryStoreProvider.future);
       await store.writeHistory(conversations);
     }
@@ -203,6 +227,27 @@ class AiChatController extends Notifier<AiChatState> {
     await ref
         .read(aiProviderControllerProvider.notifier)
         .selectActiveProvider(config.id);
+  }
+
+  Future<void> selectGlobalModel(String providerId, String modelId) async {
+    final providerState = ref.read(aiProviderControllerProvider);
+    final targetConfig = providerState.providers
+        .where((p) => p.id == providerId)
+        .firstOrNull;
+    if (targetConfig == null) return;
+
+    final updatedConfig = targetConfig.copyWith(modelId: modelId);
+    await ref
+        .read(aiProviderControllerProvider.notifier)
+        .saveProvider(updatedConfig);
+
+    if (providerState.activeProviderId != providerId) {
+      await ref
+          .read(aiProviderControllerProvider.notifier)
+          .selectActiveProvider(providerId);
+    } else {
+      await _handleActiveModelChanged(updatedConfig);
+    }
   }
 
   Future<void> startNewConversation() async {
@@ -488,8 +533,7 @@ class AiChatController extends Notifier<AiChatState> {
     AiConversation conversation,
     AiProviderConfig provider,
   ) =>
-      conversation.providerId == provider.id &&
-      conversation.modelId == provider.modelId;
+      conversation.providerId == provider.id;
 
   Future<void> clearAllData() async {
     stopGeneration();
