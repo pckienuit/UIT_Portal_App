@@ -194,10 +194,10 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                             onTap: () async {
                               await widget.onModelSelected(model.id);
                               if (context.mounted) {
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).pop();
+                                final navigator = Navigator.of(context);
+                                if (navigator.canPop()) {
+                                  navigator.pop();
+                                }
                               }
                             },
                           );
@@ -240,7 +240,12 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                         await widget.onModelSelected(
                           _customModelController.text.trim(),
                         );
-                        if (context.mounted) Navigator.of(context).pop();
+                        if (context.mounted) {
+                          final navigator = Navigator.of(context);
+                          if (navigator.canPop()) {
+                            navigator.pop();
+                          }
+                        }
                       }
                     },
                     child: const Text('Áp dụng'),
