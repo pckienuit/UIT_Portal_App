@@ -69,7 +69,7 @@ try {
     antigravity: 'antigravity.fetchAvailableModels',
     github: 'github.copilot_internal/user',
     openrouter: 'openrouter.auth/key',
-    codex: 'codex.unsupported',
+    codex: 'codex.backend-api/wham/usage',
   };
 
   function quotaState(status, connection = null, details = {}) {
@@ -138,6 +138,9 @@ try {
         ...(connection.mobileMetadata?.customModels?.length
           ? { customModels: connection.mobileMetadata.customModels }
           : {}),
+        ...(connection.mobileMetadata?.hiddenModelIds?.length
+          ? { hiddenModelIds: connection.mobileMetadata.hiddenModelIds }
+          : {}),
         ...(connection.mobileMetadata?.staticHeaders &&
         Object.keys(connection.mobileMetadata.staticHeaders).length
           ? { staticHeaders: connection.mobileMetadata.staticHeaders }
@@ -175,6 +178,7 @@ try {
           authScheme: provider.authScheme,
           models: Array.isArray(provider.models) ? provider.models : [],
           customModels: Array.isArray(provider.customModels) ? provider.customModels : [],
+          hiddenModelIds: Array.isArray(provider.hiddenModelIds) ? provider.hiddenModelIds : [],
           staticHeaders: provider.staticHeaders && typeof provider.staticHeaders === 'object'
             ? provider.staticHeaders
             : {},
@@ -237,9 +241,8 @@ try {
   }
 
   function sendSanitizedUpstreamError(response, upstreamResponse, _errorBody, provider) {
-    const errorDetail = _errorBody ? _errorBody.toString('utf8') : '';
     logToFile(
-      `Upstream ${provider.presetId || provider.id} HTTP ${upstreamResponse.status} detail: ${errorDetail}`,
+      `Upstream ${provider.presetId || provider.id} HTTP ${upstreamResponse.status}`,
       'ERROR',
     );
     return sendJson(response, upstreamResponse.status, { error: 'upstream_request_failed' });
@@ -258,23 +261,42 @@ try {
     return `${provider.baseUrl.replace(/\/$/, '')}${path}`;
   }
 
-  function configuredModels(provider) {
-    const models = provider.presetId === 'antigravity'
-      ? (Array.isArray(provider.models) ? provider.models : [])
-      : [...(Array.isArray(provider.models) ? provider.models : []), ...(Array.isArray(provider.customModels) ? provider.customModels : [])];
-    const entries = models
+  function listedModels(provider, models, fallbackToModelId = false, ownedBy = provider.id) {
+    const hiddenSet = new Set((Array.isArray(provider.hiddenModelIds) ? provider.hiddenModelIds : [])
+      .filter((id) => typeof id === 'string' && id.trim())
+      .map((id) => id.trim()));
+    const custom = Array.isArray(provider.customModels) ? provider.customModels : [];
+    const combined = [...models, ...custom];
+    const entries = combined
       .map((model) => typeof model === 'string'
         ? { id: model }
-        : { id: model?.id, name: model?.name })
-      .filter((model) => typeof model.id === 'string' && model.id.trim());
-    if (!entries.length && provider.modelId) entries.push({ id: provider.modelId });
+        : { ...model, id: model?.id, name: model?.name })
+      .filter((model) => typeof model.id === 'string' && model.id.trim())
+      .map((model) => ({ ...model, id: model.id.trim() }))
+      .filter((model) => !hiddenSet.has(model.id));
+    if (fallbackToModelId && !entries.length && typeof provider.modelId === 'string' &&
+        provider.modelId.trim() && !hiddenSet.has(provider.modelId.trim())) {
+      entries.push({ id: provider.modelId.trim() });
+    }
     const ids = new Set();
-    return entries.filter((model) => ids.add(model.id.trim())).map((model) => ({
-      id: model.id,
+    return entries.filter((model) => {
+      if (ids.has(model.id)) return false;
+      ids.add(model.id);
+      return true;
+    }).map((model) => ({
+      ...model,
       ...(typeof model.name === 'string' && model.name ? { name: model.name } : {}),
       object: 'model',
-      owned_by: provider.id,
+      owned_by: model.owned_by || ownedBy,
     }));
+  }
+
+  function configuredModels(provider) {
+    return listedModels(
+      provider,
+      Array.isArray(provider.models) ? provider.models : [],
+      true,
+    );
   }
 
   const server = http.createServer(async (request, response) => {
@@ -301,19 +323,10 @@ try {
 
     if (request.method === 'GET' && url.pathname === '/v1/models') {
       const requestedConnectionId = url.searchParams.get('connectionId');
-      if (requestedConnectionId) {
-        const targetProvider = db.providers.find(p => p.id === requestedConnectionId || p.presetId === requestedConnectionId);
-        if (!targetProvider) {
-          return sendJson(response, 200, { data: [] });
-        }
-        return sendJson(response, 200, {
-          data: configuredModels(targetProvider),
-        });
-      }
-
-      const activeProvider =
-        db.providers.find(p => p.active) ||
-        db.providers[0];
+      const hasConnectionId = url.searchParams.has('connectionId');
+      const activeProvider = hasConnectionId
+        ? db.providers.find(p => p.id === requestedConnectionId)
+        : db.providers.find(p => p.active) || db.providers[0];
       if (!activeProvider) {
         return sendJson(response, 200, { data: [] });
       }
@@ -326,7 +339,7 @@ try {
           });
           if (ids.length > 0) {
             return sendJson(response, 200, {
-              data: ids.map((id) => ({ id, object: 'model', owned_by: 'gemini-cli' })),
+              data: listedModels(activeProvider, ids, false, 'gemini-cli'),
             });
           }
         } catch {
@@ -346,12 +359,7 @@ try {
           });
           if (models.length > 0) {
             return sendJson(response, 200, {
-              data: models.map((model) => ({
-                id: model.id,
-                name: model.name,
-                object: 'model',
-                owned_by: 'antigravity',
-              })),
+              data: listedModels(activeProvider, models, false, 'antigravity'),
             });
           }
         } catch (error) {
@@ -373,6 +381,14 @@ try {
             },
           });
           const payload = Buffer.from(await upstream.arrayBuffer());
+          if (upstream.ok) {
+            const parsed = JSON.parse(payload.toString('utf8'));
+            if (Array.isArray(parsed?.data) && parsed.data.every(
+              (model) => model && typeof model.id === 'string' && model.id.trim(),
+            )) {
+              return sendJson(response, 200, { data: listedModels(activeProvider, parsed.data) });
+            }
+          }
           response.writeHead(upstream.status, {
             'content-type': upstream.headers.get('content-type') || 'application/json',
           });
@@ -393,11 +409,7 @@ try {
               (model) => model && typeof model.name === 'string' && model.name.trim(),
             )) {
               return sendJson(response, 200, {
-                data: payload.models.map((model) => ({
-                  id: model.name,
-                  object: 'model',
-                  owned_by: activeProvider.id,
-                })),
+                data: listedModels(activeProvider, payload.models.map((model) => ({ id: model.name }))),
               });
             }
           }
@@ -413,7 +425,7 @@ try {
             if (Array.isArray(payload?.data) && payload.data.every(
               (model) => model && typeof model.id === 'string' && model.id.trim(),
             )) {
-              return sendJson(response, 200, { data: payload.data });
+              return sendJson(response, 200, { data: listedModels(activeProvider, payload.data) });
             }
           }
         } catch (_) {}
@@ -425,9 +437,17 @@ try {
 
     if (request.method === 'POST' && url.pathname === '/v1/chat/completions') {
       try {
-        const activeProvider = db.providers.find(p => p.active) || db.providers[0];
+        const requestedConnectionId = url.searchParams.get('connectionId');
+        const hasConnectionId = url.searchParams.has('connectionId');
+        const activeProvider = hasConnectionId
+          ? db.providers.find(p => p.id === requestedConnectionId)
+          : db.providers.find(p => p.active) || db.providers[0];
         if (!activeProvider) {
-          return sendJson(response, 400, { error: 'No active provider connection configured' });
+          return sendJson(response, hasConnectionId ? 404 : 400, {
+            error: hasConnectionId
+              ? 'Provider connection not found'
+              : 'No active provider connection configured',
+          });
         }
 
         let body = await parseJsonBody(request);
@@ -790,6 +810,7 @@ try {
           authScheme: data.authScheme,
           models: Array.isArray(data.models) ? data.models : [],
           customModels: Array.isArray(data.customModels) ? data.customModels : [],
+          hiddenModelIds: Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : [],
           staticHeaders: data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders
             : {},
@@ -827,6 +848,7 @@ try {
         if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
         if (data.models !== undefined) provider.models = Array.isArray(data.models) ? data.models : [];
         if (data.customModels !== undefined) provider.customModels = Array.isArray(data.customModels) ? data.customModels : [];
+        if (data.hiddenModelIds !== undefined) provider.hiddenModelIds = Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : [];
         if (data.staticHeaders !== undefined) {
           provider.staticHeaders = data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders

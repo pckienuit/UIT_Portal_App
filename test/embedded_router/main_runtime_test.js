@@ -456,11 +456,16 @@ test('Gemini CLI model listing uses live quota buckets', async (t) => {
     id: 'gemini-provider', name: 'Gemini CLI', presetId: 'gemini-cli',
     baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
     modelId: 'stale-model', projectId: 'cloud-project', apiKey: 'runtime-token', active: true,
+    customModels: [{ id: ' custom-model ' }, { id: 'gemini-live-model' }, { id: 'manual-model' }],
+    hiddenModelIds: [' custom-model '],
   })).status, 201);
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
-    data: [{ id: 'gemini-live-model', object: 'model', owned_by: 'gemini-cli' }],
+    data: [
+      { id: 'gemini-live-model', object: 'model', owned_by: 'gemini-cli' },
+      { id: 'manual-model', object: 'model', owned_by: 'gemini-cli' },
+    ],
   });
 });
 
@@ -504,6 +509,9 @@ test('model listing targets requested connection instead of active fallback', as
   assert.deepEqual(await response.json(), {
     data: [{ id: 'requested-model', object: 'model', owned_by: 'gemini-cli' }],
   });
+  const missing = await request(baseUrl, token, 'GET', '/v1/models?connectionId=missing');
+  assert.equal(missing.status, 200);
+  assert.deepEqual(await missing.json(), { data: [] });
 });
 
 test('GitHub model listing proxies the live upstream catalog', async (t) => {
@@ -512,7 +520,7 @@ test('GitHub model listing proxies the live upstream catalog', async (t) => {
     assert.equal(request.headers['copilot-integration-id'], 'vscode-chat');
     assert.match(request.headers.authorization, /^Bearer /);
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ data: [{ id: 'available-model' }] }));
+    response.end(JSON.stringify({ data: [{ id: ' available-model ' }, { id: 'hidden-model' }] }));
   });
   await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
   t.after(() => upstream.close());
@@ -534,11 +542,15 @@ test('GitHub model listing proxies the live upstream catalog', async (t) => {
     modelId: 'retired-model',
     apiKey: 'runtime-token',
     active: true,
+    customModels: [{ id: 'available-model' }, { id: 'custom-model' }],
+    hiddenModelIds: ['hidden-model'],
   })).status, 201);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { data: [{ id: 'available-model' }] });
+  assert.deepEqual((await response.json()).data.map((model) => model.id), [
+    'available-model', 'custom-model',
+  ]);
 });
 
 test('GitHub model listing returns 502 when upstream is unavailable', async (t) => {
@@ -833,14 +845,16 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
       { id: 'claude-sonnet-4-6', name: 'Catalog Sonnet' },
       { id: 'gemini-3-flash-agent', name: 'Catalog Flash' },
       { id: 'catalog-only', name: 'Wrong catalog fallback' },
-    ], active: false,
+    ],
+    customModels: [{ id: ' claude-sonnet-4-6 ' }, { id: 'manual-model' }],
+    hiddenModelIds: ['gemini-3-flash-agent'], active: false,
   })).status, 201);
 
   const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
   assert.equal(models.status, 200);
   assert.deepEqual(await models.json(), { data: [
     { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', object: 'model', owned_by: 'antigravity' },
-    { id: 'gemini-3-flash-agent', name: 'Gemini 3.5 Flash (High)', object: 'model', owned_by: 'antigravity' },
+    { id: 'manual-model', object: 'model', owned_by: 'antigravity' },
   ] });
 
   const quota = await request(baseUrl, token, 'POST', '/internal/quota/provider-antigravity/refresh');
@@ -962,7 +976,8 @@ test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => 
     assert.equal(request.headers['x-api-key'], `Token ${secret}`);
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ data: [
-      { id: 'live-model', object: 'model', owned_by: 'upstream' },
+      { id: ' live-model ', object: 'model', owned_by: 'upstream' },
+      { id: 'hidden-model', object: 'model', owned_by: 'upstream' },
     ] }));
   });
   await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
@@ -982,13 +997,15 @@ test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => 
     modelsUrl: `http://127.0.0.1:${upstream.address().port}/locked/models`,
     authHeader: 'X-API-Key', authScheme: 'Token',
     models: [{ id: 'catalog-model', name: 'Catalog Model' }],
+    customModels: [{ id: 'live-model' }, { id: 'custom-model' }],
+    hiddenModelIds: ['hidden-model'],
   })).status, 201);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { data: [
-    { id: 'live-model', object: 'model', owned_by: 'upstream' },
-  ] });
+  assert.deepEqual((await response.json()).data.map((model) => model.id), [
+    'live-model', 'custom-model',
+  ]);
 });
 
 test('OpenAI Chat model descriptor falls back to catalog then configured model', async (t) => {
@@ -1087,6 +1104,7 @@ test('Ollama tags map live models from saved base URL', async (t) => {
     response.end(JSON.stringify({ models: [
       { name: 'llama3:latest' },
       { name: 'custom/saved-model' },
+      { name: ' hidden-model ' },
     ] }));
   });
   await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
@@ -1106,12 +1124,14 @@ test('Ollama tags map live models from saved base URL', async (t) => {
     transportKind: 'ollamaChat',
     chatUrl: `${ollamaBaseUrl}/api/chat`,
     modelsUrl: `${ollamaBaseUrl}/api/tags`,
+    customModels: [{ id: 'custom/saved-model' }, { id: 'manual-model' }],
+    hiddenModelIds: ['hidden-model'],
   })).status, 201);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.map((model) => model.id), [
-    'llama3:latest', 'custom/saved-model',
+    'llama3:latest', 'custom/saved-model', 'manual-model',
   ]);
 });
 
@@ -1188,7 +1208,7 @@ test('provider PATCH persists corrected runtime descriptor and models', async (t
   );
 });
 
-test('generic custom models persist across restart', async (t) => {
+test('generic custom and hidden models persist across post patch and restart', async (t) => {
   const dataDir = tempDir();
   const token = 'custom-models-core-token';
   let port = await freePort();
@@ -1197,8 +1217,16 @@ test('generic custom models persist across restart', async (t) => {
   await waitUntilReady(baseUrl, token, child);
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'generic-custom', name: 'Generic', presetId: 'custom', baseUrl: 'https://example.test/v1',
-    modelId: 'configured', models: [{ id: 'configured' }], customModels: [{ id: 'manual/model-x' }], active: true,
+    modelId: 'configured', models: [{ id: 'configured' }, { id: 'hidden-post' }],
+    customModels: [{ id: 'manual/post' }], hiddenModelIds: ['hidden-post'], active: true,
   })).status, 201);
+  const postedState = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.deepEqual(postedState.connections[0].mobileMetadata.customModels, [{ id: 'manual/post' }]);
+  assert.deepEqual(postedState.connections[0].mobileMetadata.hiddenModelIds, ['hidden-post']);
+  assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/generic-custom', {
+    customModels: [{ id: ' manual/model-x ' }, { id: 'configured' }],
+    hiddenModelIds: ['configured'],
+  })).status, 200);
   child.kill();
   port = await freePort();
   baseUrl = `http://127.0.0.1:${port}`;
@@ -1206,8 +1234,11 @@ test('generic custom models persist across restart', async (t) => {
   t.after(() => child.kill());
   await waitUntilReady(baseUrl, token, child);
   assert.deepEqual((await (await request(baseUrl, token, 'GET', '/v1/models')).json()).data.map((model) => model.id), [
-    'configured', 'manual/model-x',
+    'hidden-post', 'manual/model-x',
   ]);
+  const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
+  assert.deepEqual(providers[0].customModels, [{ id: ' manual/model-x ' }, { id: 'configured' }]);
+  assert.deepEqual(providers[0].hiddenModelIds, ['configured']);
 });
 
 test('Codex Responses forces stream and sends upstream-only account metadata', async (t) => {
@@ -1250,4 +1281,91 @@ test('Codex Responses forces stream and sends upstream-only account metadata', a
   assert.equal(seen.headers.authorization, 'Bearer access-secret');
   assert.equal(seen.headers.id, undefined);
   assert.doesNotMatch(JSON.stringify(seen), /refresh-secret/);
+});
+
+test('chat query targets exact inactive connection and model', async (t) => {
+  const seen = {};
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    Object.assign(seen, { url: request.url, body: raw ? JSON.parse(raw) : null });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"choices":[]}');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'provider-test-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const upstreamBaseUrl = `http://127.0.0.1:${upstream.address().port}`;
+
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'active-provider', name: 'Active', baseUrl: `${upstreamBaseUrl}/active`,
+    modelId: 'active-model', active: true,
+  })).status, 201);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'inactive-provider', name: 'Inactive', baseUrl: `${upstreamBaseUrl}/inactive`,
+    modelId: 'inactive-model', active: false,
+  })).status, 201);
+
+  const response = await request(
+    baseUrl,
+    token,
+    'POST',
+    '/v1/chat/completions?connectionId=inactive-provider',
+    { messages: [{ role: 'user', content: 'test' }], max_tokens: 1 },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(seen.url, '/inactive/chat/completions');
+  assert.equal(seen.body.model, 'inactive-model');
+  assert.equal(seen.body.max_tokens, 1);
+  const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
+  assert.equal(providers.find((provider) => provider.id === 'active-provider').active, true);
+  assert.equal(providers.find((provider) => provider.id === 'inactive-provider').active, false);
+});
+
+test('chat request with missing connectionId fails closed', async (t) => {
+  let upstreamCalls = 0;
+  const upstream = require('node:http').createServer((_request, response) => {
+    upstreamCalls += 1;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"choices":[]}');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'missing-connection-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'active-provider', name: 'Active',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}`,
+    modelId: 'active-model', active: true,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'POST', '/v1/chat/completions?connectionId=missing', {
+    model: 'active-model',
+    messages: [{ role: 'user', content: 'hi' }],
+    max_tokens: 1,
+  });
+
+  assert.equal(response.status, 404);
+  assert.equal(upstreamCalls, 0);
+
+  const empty = await request(baseUrl, token, 'POST', '/v1/chat/completions?connectionId=', {
+    model: 'active-model',
+    messages: [{ role: 'user', content: 'hi' }],
+    max_tokens: 1,
+  });
+  assert.equal(empty.status, 404);
+  assert.equal(upstreamCalls, 0);
 });
