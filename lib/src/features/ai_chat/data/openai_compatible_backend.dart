@@ -11,6 +11,7 @@ class OpenAiCompatibleBackend implements AiChatBackend {
     required this.baseUrl,
     required this.modelId,
     required this.apiKey,
+    this.connectionId,
     Dio? dio,
   }) : _dio =
            dio ??
@@ -25,19 +26,37 @@ class OpenAiCompatibleBackend implements AiChatBackend {
   final String baseUrl;
   final String modelId;
   final String apiKey;
+  final String? connectionId;
   final Dio _dio;
   CancelToken? _cancelToken;
 
   @override
-  Future<AiConnectionResult> testConnection() async {
+  Future<AiConnectionResult> testConnection({String? testModelId}) async {
     try {
-      final endpoint = AiProviderValidator.endpoint(baseUrl, 'models');
-      final response = await _dio.getUri(
+      final targetModel = testModelId ?? modelId;
+      var endpoint = AiProviderValidator.endpoint(baseUrl, 'chat/completions');
+      if (connectionId != null) {
+        endpoint = endpoint.replace(
+          queryParameters: {
+            ...endpoint.queryParameters,
+            'connectionId': connectionId!,
+          },
+        );
+      }
+      final response = await _dio.postUri(
         endpoint,
+        data: {
+          'model': targetModel,
+          'messages': [
+            {'role': 'user', 'content': 'hi'}
+          ],
+          'max_tokens': 1,
+        },
         options: Options(
           headers: {
             'Authorization': 'Bearer $apiKey',
             'Accept': 'application/json',
+            'Content-Type': 'application/json',
           },
         ),
       );
@@ -78,8 +97,9 @@ class OpenAiCompatibleBackend implements AiChatBackend {
         final list = data['data'] as List;
         return list
             .map((e) {
-              if (e is! Map<String, dynamic>)
+              if (e is! Map<String, dynamic>) {
                 return const AiModelOption(id: '', name: '');
+              }
 
               final id = e['id']?.toString() ?? '';
               final name = e['name']?.toString() ?? id;

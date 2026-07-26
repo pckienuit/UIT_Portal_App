@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/openai_compatible_backend.dart';
@@ -22,6 +24,38 @@ void main() {
       final result = await backend.testConnection();
       expect(result.success, isTrue);
       expect(result.errorMessage, isNull);
+    });
+
+    test('embedded Core test uses exact connectionId query and model', () async {
+      final adapter = _StaticAdapter(
+        statusCode: 200,
+        responseBody: '{"choices":[]}',
+      );
+      final dio = Dio()..httpClientAdapter = adapter;
+      final backend = OpenAiCompatibleBackend(
+        baseUrl: 'http://localhost/v1',
+        modelId: 'default-model',
+        apiKey: 'internal',
+        connectionId: 'provider/id + exact',
+        dio: dio,
+      );
+
+      final result = await backend.testConnection(testModelId: 'tested-model');
+
+      expect(result.success, isTrue);
+      expect(
+        adapter.requestUri,
+        Uri.parse(
+          'http://localhost/v1/chat/completions?connectionId=provider%2Fid+%2B+exact',
+        ),
+      );
+      expect(adapter.requestBody, {
+        'model': 'tested-model',
+        'messages': [
+          {'role': 'user', 'content': 'hi'},
+        ],
+        'max_tokens': 1,
+      });
     });
 
     test('testConnection maps 401 error', () async {
@@ -157,6 +191,8 @@ class _StaticAdapter implements HttpClientAdapter {
 
   final int statusCode;
   final String responseBody;
+  Uri? requestUri;
+  Object? requestBody;
 
   @override
   Future<ResponseBody> fetch(
@@ -164,6 +200,10 @@ class _StaticAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requestUri = options.uri;
+    requestBody = options.data is String
+        ? jsonDecode(options.data as String)
+        : options.data;
     return ResponseBody.fromString(
       responseBody,
       statusCode,

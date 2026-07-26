@@ -86,11 +86,8 @@ void main() {
       expect(find.text('model-a'), findsOneWidget);
       expect(find.text('Model B'), findsOneWidget);
       expect(find.text('Vision'), findsOneWidget);
-      expect(
-        find.widgetWithText(TextField, 'Nhập Model ID thủ công'),
-        findsOneWidget,
-      );
-      expect(find.text('Áp dụng'), findsOneWidget);
+      expect(find.byIcon(Icons.delete_outline), findsNothing);
+      expect(find.text('Thêm Model'), findsOneWidget);
     },
   );
 
@@ -183,12 +180,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Thử lại'), findsOneWidget);
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nhập Model ID thủ công'),
-        'manual-antigravity-id',
-      );
-      await tester.tap(find.text('Áp dụng'));
-      expect(selected, isNull);
     },
   );
 
@@ -262,31 +253,6 @@ void main() {
 
       expect(find.text('Locked model'), findsOneWidget);
       expect(find.text('Unknown live'), findsNothing);
-      expect(
-        container
-            .read(aiProviderControllerProvider)
-            .providers
-            .single
-            .models
-            .map((model) => model.id),
-        ['locked-model'],
-      );
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nhập Model ID thủ công'),
-        'unknown-live-model',
-      );
-      await tester.tap(find.text('Áp dụng'));
-      await tester.pumpAndSettle();
-
-      expect(
-        container
-            .read(aiProviderControllerProvider)
-            .providers
-            .single
-            .customModels,
-        isEmpty,
-      );
-      expect(selected, isNull);
     },
   );
 
@@ -331,5 +297,247 @@ void main() {
     expect(find.text('gemini-2.5-flash-lite'), findsNWidgets(2));
     expect(find.text('gemini-2.5-flash'), findsNWidgets(2));
     expect(find.textContaining('Owner:'), findsNothing);
+  });
+
+  testWidgets('custom model added is displayed in both per-provider and global modes', (tester) async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      jsonEncode([
+        {
+          'id': 'provider-custom-1',
+          'name': 'Custom Provider 1',
+          'kind': 'openAiCompatible',
+          'baseUrl': 'https://custom.api/v1',
+          'modelId': 'base-model',
+          'presetId': 'custom',
+          'models': [
+            {'id': 'base-model', 'name': 'Base Model'},
+          ],
+          'customModels': [],
+        },
+      ]),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        routerModelCatalogProvider('provider-custom-1').overrideWith(
+          (ref) async => const [
+            AiModelOption(id: 'base-model', name: 'Base Model'),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // 1. Open in per-provider mode
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              providerId: 'provider-custom-1',
+              currentModelId: 'base-model',
+              onModelSelected: (_, __) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Base Model'), findsOneWidget);
+    expect(find.text('new-added-model'), findsNothing);
+
+    // 2. Add custom model via controller
+    final controller = container.read(aiProviderControllerProvider.notifier);
+    final success = await controller.addCustomModel('provider-custom-1', 'new-added-model');
+    expect(success, isTrue);
+
+    await tester.pumpAndSettle();
+
+    // 3. Verify it shows in per-provider picker
+    expect(find.text('new-added-model'), findsWidgets);
+
+    // 4. Open in global mode
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              providerId: null, // Global mode
+              currentModelId: 'base-model',
+              onModelSelected: (_, __) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('new-added-model'), findsWidgets);
+    expect(find.textContaining('Provider: Custom Provider 1'), findsWidgets);
+  });
+
+  testWidgets('global picker does not expose add model action', (tester) async {
+    final container = ProviderContainer(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              providerId: null,
+              currentModelId: '',
+              onModelSelected: (_, __) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.text('Thêm Model'), findsNothing);
+  });
+
+  testWidgets('add model stays disabled until current model test succeeds', (
+    tester,
+  ) async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      jsonEncode([
+        {
+          'id': 'inactive-provider',
+          'name': 'Inactive Provider',
+          'kind': 'openAiCompatible',
+          'baseUrl': 'https://unused.test/v1',
+          'modelId': 'base-model',
+          'presetId': 'custom',
+        },
+      ]),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        routerModelCatalogProvider('inactive-provider').overrideWith(
+          (ref) async => const <AiModelOption>[],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              providerId: 'inactive-provider',
+              currentModelId: 'base-model',
+              onModelSelected: (_, __) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thêm Model'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Model ID'),
+      'tested-model',
+    );
+
+    final addButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Thêm model'),
+    );
+    expect(addButton.onPressed, isNull);
+  });
+
+  testWidgets('changing model ID resets successful test eligibility', (
+    tester,
+  ) async {
+    await prefs.setString(
+      'ai_provider_configs_v1',
+      jsonEncode([
+        {
+          'id': 'inactive-provider',
+          'name': 'Inactive Provider',
+          'kind': 'openAiCompatible',
+          'baseUrl': 'https://unused.test/v1',
+          'modelId': 'base-model',
+          'presetId': 'custom',
+        },
+      ]),
+    );
+    final testedIds = <String>[];
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        routerModelCatalogProvider('inactive-provider').overrideWith(
+          (ref) async => const <AiModelOption>[],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              providerId: 'inactive-provider',
+              currentModelId: 'base-model',
+              onModelSelected: (_, __) async {},
+              modelTester: (config, modelId) async {
+                testedIds.add(modelId);
+                return const AiConnectionResult(success: true);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thêm Model'));
+    await tester.pumpAndSettle();
+    final modelField = find.widgetWithText(TextFormField, 'Model ID');
+    await tester.enterText(modelField, 'tested-model');
+    await tester.tap(find.text('Test'));
+    await tester.pumpAndSettle();
+    expect(testedIds, ['tested-model']);
+    expect(find.textContaining('tested-model!'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Thêm model'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+
+    await tester.enterText(modelField, 'changed-model');
+    await tester.pump();
+    expect(
+      find.text('Model ID được gửi tới provider: changed-model'),
+      findsOneWidget,
+    );
+
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Thêm model'),
+          )
+          .onPressed,
+      isNull,
+    );
   });
 }

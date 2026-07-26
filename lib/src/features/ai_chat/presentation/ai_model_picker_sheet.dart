@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
+import '../data/ai_backend_factory.dart';
+import '../data/ai_provider_repository.dart';
 import '../data/router_admin_client.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/ai_chat_models.dart';
 import '../domain/router_catalog.dart';
 
 class GlobalModelOption {
@@ -23,17 +26,24 @@ class GlobalModelOption {
   final AiModelCapabilities capabilities;
 }
 
+typedef AiModelTester = Future<AiConnectionResult> Function(
+  AiProviderConfig config,
+  String modelId,
+);
+
 class AiModelPickerSheet extends ConsumerStatefulWidget {
   const AiModelPickerSheet({
     super.key,
     this.providerId,
     required this.currentModelId,
     required this.onModelSelected,
+    this.modelTester,
   });
 
   final String? providerId;
   final String currentModelId;
   final Future<void> Function(String modelId, String? providerId) onModelSelected;
+  final AiModelTester? modelTester;
 
   @override
   ConsumerState<AiModelPickerSheet> createState() => _AiModelPickerSheetState();
@@ -41,14 +51,12 @@ class AiModelPickerSheet extends ConsumerStatefulWidget {
 
 class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
   final _searchController = TextEditingController();
-  final _customModelController = TextEditingController();
   String _searchQuery = '';
   GlobalModelOption? _selectedOption;
 
   @override
   void dispose() {
     _searchController.dispose();
-    _customModelController.dispose();
     super.dispose();
   }
 
@@ -64,9 +72,21 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final isGlobal = widget.providerId == null || widget.providerId!.isEmpty;
     final providers = isGlobal
         ? providerState.providers
-        : providerState.providers
-            .where((p) => p.id == widget.providerId)
-            .toList();
+        : () {
+            final found = providerState.providers
+                .where((p) => p.id == widget.providerId)
+                .toList();
+            if (found.isNotEmpty) return found;
+            return [
+              AiProviderConfig(
+                id: widget.providerId!,
+                name: widget.providerId!,
+                kind: AiBackendKind.openAiCompatible,
+                baseUrl: '',
+                modelId: widget.currentModelId,
+              ),
+            ];
+          }();
 
     final allOptions = <GlobalModelOption>[];
 
@@ -113,16 +133,14 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
       final custom = isAntigravity
           ? const <AiModelOption>[]
           : config.customModels
-                    .map((model) => AiModelOption(id: model.id, name: model.name))
-                    .toList() ??
-                const <AiModelOption>[];
+                .map((model) => AiModelOption(id: model.id, name: model.name))
+                .toList();
 
+      final hiddenSet = config.hiddenModelIds.toSet();
       final seenIds = <String>{};
       final models =
-          (liveModels.hasError
-                  ? const <AiModelOption>[]
-                  : [...allowedLive, ...fallback, ...custom])
-              .where((model) => model.id.trim().isNotEmpty && seenIds.add(model.id.trim()))
+          [...custom, ...allowedLive, ...fallback]
+              .where((model) => model.id.trim().isNotEmpty && !hiddenSet.contains(model.id.trim()) && seenIds.add(model.id.trim()))
               .toList();
 
       for (final model in models) {
@@ -201,7 +219,20 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               const SizedBox(height: PortalSpacing.md),
 
               Expanded(
-                child: filteredOptions.isEmpty
+                child: !isGlobal && widget.providerId == 'provider-antigravity' && ref.watch(routerModelCatalogProvider('provider-antigravity')).hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Không thể tải danh sách mô hình khả dụng.'),
+                            ElevatedButton(
+                              onPressed: () => ref.invalidate(routerModelCatalogProvider('provider-antigravity')),
+                              child: const Text('Thử lại'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : filteredOptions.isEmpty
                     ? Center(
                         child: Text(
                           _searchQuery.isNotEmpty
@@ -216,8 +247,11 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                           final isSelected = _selectedOption != null
                               ? (_selectedOption!.providerId == option.providerId &&
                                   _selectedOption!.modelId == option.modelId)
-                              : (activeProvider?.id == option.providerId &&
-                                  activeProvider?.modelId == option.modelId);
+                              : (widget.providerId != null && widget.providerId!.isNotEmpty
+                                  ? (widget.providerId == option.providerId &&
+                                      widget.currentModelId == option.modelId)
+                                  : (activeProvider?.id == option.providerId &&
+                                      activeProvider?.modelId == option.modelId));
 
                           return ListTile(
                             title: Text(
@@ -245,9 +279,27 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                                 ),
                               ],
                             ),
-                            trailing: isSelected
-                                ? Icon(Icons.check, color: colorScheme.primary)
-                                : null,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!isGlobal && providers
+                                    .firstWhere((p) => p.id == option.providerId)
+                                    .customModels
+                                    .any((model) => model.id == option.modelId))
+                                  IconButton(
+                                    tooltip: 'Xóa model',
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => ref
+                                        .read(aiProviderControllerProvider.notifier)
+                                        .deleteCustomModel(
+                                          option.providerId,
+                                          option.modelId,
+                                        ),
+                                  ),
+                                if (isSelected)
+                                  Icon(Icons.check, color: colorScheme.primary),
+                              ],
+                            ),
                             onTap: () async {
                               setState(() {
                                 _selectedOption = option;
@@ -272,85 +324,21 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
               const Divider(),
               const SizedBox(height: PortalSpacing.sm),
 
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final field = TextField(
-                    controller: _customModelController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nhập Model ID thủ công',
-                      hintText: 'Ví dụ: deepseek-chat',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: PortalSpacing.md,
-                        vertical: PortalSpacing.sm,
-                      ),
-                    ),
-                  );
-                  final apply = ElevatedButton(
-                    onPressed: () async {
-                      final customText = _customModelController.text.trim();
-                      if (customText.isNotEmpty) {
-                        final targetProviderId =
-                            widget.providerId ?? activeProvider?.id ?? '';
-                        if (targetProviderId.isNotEmpty) {
-                          final saved = await ref
-                              .read(aiProviderControllerProvider.notifier)
-                              .addCustomModel(
-                                targetProviderId,
-                                customText,
-                              );
-                          if (saved) {
-                            await widget.onModelSelected(
-                              customText,
-                              targetProviderId,
-                            );
-                            if (context.mounted) {
-                              final navigator = Navigator.of(context);
-                              if (navigator.canPop()) {
-                                navigator.pop();
-                              }
-                            }
-                          }
-                        }
-                      } else {
-                        final opt = _selectedOption;
-                        final modelToApply =
-                            opt?.modelId ?? widget.currentModelId;
-                        final providerToApply =
-                            opt?.providerId ?? widget.providerId;
-                        await widget.onModelSelected(
-                          modelToApply,
-                          providerToApply,
-                        );
-                        if (context.mounted) {
-                          final navigator = Navigator.of(context);
-                          if (navigator.canPop()) {
-                            navigator.pop();
-                          }
-                        }
-                      }
-                    },
-                    child: const Text('Áp dụng'),
-                  );
-                  if (constraints.maxWidth < 360) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        field,
-                        const SizedBox(height: PortalSpacing.sm),
-                        apply,
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: field),
-                      const SizedBox(width: PortalSpacing.md),
-                      apply,
-                    ],
-                  );
-                },
-              ),
+              if (!isGlobal &&
+                  providers.single.presetId != 'antigravity') ...[
+                const SizedBox(height: PortalSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: () => _showAddCustomModelDialog(
+                    context,
+                    ref,
+                    widget.providerId!,
+                    widget.onModelSelected,
+                    widget.modelTester,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Thêm Model'),
+                ),
+              ],
             ],
           ),
         ),
@@ -400,24 +388,266 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: color),
-          const SizedBox(width: 2),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 10,
               color: color,
               fontWeight: FontWeight.bold,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _showAddCustomModelDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String providerId,
+  Future<void> Function(String modelId, String? providerId)? onModelSelected,
+  AiModelTester? modelTester,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (context) => _AddCustomModelDialog(
+      providerId: providerId,
+      onModelSelected: onModelSelected,
+      modelTester: modelTester,
+    ),
+  );
+}
+
+class _AddCustomModelDialog extends ConsumerStatefulWidget {
+  const _AddCustomModelDialog({
+    required this.providerId,
+    this.onModelSelected,
+    this.modelTester,
+  });
+
+  final String providerId;
+  final Future<void> Function(String modelId, String? providerId)? onModelSelected;
+  final AiModelTester? modelTester;
+
+  @override
+  ConsumerState<_AddCustomModelDialog> createState() =>
+      _AddCustomModelDialogState();
+}
+
+class _AddCustomModelDialogState
+    extends ConsumerState<_AddCustomModelDialog> {
+  final _modelIdController = TextEditingController();
+  bool _isTesting = false;
+  String? _testResult;
+  bool _testSuccess = false;
+  String? _testedModelId;
+
+  @override
+  void dispose() {
+    _modelIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testModel() async {
+    final modelId = _modelIdController.text.trim();
+    if (modelId.isEmpty) {
+      setState(() {
+        _testResult = 'Model ID không được để trống';
+        _testSuccess = false;
+      });
+      return;
+    }
+
+    final providerState = ref.read(aiProviderControllerProvider);
+    final configIndex =
+        providerState.providers.indexWhere((p) => p.id == widget.providerId);
+    if (configIndex < 0) return;
+    final config = providerState.providers[configIndex];
+
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+      _testSuccess = false;
+      _testedModelId = null;
+    });
+
+    try {
+      final testConfig = config.copyWith(modelId: modelId);
+      final injectedTester = widget.modelTester;
+      if (injectedTester != null) {
+        final result = await injectedTester(testConfig, modelId);
+        if (mounted && _modelIdController.text.trim() == modelId) {
+          setState(() {
+            _testSuccess = result.success;
+            _testedModelId = result.success ? modelId : null;
+            _testResult = result.success
+                ? 'Kết nối thử nghiệm thành công với model $modelId!'
+                : (result.errorMessage ??
+                    'Kết nối thử nghiệm thất bại.');
+          });
+        }
+        return;
+      }
+      final secureStorage = ref.read(secureStorageProvider);
+      final factory = AiBackendFactory(
+        ref: ref,
+        secureStorage: secureStorage,
+      );
+
+      final backend = await factory.buildBackend(testConfig);
+      if (backend != null) {
+        late final AiConnectionResult result;
+        try {
+          result = await backend.testConnection(testModelId: modelId);
+        } finally {
+          await backend.dispose();
+        }
+        if (mounted && _modelIdController.text.trim() == modelId) {
+          setState(() {
+            _testSuccess = result.success;
+            _testedModelId = result.success ? modelId : null;
+            _testResult = result.success
+                ? 'Kết nối thử nghiệm thành công với model $modelId!'
+                : (result.errorMessage ?? 'Kết nối thử nghiệm thất bại.');
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _testSuccess = false;
+            _testResult = 'Không thể tạo backend thử nghiệm.';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _testSuccess = false;
+          _testResult = 'Lỗi kết nối: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleAddModel() async {
+    final modelId = _modelIdController.text.trim();
+    if (modelId.isEmpty || !_testSuccess || _testedModelId != modelId) return;
+
+    final saved = await ref
+        .read(aiProviderControllerProvider.notifier)
+        .addCustomModel(widget.providerId, modelId);
+
+    if (saved && mounted) {
+      Navigator.of(context).pop();
+      if (widget.onModelSelected != null) {
+        await widget.onModelSelected!(modelId, widget.providerId);
+      }
+    } else if (mounted) {
+      setState(() {
+        _testSuccess = false;
+        _testResult = 'Không thể thêm model (có thể model đã tồn tại).';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: const Text('Thêm model tùy chỉnh'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _modelIdController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Model ID',
+                hintText: 'Ví dụ: claude-opus-4-5',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) {
+                setState(() {
+                  _testSuccess = false;
+                  _testedModelId = null;
+                  _testResult = null;
+                });
+              },
+            ),
+            const SizedBox(height: PortalSpacing.xs),
+            Text(
+              'Model ID được gửi tới provider: ${_modelIdController.text.trim().isEmpty ? "model-id" : _modelIdController.text.trim()}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: PortalSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: _isTesting ? null : _testModel,
+              icon: _isTesting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.science_outlined),
+              label: const Text('Test'),
+            ),
+            if (_testResult != null) ...[
+              const SizedBox(height: PortalSpacing.sm),
+              Card(
+                color: _testSuccess
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(PortalSpacing.sm),
+                  child: Text(
+                    _testResult!,
+                    style: TextStyle(
+                      color: _testSuccess
+                          ? Colors.green.shade900
+                          : Colors.red.shade900,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: !_isTesting &&
+                  _testSuccess &&
+                  _testedModelId == _modelIdController.text.trim()
+              ? _handleAddModel
+              : null,
+          child: const Text('Thêm model'),
+        ),
+      ],
     );
   }
 }

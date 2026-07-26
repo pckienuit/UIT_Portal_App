@@ -58,6 +58,7 @@ class AiBackendFactory {
         baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
         modelId: config.modelId,
         apiKey: runtimeState.bearer!,
+        connectionId: config.id,
       );
     }
 

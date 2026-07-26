@@ -106,8 +106,8 @@ abstract class AiChatBackend {
   Future<void> dispose();
   Future<void> cancel();
 
-  /// Thử kết nối, ví dụ gọi test api keys, trả về object `AiConnectionResult`
-  Future<AiConnectionResult> testConnection();
+  /// Thử kết nối, ví dụ gọi test api keys hoặc test cụ thể modelId, trả về object `AiConnectionResult`
+  Future<AiConnectionResult> testConnection({String? testModelId});
 
   /// Nạp các model hiện có
   Future<List<AiModelOption>> listModels();

@@ -84,8 +84,19 @@ class AiProviderController extends Notifier<AiProviderState> {
     String? apiKey,
     String? oauthAccessToken,
     String? oauthSourceToken,
+    bool replaceModelMetadata = false,
   }) async {
-    final hydrated = RouterCatalog.hydrateConfig(config);
+    final savedProviders = _repository.listProviders();
+    final existingIndex = savedProviders.indexWhere(
+      (item) => item.id == config.id,
+    );
+    final configToSave = existingIndex < 0 || replaceModelMetadata
+        ? config
+        : config.copyWith(
+            customModels: savedProviders[existingIndex].customModels,
+            hiddenModelIds: savedProviders[existingIndex].hiddenModelIds,
+          );
+    final hydrated = RouterCatalog.hydrateConfig(configToSave);
     await _repository.saveProvider(
       hydrated,
       apiKey: apiKey,
@@ -94,6 +105,21 @@ class AiProviderController extends Notifier<AiProviderState> {
     );
 
     // Model-only save không chờ Core dừng; credential phải vào Core RAM ngay.
+    final providers = _repository.listProviders();
+    var activeId = state.activeProviderId;
+    var activatedLocally = false;
+
+    if (activeId == null && providers.isNotEmpty) {
+      activeId = config.id;
+      await _repository.setActiveProviderId(activeId);
+      activatedLocally = true;
+    }
+
+    state = state.copyWith(
+      providers: providers,
+      activeProviderId: () => activeId,
+    );
+
     final hasRuntimeCredential =
         oauthAccessToken != null || oauthSourceToken != null || apiKey != null;
     if (hasRuntimeCredential ||
@@ -105,24 +131,11 @@ class AiProviderController extends Notifier<AiProviderState> {
           apiKey: oauthAccessToken ?? apiKey,
           sourceToken: oauthSourceToken,
         );
+        if (activatedLocally) {
+          await client.setActiveProvider(activeId!);
+        }
       } catch (_) {}
     }
-
-    final providers = _repository.listProviders();
-    var activeId = state.activeProviderId;
-
-    if (activeId == null && providers.isNotEmpty) {
-      activeId = config.id;
-      await _repository.setActiveProviderId(activeId);
-      try {
-        await ref.read(routerAdminClientProvider).setActiveProvider(activeId);
-      } catch (_) {}
-    }
-
-    state = state.copyWith(
-      providers: providers,
-      activeProviderId: () => activeId,
-    );
   }
 
   Future<bool> addCustomModel(
@@ -150,17 +163,68 @@ class AiProviderController extends Notifier<AiProviderState> {
         (allowedAntigravityIds?.contains(modelId) ?? false) &&
             lockedAntigravityIds.contains(modelId);
     if (!isAllowedAntigravityModel ||
-        config.customModels.any((model) => model.id == modelId)) {
+        config.customModels.any((m) => m.id == modelId)) {
       return false;
     }
+    final isHidden = config.hiddenModelIds.contains(modelId);
+    final updatedHidden = isHidden
+        ? config.hiddenModelIds.where((h) => h != modelId).toList(growable: false)
+        : config.hiddenModelIds;
+
+    final updatedCustom = config.customModels.any((m) => m.id == modelId)
+        ? config.customModels
+        : [
+            ...config.customModels,
+            AiProviderModelDescriptor(id: modelId, name: modelId),
+          ];
+
     await saveProvider(
       config.copyWith(
-        customModels: [
-          ...config.customModels,
-          AiProviderModelDescriptor(id: modelId, name: modelId),
-        ],
+        customModels: updatedCustom,
+        hiddenModelIds: updatedHidden,
       ),
+      replaceModelMetadata: true,
     );
+    ref.invalidate(routerModelCatalogProvider(connectionId));
+    return true;
+  }
+
+  Future<bool> deleteCustomModel(
+    String connectionId,
+    String modelId,
+  ) async {
+    final targetId = modelId.trim();
+    final index = state.providers.indexWhere((item) => item.id == connectionId);
+    if (index < 0) return false;
+    final config = state.providers[index];
+    final isCustom = config.customModels.any((m) => m.id == targetId);
+
+    if (isCustom) {
+      final updatedCustom = config.customModels
+          .where((m) => m.id != targetId)
+          .toList(growable: false);
+      final fallbackModelId = config.models
+          .map((model) => model.id)
+          .firstWhere(
+            (id) => id != targetId && !config.hiddenModelIds.contains(id),
+            orElse: () => '',
+          );
+      await saveProvider(
+        config.copyWith(
+          customModels: updatedCustom,
+          modelId: config.modelId == targetId ? fallbackModelId : config.modelId,
+        ),
+        replaceModelMetadata: true,
+      );
+    } else {
+      if (config.hiddenModelIds.contains(targetId)) return false;
+      final updatedHidden = [...config.hiddenModelIds, targetId];
+      await saveProvider(
+        config.copyWith(hiddenModelIds: updatedHidden),
+        replaceModelMetadata: true,
+      );
+    }
+    ref.invalidate(routerModelCatalogProvider(connectionId));
     return true;
   }
 

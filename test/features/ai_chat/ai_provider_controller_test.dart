@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -367,6 +368,88 @@ void main() {
       );
     },
   );
+
+  test('save publishes persisted local state before slow Core sync', () async {
+    final saveGate = Completer<void>();
+    final admin = _FakeRouterAdminClient(saveGate: saveGate);
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+        routerRuntimeServiceProvider.overrideWith(
+          _ReadyRouterRuntimeService.new,
+        ),
+        routerAdminClientProvider.overrideWithValue(admin),
+      ],
+    );
+    addTearDown(container.dispose);
+    const config = AiProviderConfig(
+      id: 'slow-core-provider',
+      name: 'Slow Core',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://example.test/v1',
+      modelId: 'model',
+    );
+
+    final saving = container
+        .read(aiProviderControllerProvider.notifier)
+        .saveProvider(config, apiKey: 'secret');
+    await admin.saveStarted.future;
+
+    expect(
+      container.read(aiProviderControllerProvider).providers.single.id,
+      config.id,
+    );
+
+    saveGate.complete();
+    await saving;
+  });
+
+  test('provider edit preserves custom and hidden model metadata', () async {
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(fakeSecureStorage),
+        chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(aiProviderControllerProvider.notifier);
+
+    await controller.saveProvider(
+      const AiProviderConfig(
+        id: 'edited-provider',
+        name: 'Before',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'visible-model',
+        presetId: 'custom',
+        customModels: [
+          AiProviderModelDescriptor(id: 'custom-model', name: 'Custom Model'),
+        ],
+        hiddenModelIds: ['hidden-model'],
+      ),
+    );
+
+    await controller.saveProvider(
+      const AiProviderConfig(
+        id: 'edited-provider',
+        name: 'After',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://example.test/v1',
+        modelId: 'visible-model',
+        presetId: 'custom',
+      ),
+    );
+
+    final edited = container
+        .read(aiProviderControllerProvider)
+        .providers
+        .single;
+    expect(edited.customModels.map((model) => model.id), ['custom-model']);
+    expect(edited.hiddenModelIds, ['hidden-model']);
+  });
 }
 
 class _ReadyRouterRuntimeService extends RouterRuntimeService {
@@ -379,9 +462,11 @@ class _ReadyRouterRuntimeService extends RouterRuntimeService {
 }
 
 class _FakeRouterAdminClient extends Fake implements RouterAdminClient {
-  _FakeRouterAdminClient({this.setActiveResult = true});
+  _FakeRouterAdminClient({this.setActiveResult = true, this.saveGate});
 
   bool setActiveResult;
+  final Completer<void>? saveGate;
+  final Completer<void> saveStarted = Completer<void>();
   final List<String> deletedIds = [];
   final List<String> activatedIds = [];
   String? savedRuntimeToken;
@@ -393,6 +478,8 @@ class _FakeRouterAdminClient extends Fake implements RouterAdminClient {
     String? apiKey,
     String? sourceToken,
   }) async {
+    if (!saveStarted.isCompleted) saveStarted.complete();
+    await saveGate?.future;
     savedRuntimeToken = apiKey;
     savedSourceToken = sourceToken;
     return true;

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
+import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import '../domain/ai_provider_catalog.dart';
 import '../domain/ai_provider_validator.dart';
@@ -305,45 +306,53 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                         },
                       ),
                       SizedBox(height: PortalSpacing.md),
-                      if (widget.preset.models.isNotEmpty) ...[
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: widget.preset.models.any((m) => m.id == _modelIdController.text.trim())
-                              ? _modelIdController.text.trim()
-                              : null,
-                          decoration: const InputDecoration(
-                            labelText: 'Gợi ý Model từ Provider',
-                          ),
-                          hint: const Text('Chọn model từ danh sách'),
-                          items: widget.preset.models
-                              .map(
-                                (m) => DropdownMenuItem(
-                                  value: m.id,
-                                  child: Text('${m.name} (${m.id})'),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _modelIdController.text = val;
-                              });
-                            }
-                          },
-                        ),
-                        SizedBox(height: PortalSpacing.md),
-                      ],
-                      TextFormField(
-                        controller: _modelIdController,
-                        decoration: const InputDecoration(
-                          labelText: 'Model ID',
-                          hintText: 'Ví dụ: gpt-4o-mini',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Model ID không được để trống';
-                          }
-                          return null;
+                      Builder(
+                        builder: (context) {
+                          final customModels =
+                              widget.config?.customModels ??
+                              const <AiProviderModelDescriptor>[];
+                          final allPresetModels = <AiModelOption>[
+                            ...customModels.map(
+                              (model) => AiModelOption(
+                                id: model.id,
+                                name: model.name,
+                              ),
+                            ),
+                            ...widget.preset.models.map(
+                              (model) => AiModelOption(
+                                id: model.id,
+                                name: model.name,
+                              ),
+                            ),
+                          ];
+                          final seen = <String>{};
+                          final uniqueModels = allPresetModels.where((m) => seen.add(m.id)).toList();
+                          if (uniqueModels.isEmpty) return const SizedBox.shrink();
+                          return DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: uniqueModels.any((m) => m.id == _modelIdController.text.trim())
+                                ? _modelIdController.text.trim()
+                                : (uniqueModels.first.id),
+                            decoration: const InputDecoration(
+                              labelText: 'Model mặc định',
+                            ),
+                            hint: const Text('Chọn model từ danh sách'),
+                            items: uniqueModels
+                                .map<DropdownMenuItem<String>>(
+                                  (m) => DropdownMenuItem<String>(
+                                    value: m.id,
+                                    child: Text('${m.name} (${m.id})'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _modelIdController.text = val;
+                                });
+                              }
+                            },
+                          );
                         },
                       ),
                     ],
