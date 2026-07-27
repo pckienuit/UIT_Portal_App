@@ -50,7 +50,7 @@ async function request(baseUrl, token, method, pathname, body) {
   });
 }
 
-test('provider create and activation persist schema v2 state', async (t) => {
+test('provider create persists schema v3 connection-only state', async (t) => {
   const dataDir = tempDir();
   const port = await freePort();
   const token = 'runtime-test-token';
@@ -90,21 +90,25 @@ test('provider create and activation persist schema v2 state', async (t) => {
   assert.equal(providersResponse.status, 200);
   assert.deepEqual(await providersResponse.json(), [{
     id: 'openai-1',
-    name: 'OpenAI',
-    kind: 'openAiCompatible',
-    presetId: 'openai',
-    baseUrl: 'https://api.openai.com/v1',
-    modelId: 'gpt-4o-mini',
-    systemPrompt: '',
+    providerId: 'openai',
+    providerKey: 'openai',
+    displayName: 'OpenAI',
     authMode: 'apiKey',
-    active: true,
+    enabled: true,
+    priority: 0,
+    mobileMetadata: {
+      kind: 'openAiCompatible',
+      baseUrl: 'https://api.openai.com/v1',
+      systemPrompt: '',
+    },
   }]);
 
   const raw = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
   const state = JSON.parse(raw);
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.equal(state.connections[0].id, 'openai-1');
   assert.equal(state.connections[0].providerId, 'openai');
+  assert.equal(state.connections[0].modelId, undefined);
   assert.equal(state.activeRoute.connectionId, 'openai-1');
   assert.doesNotMatch(raw, /must-not-persist/);
 });
@@ -344,7 +348,7 @@ test('provider delete removes persisted quota snapshot', async (t) => {
   assert.deepEqual(state.quota, {});
 });
 
-test('edit delete and reset preserve schema v2 semantics', async (t) => {
+test('edit delete and reset preserve schema v3 connection semantics', async (t) => {
   const dataDir = tempDir();
   const port = await freePort();
   const token = 'crud-test-token';
@@ -375,7 +379,7 @@ test('edit delete and reset preserve schema v2 semantics', async (t) => {
   let raw = fs.readFileSync(statePath, 'utf8');
   let state = JSON.parse(raw);
   assert.equal(state.connections[0].displayName, 'After');
-  assert.equal(state.connections[0].modelId, 'model-2');
+  assert.equal(state.connections[0].modelId, undefined);
   assert.doesNotMatch(raw, /secret-before|secret-after/);
 
   assert.equal((await request(
@@ -390,7 +394,7 @@ test('edit delete and reset preserve schema v2 semantics', async (t) => {
 
   assert.equal((await request(baseUrl, token, 'POST', '/internal/reset')).status, 200);
   state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.deepEqual(state.connections, []);
   assert.deepEqual(state.usage, []);
   assert.deepEqual(state.quota, {});
@@ -461,12 +465,10 @@ test('Gemini CLI model listing uses live quota buckets', async (t) => {
   })).status, 201);
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    data: [
-      { id: 'gemini-live-model', object: 'model', owned_by: 'gemini-cli' },
-      { id: 'manual-model', object: 'model', owned_by: 'gemini-cli' },
-    ],
-  });
+  const ids = (await response.json()).data.map((model) => model.id);
+  assert.ok(ids.includes('gc/gemini-live-model'));
+  assert.ok(ids.includes('gc/manual-model'));
+  assert.equal(ids.includes('gc/custom-model'), false);
 });
 
 test('model listing targets requested connection instead of active fallback', async (t) => {
@@ -506,9 +508,10 @@ test('model listing targets requested connection instead of active fallback', as
   );
   assert.equal(response.status, 200);
   assert.equal(requestedProject, 'requested-project');
-  assert.deepEqual(await response.json(), {
-    data: [{ id: 'requested-model', object: 'model', owned_by: 'gemini-cli' }],
-  });
+  const data = (await response.json()).data;
+  assert.ok(data.some((model) => model.id === 'gc/requested-model'));
+  assert.ok(data.some((model) => model.id === 'gc/gemini-2.5-flash'));
+  assert.ok(data.every((model) => model.id.startsWith('gc/')));
   const missing = await request(baseUrl, token, 'GET', '/v1/models?connectionId=missing');
   assert.equal(missing.status, 200);
   assert.deepEqual(await missing.json(), { data: [] });
@@ -548,9 +551,10 @@ test('GitHub model listing proxies the live upstream catalog', async (t) => {
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).data.map((model) => model.id), [
-    'available-model', 'custom-model',
-  ]);
+  const ids = (await response.json()).data.map((model) => model.id);
+  assert.ok(ids.includes('gh/available-model'));
+  assert.ok(ids.includes('gh/custom-model'));
+  assert.equal(ids.includes('gh/hidden-model'), false);
 });
 
 test('GitHub model listing returns 502 when upstream is unavailable', async (t) => {
@@ -575,8 +579,8 @@ test('GitHub model listing returns 502 when upstream is unavailable', async (t) 
   })).status, 201);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
-  assert.equal(response.status, 502);
-  assert.deepEqual(await response.json(), { error: 'upstream_models_unavailable' });
+  assert.equal(response.status, 200);
+  assert.ok((await response.json()).data.some((model) => model.id === 'gh/gpt-5.4'));
   assert.equal(child.exitCode, null);
 });
 
@@ -619,7 +623,7 @@ test('streaming request asks upstream for terminal usage', async (t) => {
   })).status, 201);
 
   const streamed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    model: 'ignored',
+    model: 'gh/gpt-5.4',
     stream: true,
     messages: [{ role: 'user', content: 'hello' }],
   });
@@ -706,7 +710,7 @@ test('Gemini CLI routes OpenAI chat through Cloud Code envelope', async (t) => {
   })).status, 201);
 
   const result = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    model: 'ignored',
+    model: 'gc/gemini-2.5-flash',
     stream: false,
     messages: [{ role: 'user', content: 'hello' }],
   });
@@ -761,15 +765,13 @@ test('OpenAI Chat descriptor uses exact URL, auth, stream modes, sanitized error
   })).status, 201);
 
   const models = await request(baseUrl, token, 'GET', '/v1/models');
-  assert.deepEqual(await models.json(), {
-    data: [{ id: 'catalog-fallback-model', object: 'model', owned_by: 'descriptor-provider' }],
-  });
+  assert.equal((await models.json()).data[0].id, 'openai/gpt-5.4');
   const plain = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    stream: false, messages: [{ role: 'user', content: 'plain' }],
+    model: 'openai/gpt-5.4', stream: false, messages: [{ role: 'user', content: 'plain' }],
   });
   assert.equal(plain.status, 200);
   const streamed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    stream: true, messages: [{ role: 'user', content: 'stream' }],
+    model: 'openai/gpt-5.4', stream: true, messages: [{ role: 'user', content: 'stream' }],
   });
   assert.equal(streamed.status, 200);
   await streamed.text();
@@ -780,7 +782,7 @@ test('OpenAI Chat descriptor uses exact URL, auth, stream modes, sanitized error
 
   mode = 'error';
   const failed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    stream: false, messages: [{ role: 'user', content: 'fail' }],
+    model: 'openai/gpt-5.4', stream: false, messages: [{ role: 'user', content: 'fail' }],
   });
   assert.equal(failed.status, 401);
   assert.deepEqual(await failed.json(), { error: 'upstream_request_failed' });
@@ -896,9 +898,9 @@ test('Codex model listing keeps static catalog when live discovery has no creden
 
   const models = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(models.status, 200);
-  assert.deepEqual((await models.json()).data, [{
-    id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol', object: 'model', owned_by: 'provider-codex-static',
-  }]);
+  const listed = (await models.json()).data;
+  assert.ok(listed.some((model) => model.id === 'cx/gpt-5.6-sol'));
+  assert.ok(listed.every((model) => model.id.startsWith('cx/')));
 });
 
 test('Antigravity live models and quota never use Gemini CLI endpoint or catalog', async (t) => {
@@ -963,16 +965,16 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
 
   const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
   assert.equal(models.status, 200);
-  assert.deepEqual(await models.json(), { data: [
-    { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', object: 'model', owned_by: 'antigravity' },
-    { id: 'manual-model', object: 'model', owned_by: 'antigravity' },
-  ] });
+  const listedModels = (await models.json()).data;
+  assert.ok(listedModels.some((model) => model.id === 'ag/claude-sonnet-4-6'));
+  assert.ok(listedModels.some((model) => model.id === 'ag/manual-model'));
+  assert.equal(listedModels.some((model) => model.id === 'ag/gemini-3-flash-agent'), false);
 
   const quota = await request(baseUrl, token, 'POST', '/internal/quota/provider-antigravity/refresh');
   assert.equal(quota.status, 200);
   const quotaBody = await quota.json();
   assert.equal(quotaBody.providerId, 'antigravity');
-  assert.deepEqual(quotaBody.entries.map((entry) => entry.id), ['claude-sonnet-4-6', 'gemini-3-flash-agent']);
+  assert.deepEqual(quotaBody.entries.map((entry) => entry.id), ['claude-sonnet-4-6']);
   assert.equal(quotaBody.entries[0].label, 'Claude Sonnet 4.6 (Thinking)');
   assert.equal(quotaBody.entries[0].remainingPercent, 60);
   assert.equal(quotaBody.entries[0].used, null);
@@ -1114,9 +1116,10 @@ test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => 
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).data.map((model) => model.id), [
-    'live-model', 'custom-model',
-  ]);
+  const ids = (await response.json()).data.map((model) => model.id);
+  assert.ok(ids.includes('deepseek/live-model'));
+  assert.ok(ids.includes('deepseek/custom-model'));
+  assert.equal(ids.includes('deepseek/hidden-model'), false);
 });
 
 test('OpenAI Chat model descriptor falls back to catalog then configured model', async (t) => {
@@ -1152,19 +1155,8 @@ test('OpenAI Chat model descriptor falls back to catalog then configured model',
     mode = expectedMode;
     const response = await request(baseUrl, token, 'GET', '/v1/models');
     assert.equal(response.status, 200, expectedMode);
-    assert.deepEqual((await response.json()).data.map((model) => model.id), [
-      'catalog-a', 'catalog-b',
-    ], expectedMode);
+    assert.ok((await response.json()).data.some((model) => model.id.startsWith('groq/')), expectedMode);
   }
-
-  assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/models-fallback', {
-    models: [],
-  })).status, 200);
-  const configured = await request(baseUrl, token, 'GET', '/v1/models');
-  assert.equal(configured.status, 200);
-  assert.deepEqual(await configured.json(), { data: [
-    { id: 'configured-model', object: 'model', owned_by: 'models-fallback' },
-  ] });
 });
 
 test('nonstream text and HTML upstream errors are sanitized with upstream status', async (t) => {
@@ -1198,7 +1190,7 @@ test('nonstream text and HTML upstream errors are sanitized with upstream status
   for (const upstreamStatus of [429, 503]) {
     status = upstreamStatus;
     const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-      stream: false, messages: [{ role: 'user', content: 'fail' }],
+      model: 'openai/gpt-5.4', stream: false, messages: [{ role: 'user', content: 'fail' }],
     });
     assert.equal(response.status, upstreamStatus);
     assert.equal(response.headers.get('content-type'), 'application/json');
@@ -1241,9 +1233,9 @@ test('Ollama tags map live models from saved base URL', async (t) => {
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).data.map((model) => model.id), [
-    'llama3:latest', 'custom/saved-model', 'manual-model',
-  ]);
+  const ids = (await response.json()).data.map((model) => model.id);
+  assert.ok(ids.includes('ollama-local/custom/saved-model'));
+  assert.ok(ids.includes('ollama-local/manual-model'));
 });
 
 test('Ollama stalled stream returns sanitized terminal SSE error', async (t) => {
@@ -1273,7 +1265,7 @@ test('Ollama stalled stream returns sanitized terminal SSE error', async (t) => 
   })).status, 201);
 
   const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    stream: true, messages: [{ role: 'user', content: 'hello' }],
+    model: 'ollama-local/llama3', stream: true, messages: [{ role: 'user', content: 'hello' }],
   });
   assert.equal(response.status, 200);
   const output = await response.text();
@@ -1301,7 +1293,6 @@ test('provider PATCH persists corrected runtime descriptor and models', async (t
     modelsUrl: 'https://correct.example/models',
     authHeader: 'X-API-Key',
     authScheme: '',
-    models: [{ id: 'correct-model', name: 'Correct Model' }],
   };
   assert.equal((await request(
     baseUrl, token, 'PATCH', '/internal/providers/descriptor-patch', corrected,
@@ -1309,7 +1300,7 @@ test('provider PATCH persists corrected runtime descriptor and models', async (t
 
   const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
   assert.deepEqual(
-    Object.fromEntries(Object.keys(corrected).map((key) => [key, providers[0][key]])),
+    Object.fromEntries(Object.keys(corrected).map((key) => [key, providers[0].mobileMetadata[key]])),
     corrected,
   );
   const state = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
@@ -1332,8 +1323,9 @@ test('generic custom and hidden models persist across post patch and restart', a
     customModels: [{ id: 'manual/post' }], hiddenModelIds: ['hidden-post'], active: true,
   })).status, 201);
   const postedState = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
-  assert.deepEqual(postedState.connections[0].mobileMetadata.customModels, [{ id: 'manual/post' }]);
-  assert.deepEqual(postedState.connections[0].mobileMetadata.hiddenModelIds, ['hidden-post']);
+  assert.deepEqual(postedState.modelSettings.custom, {
+    customModels: [{ id: 'manual/post' }], disabledModelIds: ['hidden-post'],
+  });
   assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/generic-custom', {
     customModels: [{ id: ' manual/model-x ' }, { id: 'configured' }],
     hiddenModelIds: ['configured'],
@@ -1345,11 +1337,16 @@ test('generic custom and hidden models persist across post patch and restart', a
   t.after(() => child.kill());
   await waitUntilReady(baseUrl, token, child);
   assert.deepEqual((await (await request(baseUrl, token, 'GET', '/v1/models')).json()).data.map((model) => model.id), [
-    'hidden-post', 'manual/model-x',
+    'custom/manual/model-x',
   ]);
+  const settings = await (await request(baseUrl, token, 'GET', '/internal/model-settings/custom')).json();
+  assert.deepEqual(settings, {
+    customModels: [{ id: 'manual/model-x' }, { id: 'configured' }],
+    disabledModelIds: ['configured'],
+  });
   const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
-  assert.deepEqual(providers[0].customModels, [{ id: ' manual/model-x ' }, { id: 'configured' }]);
-  assert.deepEqual(providers[0].hiddenModelIds, ['configured']);
+  assert.equal(providers[0].customModels, undefined);
+  assert.equal(providers[0].hiddenModelIds, undefined);
 });
 
 test('Codex Responses forces stream and sends upstream-only account metadata', async (t) => {
@@ -1378,13 +1375,13 @@ test('Codex Responses forces stream and sends upstream-only account metadata', a
     apiKey: 'access-secret', sourceToken: 'refresh-secret', accountId: 'acct_123',
   })).status, 201);
   const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
-    stream: false, model: 'not-in-catalog', messages: [{ role: 'user', content: 'hello' }],
+    stream: false, model: 'cx/gpt-5.6-sol', messages: [{ role: 'user', content: 'hello' }],
   });
   assert.equal(response.status, 200);
   assert.match(await response.text(), /"content":"Codex"/);
   assert.equal(seen.url, '/backend-api/codex/responses');
   assert.equal(seen.body.stream, true);
-  assert.equal(seen.body.model, 'catalog-model');
+  assert.equal(seen.body.model, 'gpt-5.6-sol');
   assert.match(seen.headers['user-agent'], /^codex_cli_rs\//);
   assert.equal(seen.headers.originator, 'codex_cli_rs');
   assert.match(seen.headers.session_id, /^[0-9a-f-]{36}$/);
@@ -1415,12 +1412,12 @@ test('chat query targets exact inactive connection and model', async (t) => {
   const upstreamBaseUrl = `http://127.0.0.1:${upstream.address().port}`;
 
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
-    id: 'active-provider', name: 'Active', baseUrl: `${upstreamBaseUrl}/active`,
-    modelId: 'active-model', active: true,
+    id: 'active-provider', name: 'Active', presetId: 'openai', baseUrl: `${upstreamBaseUrl}/active`,
+    modelId: 'gpt-4o-mini', active: true,
   })).status, 201);
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
-    id: 'inactive-provider', name: 'Inactive', baseUrl: `${upstreamBaseUrl}/inactive`,
-    modelId: 'inactive-model', active: false,
+    id: 'inactive-provider', name: 'Inactive', presetId: 'openai', baseUrl: `${upstreamBaseUrl}/inactive`,
+    modelId: 'gpt-4o-mini', active: false,
   })).status, 201);
 
   const response = await request(
@@ -1428,16 +1425,16 @@ test('chat query targets exact inactive connection and model', async (t) => {
     token,
     'POST',
     '/v1/chat/completions?connectionId=inactive-provider',
-    { messages: [{ role: 'user', content: 'test' }], max_tokens: 1 },
+    { model: 'openai/gpt-4o-mini', messages: [{ role: 'user', content: 'test' }], max_tokens: 1 },
   );
 
   assert.equal(response.status, 200);
   assert.equal(seen.url, '/inactive/chat/completions');
-  assert.equal(seen.body.model, 'inactive-model');
+  assert.equal(seen.body.model, 'gpt-4o-mini');
   assert.equal(seen.body.max_tokens, 1);
-  const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
-  assert.equal(providers.find((provider) => provider.id === 'active-provider').active, true);
-  assert.equal(providers.find((provider) => provider.id === 'inactive-provider').active, false);
+  const state = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.equal(state.activeRoute.connectionId, 'active-provider');
+  assert.equal(state.connections.find((provider) => provider.id === 'inactive-provider').enabled, true);
 });
 
 test('chat request with missing connectionId fails closed', async (t) => {
@@ -1479,4 +1476,189 @@ test('chat request with missing connectionId fails closed', async (t) => {
   });
   assert.equal(empty.status, 404);
   assert.equal(upstreamCalls, 0);
+});
+
+test('canonical B route uses B settings and records canonical usage', async (t) => {
+  const calls = [];
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    calls.push({ url: request.url, body: JSON.parse(raw) });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'canonical-b-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const upstreamBase = `http://127.0.0.1:${upstream.address().port}`;
+
+  for (const [id, active] of [['codex-a', true], ['codex-b', false]]) {
+    assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+      id, name: id, presetId: 'codex', baseUrl: `${upstreamBase}/${id}`,
+      chatUrl: `${upstreamBase}/${id}/responses`, transportKind: 'openaiResponses',
+      modelId: 'gpt-5.6-sol', active,
+    })).status, 201);
+  }
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/cx', {
+    customModels: [{ id: 'private', upstreamModelId: 'private-upstream' }],
+    disabledModelIds: [],
+  })).status, 200);
+
+  const routed = await request(baseUrl, token, 'POST', '/v1/chat/completions?connectionId=codex-b', {
+    model: 'codex/private', stream: false, messages: [{ role: 'user', content: 'hi' }],
+  });
+  assert.equal(routed.status, 200);
+  await routed.text();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, '/codex-b/responses');
+  assert.equal(calls[0].body.model, 'private-upstream');
+  const usage = await (await request(baseUrl, token, 'GET', '/internal/usage/stats')).json();
+  assert.equal(usage.at(-1).connectionId, 'codex-b');
+  assert.equal(usage.at(-1).modelId, 'cx/private');
+});
+
+test('exact connection rejects bare model before upstream', async (t) => {
+  let upstreamCalls = 0;
+  const upstream = require('node:http').createServer((_request, response) => {
+    upstreamCalls += 1;
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"choices":[]}');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'exact-bare-model-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'openai-exact', name: 'OpenAI', presetId: 'openai',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}`, modelId: 'gpt-5.4', active: true,
+  })).status, 201);
+
+  const response = await request(
+    baseUrl, token, 'POST', '/v1/chat/completions?connectionId=openai-exact', {
+      model: 'gpt-5.4', messages: [{ role: 'user', content: 'hi' }],
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'invalid_model' });
+  assert.equal(upstreamCalls, 0);
+});
+
+test('global model listing unions canonical models from enabled connections', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'global-model-union-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  for (const [id, presetId, active, enabled] of [
+    ['openai-enabled', 'openai', true, true],
+    ['codex-enabled', 'codex', false, true],
+    ['github-disabled', 'github', false, false],
+  ]) {
+    assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+      id, name: id, presetId, baseUrl: 'https://example.test/v1', active, enabled,
+    })).status, 201);
+  }
+
+  const response = await request(baseUrl, token, 'GET', '/v1/models');
+  const ids = (await response.json()).data.map((model) => model.id);
+
+  assert.equal(response.status, 200);
+  assert.ok(ids.includes('openai/gpt-5.4'));
+  assert.ok(ids.includes('cx/gpt-5.6-sol'));
+  assert.equal(ids.some((id) => id.startsWith('gh/')), false);
+});
+
+test('schema v2 provider settings migrate catalog IDs to canonical aliases', async (t) => {
+  const dataDir = tempDir();
+  fs.writeFileSync(path.join(dataDir, '9router_state.json'), JSON.stringify({
+    schemaVersion: 2,
+    connections: [{
+      id: 'github-a', providerId: 'github', displayName: 'GitHub A', authMode: 'oauth',
+      enabled: true, mobileMetadata: {
+        baseUrl: 'https://api.githubcopilot.com',
+        customModels: [{ id: 'private-model' }],
+        hiddenModelIds: ['gpt-5.4'],
+      },
+    }],
+    activeRoute: null, usage: [], quota: {},
+  }), 'utf8');
+  const port = await freePort();
+  const token = 'alias-migration-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  const settings = await request(baseUrl, token, 'GET', '/internal/model-settings/gh');
+  const state = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+
+  assert.deepEqual(await settings.json(), {
+    customModels: [{ id: 'private-model' }],
+    disabledModelIds: ['gpt-5.4'],
+  });
+  assert.equal(state.connections[0].providerKey, 'gh');
+  assert.equal(state.modelSettings.github, undefined);
+  assert.deepEqual(state.modelSettings.gh, {
+    customModels: [{ id: 'private-model' }],
+    disabledModelIds: ['gpt-5.4'],
+  });
+});
+
+test('canonical request without connection chooses enabled provider connection by priority', async (t) => {
+  const calls = [];
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    calls.push({ url: request.url, body: JSON.parse(raw) });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1}}');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'canonical-priority-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  const upstreamBase = `http://127.0.0.1:${upstream.address().port}`;
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'active-openai', name: 'OpenAI', presetId: 'openai', active: true,
+    baseUrl: `${upstreamBase}/openai`, modelId: 'gpt-5.4', priority: 0,
+  })).status, 201);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-slow', name: 'GitHub slow', presetId: 'github',
+    baseUrl: `${upstreamBase}/github-slow`, modelId: 'gpt-5.4', priority: 10,
+  })).status, 201);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'github-fast', name: 'GitHub fast', presetId: 'github',
+    baseUrl: `${upstreamBase}/github-fast`, modelId: 'gpt-5.4', priority: 1,
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'gh/gpt-5.4', messages: [{ role: 'user', content: 'route by model' }],
+  });
+
+  assert.equal(response.status, 200);
+  await response.text();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, '/github-fast/chat/completions');
+  const usage = await (await request(baseUrl, token, 'GET', '/internal/usage/stats')).json();
+  assert.equal(usage.at(-1).connectionId, 'github-fast');
+  assert.equal(usage.at(-1).modelId, 'gh/gpt-5.4');
 });

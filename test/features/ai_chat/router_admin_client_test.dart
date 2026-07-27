@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
-import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_provider_model_settings.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 
 class _ModelsAdapter implements HttpClientAdapter {
@@ -20,6 +20,31 @@ class _ModelsAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       '{"data":[{"id":"claude-sonnet-4-6",'
       '"name":"Claude Sonnet 4.6 (Thinking)","owned_by":"antigravity"}]}',
+      200,
+      headers: {Headers.contentTypeHeader: ['application/json']},
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _ProvidersAdapter implements HttpClientAdapter {
+  final requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return ResponseBody.fromString(
+      '[{"id":"github-1","providerId":"github","providerKey":"gh",'
+      '"displayName":"GitHub","authMode":"oauth","enabled":true,'
+      '"priority":0,"mobileMetadata":{"kind":"openAiCompatible",'
+      '"baseUrl":"https://api.githubcopilot.com","systemPrompt":"",'
+      '"transportKind":"openaiChat"}}]',
       200,
       headers: {Headers.contentTypeHeader: ['application/json']},
     );
@@ -94,7 +119,12 @@ void main() {
     );
 
     expect(config.toJson()['models'], [
-      {'id': 'deepseek-chat', 'name': 'DeepSeek Chat'},
+      {
+        'id': 'deepseek-chat',
+        'name': 'DeepSeek Chat',
+        'upstreamModelId': null,
+        'quotaFamily': null,
+      },
     ]);
     expect(
       AiProviderConfig.fromJson(config.toJson()).models.single.id,
@@ -135,6 +165,53 @@ void main() {
     expect(models.single.id, 'claude-sonnet-4-6');
     expect(models.single.name, 'Claude Sonnet 4.6 (Thinking)');
     expect(models.single.owner, 'antigravity');
+  });
+
+  test('provider client reads schema v3 connection-only response', () async {
+    final adapter = _ProvidersAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+
+    final providers = await RouterAdminClient.forTest(dio).listProviders();
+
+    expect(adapter.requests.single.path, '/internal/providers');
+    expect(providers, hasLength(1));
+    expect(providers.single.id, 'github-1');
+    expect(providers.single.name, 'GitHub');
+    expect(providers.single.presetId, 'github');
+    expect(providers.single.baseUrl, 'https://api.githubcopilot.com');
+    expect(providers.single.modelId, isEmpty);
+  });
+
+  test('model settings sync uses provider-scoped PUT payload', () async {
+    final adapter = _ModelsAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
+      ..httpClientAdapter = adapter;
+
+    final saved = await RouterAdminClient.forTest(dio).saveModelSettings(
+      const AiProviderModelSettings(
+        providerKey: 'gh',
+        customModels: [
+          AiProviderModelDescriptor(id: 'private-model', name: 'Private model'),
+        ],
+        disabledModelIds: {'gpt-5.4'},
+      ),
+    );
+
+    expect(saved, isTrue);
+    expect(adapter.requests.single.method, 'PUT');
+    expect(adapter.requests.single.path, '/internal/model-settings/gh');
+    expect(adapter.requests.single.data, {
+      'customModels': [
+        {
+          'id': 'private-model',
+          'name': 'Private model',
+          'upstreamModelId': null,
+          'quotaFamily': null,
+        },
+      ],
+      'disabledModelIds': ['gpt-5.4'],
+    });
   });
 
   test(

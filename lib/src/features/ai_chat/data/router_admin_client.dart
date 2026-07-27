@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../application/router_runtime_service.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+import '../domain/ai_provider_model_settings.dart';
 import 'ai_provider_repository.dart';
 import '../domain/router_models.dart';
 
@@ -54,8 +55,9 @@ class RouterAdminClient {
       if (res.statusCode == 200) {
         final list = res.data as List<dynamic>;
         return list
-            .map((e) => AiProviderConfig.fromJson(e as Map<String, dynamic>))
-            .toList();
+            .whereType<Map>()
+            .map((item) => _connectionFromCore(Map<String, dynamic>.from(item)))
+            .toList(growable: false);
       }
     } catch (e) {
       debugPrint('Failed to list providers from core: $e');
@@ -86,6 +88,19 @@ class RouterAdminClient {
         .toList(growable: false);
   }
 
+  Future<bool> saveModelSettings(AiProviderModelSettings settings) async {
+    try {
+      final res = await _dio.put(
+        '/internal/model-settings/${Uri.encodeComponent(settings.providerKey)}',
+        data: settings.toJson(),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Failed to save model settings to core: $e');
+      return false;
+    }
+  }
+
   // Thêm / Cập nhật provider connection
   Future<bool> saveProvider(
     AiProviderConfig config, {
@@ -114,7 +129,7 @@ class RouterAdminClient {
       final providers = await listProviders();
       final exists = providers.any((p) => p.id == config.id);
 
-      final payload = config.toJson();
+      final payload = _connectionPayload(config);
       if (key != null) {
         payload['apiKey'] = key;
       }
@@ -261,6 +276,58 @@ class RouterAdminClient {
     }
   }
 }
+
+AiProviderConfig _connectionFromCore(Map<String, dynamic> json) {
+  final metadata = json['mobileMetadata'];
+  final mobile = metadata is Map
+      ? Map<String, dynamic>.from(metadata)
+      : const <String, dynamic>{};
+  final kind = mobile['kind']?.toString();
+  return AiProviderConfig(
+    id: json['id']?.toString() ?? '',
+    name: json['displayName']?.toString() ?? '',
+    kind: AiBackendKind.values.firstWhere(
+      (value) => value.name == kind,
+      orElse: () => AiBackendKind.openAiCompatible,
+    ),
+    baseUrl: mobile['baseUrl']?.toString() ?? '',
+    // ponytail: Phase 6 removes this legacy local fallback after chat routes migrate.
+    modelId: '',
+    presetId: json['providerId']?.toString(),
+    systemPrompt: mobile['systemPrompt']?.toString(),
+    authMode: json['authMode']?.toString() ?? 'apiKey',
+    accountId: mobile['accountId']?.toString(),
+    projectId: mobile['projectId']?.toString(),
+    transportKind: mobile['transportKind']?.toString(),
+    chatUrl: mobile['chatUrl']?.toString(),
+    modelsUrl: mobile['modelsUrl']?.toString(),
+    authHeader: mobile['authHeader']?.toString(),
+    authScheme: mobile['authScheme']?.toString(),
+    staticHeaders: mobile['staticHeaders'] is Map
+        ? Map<String, String>.from(mobile['staticHeaders'] as Map)
+        : const {},
+  );
+}
+
+Map<String, dynamic> _connectionPayload(AiProviderConfig config) => {
+  'id': config.id,
+  'name': config.name,
+  'kind': config.kind.name,
+  'baseUrl': config.baseUrl,
+  // ponytail: removed with Phase 6 canonical conversation routes.
+  'modelId': config.modelId,
+  'presetId': config.presetId,
+  'systemPrompt': config.systemPrompt,
+  'authMode': config.authMode,
+  'accountId': config.accountId,
+  'projectId': config.projectId,
+  'transportKind': config.transportKind,
+  'chatUrl': config.chatUrl,
+  'modelsUrl': config.modelsUrl,
+  'authHeader': config.authHeader,
+  'authScheme': config.authScheme,
+  'staticHeaders': config.staticHeaders,
+};
 
 final routerAdminClientProvider = Provider<RouterAdminClient>((ref) {
   final secureStorage = ref.watch(secureStorageProvider);

@@ -3,6 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
+const {
+  buildEffectiveModels,
+  parseCanonicalModel,
+  resolveProviderModel,
+} = require('./provider_model_resolver');
 const { createSseUsageParser } = require('./sse_usage');
 const { waitForDrainOrClose, writeWithBackpressure } = require('./stream_backpressure');
 const { fetchQuota, listAntigravityModels, listCodexModels, listGeminiModels } = require('./quota_adapters');
@@ -35,6 +40,13 @@ const {
 
 const [portArgument, token, dataDirArg] = process.argv.slice(2);
 const port = Number(portArgument);
+const providerCatalog = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'provider_catalog.json'), 'utf8'),
+).providers;
+const catalogByKey = new Map(providerCatalog.flatMap((provider) => [
+  [provider.id, provider],
+  ...(provider.alias ? [[provider.alias, provider]] : []),
+]));
 
 // Thiết lập file log
 const DATA_DIR = dataDirArg || process.env.NODE_DATA_DIR || process.cwd();
@@ -62,6 +74,8 @@ try {
 
   const stateStore = createStateStore({ dataDir: DATA_DIR });
   const runtimeSecrets = new Map();
+  // ponytail: legacy bare-model requests work only during current process; callers must send canonical model.
+  const runtimeModelDefaults = new Map();
   const refreshedModels = new Map();
   const refreshedQuota = new Set();
 
@@ -108,9 +122,12 @@ try {
         id: connection.id,
         name: connection.displayName,
         kind: connection.mobileMetadata?.kind || 'openAiCompatible',
-        presetId: connection.providerId,
+        presetId: connection.providerId || connection.providerKey,
+        providerKey: connection.providerKey,
         baseUrl: connection.mobileMetadata?.baseUrl || '',
-        modelId: connection.modelId,
+        ...(runtimeModelDefaults.has(connection.id)
+          ? { modelId: runtimeModelDefaults.get(connection.id) }
+          : {}),
         systemPrompt: connection.mobileMetadata?.systemPrompt || '',
         ...(connection.mobileMetadata?.projectId
           ? { projectId: connection.mobileMetadata.projectId }
@@ -133,39 +150,48 @@ try {
         ...(connection.mobileMetadata?.authScheme !== undefined
           ? { authScheme: connection.mobileMetadata.authScheme }
           : {}),
-        ...(connection.mobileMetadata?.models?.length
-          ? { models: connection.mobileMetadata.models }
-          : {}),
-        ...(connection.mobileMetadata?.customModels?.length
-          ? { customModels: connection.mobileMetadata.customModels }
-          : {}),
-        ...(connection.mobileMetadata?.hiddenModelIds?.length
-          ? { hiddenModelIds: connection.mobileMetadata.hiddenModelIds }
-          : {}),
+
         ...(connection.mobileMetadata?.staticHeaders &&
         Object.keys(connection.mobileMetadata.staticHeaders).length
           ? { staticHeaders: connection.mobileMetadata.staticHeaders }
           : {}),
         authMode: connection.authMode || 'apiKey',
+        enabled: connection.enabled !== false,
+        priority: connection.priority || 0,
         active: connection.id === activeConnectionId,
         apiKey: runtimeSecrets.get(connection.id)?.runtimeToken || '',
       })),
+      modelSettings: state.modelSettings || {},
       usage: state.usage,
       quota: state.quota,
     };
   }
 
-  function toSchemaV2(db) {
+  function toSchemaV3(db) {
     const timestamp = new Date().toISOString();
     const active = db.providers.find((provider) => provider.active);
+    const modelSettings = { ...(db.modelSettings || {}) };
+    for (const provider of db.providers) {
+      const definition = catalogByKey.get(provider.presetId || provider.id);
+      const providerKey = definition?.alias || definition?.id || provider.providerKey || provider.presetId || provider.id;
+      if (!modelSettings[providerKey]) {
+        modelSettings[providerKey] = {
+          customModels: provider.customModels || [],
+          disabledModelIds: provider.hiddenModelIds || [],
+        };
+      }
+    }
     return {
       connections: db.providers.map((provider) => ({
         id: provider.id,
         providerId: provider.presetId || provider.id,
+        providerKey: catalogByKey.get(provider.providerKey || provider.presetId || provider.id)?.alias ||
+          catalogByKey.get(provider.providerKey || provider.presetId || provider.id)?.id ||
+          provider.providerKey || provider.presetId || provider.id,
         displayName: provider.name,
         authMode: provider.authMode || 'apiKey',
-        modelId: provider.modelId,
-        enabled: true,
+        enabled: provider.enabled !== false,
+        priority: Number.isFinite(provider.priority) ? provider.priority : 0,
         mobileMetadata: {
           kind: provider.kind || 'openAiCompatible',
           baseUrl: provider.baseUrl,
@@ -177,9 +203,7 @@ try {
           modelsUrl: provider.modelsUrl,
           authHeader: provider.authHeader,
           authScheme: provider.authScheme,
-          models: Array.isArray(provider.models) ? provider.models : [],
-          customModels: Array.isArray(provider.customModels) ? provider.customModels : [],
-          hiddenModelIds: Array.isArray(provider.hiddenModelIds) ? provider.hiddenModelIds : [],
+
           staticHeaders: provider.staticHeaders && typeof provider.staticHeaders === 'object'
             ? provider.staticHeaders
             : {},
@@ -188,19 +212,51 @@ try {
         updatedAt: timestamp,
       })),
       activeRoute: active
-        ? { connectionId: active.id, modelId: active.modelId, local: false }
+        ? {
+            connectionId: active.id,
+            modelId: active.modelId
+              ? `${catalogByKey.get(active.providerKey || active.presetId || active.id)?.alias || active.providerKey || active.presetId || active.id}/${active.modelId}`
+              : undefined,
+            local: false,
+          }
         : null,
+      modelSettings,
       usage: db.usage,
       quota: db.quota,
     };
   }
 
   function loadDb() {
-    return toLegacyDb(stateStore.load());
+    const state = stateStore.load();
+    let migrated = false;
+    const remappedSettings = {};
+    for (const [rawKey, settings] of Object.entries(state.modelSettings || {})) {
+      const definition = catalogByKey.get(rawKey);
+      const providerKey = definition?.alias || definition?.id || rawKey;
+      const target = remappedSettings[providerKey] || (remappedSettings[providerKey] = {
+        customModels: [], disabledModelIds: [],
+      });
+      target.customModels.push(...(settings.customModels || []));
+      target.disabledModelIds.push(...(settings.disabledModelIds || []));
+      if (rawKey !== providerKey) migrated = true;
+    }
+    if (migrated) state.modelSettings = remappedSettings;
+    for (const connection of state.connections) {
+      const definition = catalogByKey.get(connection.providerKey || connection.providerId || connection.id);
+      const providerKey = definition?.alias || definition?.id || connection.providerKey || connection.providerId || connection.id;
+      if (connection.providerKey !== providerKey) {
+        connection.providerKey = providerKey;
+        migrated = true;
+      }
+    }
+    return toLegacyDb(migrated ? stateStore.save(state) : state);
   }
 
   function saveDb(db) {
     for (const provider of db.providers) {
+      if (typeof provider.modelId === 'string' && provider.modelId.trim()) {
+        runtimeModelDefaults.set(provider.id, provider.modelId.trim());
+      }
       const current = runtimeSecrets.get(provider.id) || {};
       const runtimeToken = provider.apiKey || current.runtimeToken;
       const sourceToken = provider.sourceToken || current.sourceToken;
@@ -212,7 +268,7 @@ try {
         });
       }
     }
-    stateStore.save(toSchemaV2(db));
+    stateStore.save(toSchemaV3(db));
   }
 
   function hasValidBearer(request) {
@@ -262,11 +318,11 @@ try {
     return `${provider.baseUrl.replace(/\/$/, '')}${path}`;
   }
 
-  function listedModels(provider, models, fallbackToModelId = false, ownedBy = provider.id) {
-    const hiddenSet = new Set((Array.isArray(provider.hiddenModelIds) ? provider.hiddenModelIds : [])
+  function listedModels(provider, models, fallbackToModelId = false, ownedBy = provider.id, settings = {}) {
+    const hiddenSet = new Set((Array.isArray(settings.disabledModelIds) ? settings.disabledModelIds : [])
       .filter((id) => typeof id === 'string' && id.trim())
       .map((id) => id.trim()));
-    const custom = Array.isArray(provider.customModels) ? provider.customModels : [];
+    const custom = Array.isArray(settings.customModels) ? settings.customModels : [];
     const combined = [...models, ...custom];
     const entries = combined
       .map((model) => typeof model === 'string'
@@ -292,12 +348,66 @@ try {
     }));
   }
 
-  function configuredModels(provider) {
-    return listedModels(
-      provider,
-      Array.isArray(provider.models) ? provider.models : [],
-      true,
-    );
+  function settingsForProvider(provider, db) {
+    const definition = catalogByKey.get(provider.providerKey || provider.presetId || provider.id);
+    const providerKey = definition?.alias || definition?.id || provider.providerKey || provider.presetId || provider.id;
+    return db.modelSettings?.[providerKey] || {};
+  }
+
+  function configuredModels(provider, db) {
+    const definition = catalogByKey.get(provider.presetId || provider.id);
+    return listedModels(provider, definition?.models || [], true, provider.id, settingsForProvider(provider, db));
+  }
+
+  function providerKeyFor(provider) {
+    const definition = catalogByKey.get(provider.providerKey || provider.presetId || provider.id);
+    return definition?.alias || definition?.id || provider.providerKey || provider.presetId || provider.id;
+  }
+
+  function resolverCatalogFor(provider) {
+    const providerKey = providerKeyFor(provider);
+    if (catalogByKey.has(providerKey)) return catalogByKey;
+    const custom = {
+      id: providerKey,
+      alias: providerKey,
+      models: [],
+      passthroughModels: true,
+    };
+    return new Map([...catalogByKey, [providerKey, custom]]);
+  }
+
+  function effectiveModelsFor(provider, db, liveModels = []) {
+    const definition = catalogByKey.get(provider.providerKey || provider.presetId || provider.id) || {
+      id: providerKeyFor(provider), alias: providerKeyFor(provider), models: [], passthroughModels: true,
+    };
+    return buildEffectiveModels({
+      definition,
+      settings: settingsForProvider(provider, db),
+      liveModels,
+    });
+  }
+
+  function serializeModels(provider, db, liveModels = []) {
+    const providerKey = providerKeyFor(provider);
+    return effectiveModelsFor(provider, db, liveModels).map((model) => ({
+      id: `${providerKey}/${model.id}`,
+      ...(typeof model.name === 'string' && model.name ? { name: model.name } : {}),
+      object: 'model',
+      owned_by: provider.id,
+    }));
+  }
+
+  function applyLegacyModelSettings(provider, data, db) {
+    if (!Array.isArray(data.customModels) && !Array.isArray(data.hiddenModelIds)) return;
+    const providerKey = providerKeyFor(provider);
+    const current = db.modelSettings?.[providerKey] || {};
+    db.modelSettings = {
+      ...(db.modelSettings || {}),
+      [providerKey]: {
+        customModels: Array.isArray(data.customModels) ? data.customModels : current.customModels || [],
+        disabledModelIds: Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : current.disabledModelIds || [],
+      },
+    };
   }
 
   const server = http.createServer(async (request, response) => {
@@ -325,6 +435,19 @@ try {
     if (request.method === 'GET' && url.pathname === '/v1/models') {
       const requestedConnectionId = url.searchParams.get('connectionId');
       const hasConnectionId = url.searchParams.has('connectionId');
+      if (!hasConnectionId) {
+        const listed = db.providers
+          .filter((provider) => provider.enabled !== false)
+          .flatMap((provider) => serializeModels(
+            provider,
+            db,
+            refreshedModels.get(provider.id) || [],
+          ));
+        const seen = new Set();
+        return sendJson(response, 200, {
+          data: listed.filter((model) => !seen.has(model.id) && seen.add(model.id)),
+        });
+      }
       const activeProvider = hasConnectionId
         ? db.providers.find(p => p.id === requestedConnectionId)
         : db.providers.find(p => p.active) || db.providers[0];
@@ -340,7 +463,7 @@ try {
           });
           if (ids.length > 0) {
             return sendJson(response, 200, {
-              data: listedModels(activeProvider, ids, false, 'gemini-cli'),
+              data: serializeModels(activeProvider, db, ids),
             });
           }
         } catch {
@@ -353,7 +476,7 @@ try {
           if (models.length > 0) {
             refreshedModels.set(activeProvider.id, models);
             return sendJson(response, 200, {
-              data: listedModels(activeProvider, models, false, 'codex'),
+              data: serializeModels(activeProvider, db, models),
             });
           }
         } catch (_) {
@@ -369,11 +492,11 @@ try {
             baseUrl: activeProvider.baseUrl,
             projectId: activeProvider.projectId,
             runtimeToken: activeProvider.apiKey,
-            configuredModels: activeProvider.models,
+            configuredModels: effectiveModelsFor(activeProvider, db),
           });
           if (models.length > 0) {
             return sendJson(response, 200, {
-              data: listedModels(activeProvider, models, false, 'antigravity'),
+              data: serializeModels(activeProvider, db, models),
             });
           }
         } catch (error) {
@@ -400,7 +523,7 @@ try {
             if (Array.isArray(parsed?.data) && parsed.data.every(
               (model) => model && typeof model.id === 'string' && model.id.trim(),
             )) {
-              return sendJson(response, 200, { data: listedModels(activeProvider, parsed.data) });
+              return sendJson(response, 200, { data: serializeModels(activeProvider, db, parsed.data) });
             }
           }
           response.writeHead(upstream.status, {
@@ -423,7 +546,7 @@ try {
               (model) => model && typeof model.name === 'string' && model.name.trim(),
             )) {
               return sendJson(response, 200, {
-                data: listedModels(activeProvider, payload.models.map((model) => ({ id: model.name }))),
+                data: serializeModels(activeProvider, db, payload.models.map((model) => ({ id: model.name }))),
               });
             }
           }
@@ -439,13 +562,13 @@ try {
             if (Array.isArray(payload?.data) && payload.data.every(
               (model) => model && typeof model.id === 'string' && model.id.trim(),
             )) {
-              return sendJson(response, 200, { data: listedModels(activeProvider, payload.data) });
+              return sendJson(response, 200, { data: serializeModels(activeProvider, db, payload.data) });
             }
           }
         } catch (_) {}
       }
       return sendJson(response, 200, {
-        data: configuredModels(activeProvider),
+        data: serializeModels(activeProvider, db),
       });
     }
 
@@ -453,10 +576,10 @@ try {
       try {
         const requestedConnectionId = url.searchParams.get('connectionId');
         const hasConnectionId = url.searchParams.has('connectionId');
-        const activeProvider = hasConnectionId
+        let activeProvider = hasConnectionId
           ? db.providers.find(p => p.id === requestedConnectionId)
           : db.providers.find(p => p.active) || db.providers[0];
-        if (!activeProvider) {
+        if (hasConnectionId && !activeProvider) {
           return sendJson(response, hasConnectionId ? 404 : 400, {
             error: hasConnectionId
               ? 'Provider connection not found'
@@ -465,25 +588,44 @@ try {
         }
 
         let body = await parseJsonBody(request);
+        const requestedModel = parseCanonicalModel(body.model);
+        if (!hasConnectionId && requestedModel?.providerKey) {
+          const requestedDefinition = catalogByKey.get(requestedModel.providerKey);
+          const candidates = db.providers.filter((provider) => {
+            if (provider.enabled === false) return false;
+            const connectionKey = providerKeyFor(provider);
+            const connectionDefinition = catalogByKey.get(connectionKey);
+            return connectionKey === requestedModel.providerKey ||
+              (requestedDefinition && connectionDefinition?.id === requestedDefinition.id);
+          }).sort((a, b) => (a.priority || 0) - (b.priority || 0));
+          if (!candidates.length) {
+            return sendJson(response, 400, {
+              error: requestedDefinition ? 'no_enabled_provider_connection' : 'unknown_provider',
+            });
+          }
+          activeProvider = candidates[0];
+        }
+        if (!activeProvider) {
+          return sendJson(response, 400, { error: 'No active provider connection configured' });
+        }
         const requestedStream = body.stream === true || activeProvider.presetId === 'codex';
-        const rawModel = (typeof body.model === 'string' && body.model.trim()) ? body.model.trim() : '';
-        const managedModels = [
-          ...(Array.isArray(activeProvider.models) ? activeProvider.models : []),
-          ...(Array.isArray(activeProvider.customModels) ? activeProvider.customModels : []),
-          ...(refreshedModels.get(activeProvider.id) || []),
-        ].map((model) => typeof model === 'string' ? { id: model } : model)
-          .filter((model) => typeof model?.id === 'string' && model.id.trim())
-          .map((model) => ({ ...model, id: model.id.trim() }));
-        const managedModelById = new Map(managedModels.map((model) => [model.id, model]));
+        const legacyModel = runtimeModelDefaults.get(activeProvider.id);
+        const rawModel = (typeof body.model === 'string' && body.model.trim())
+          ? body.model.trim()
+          : legacyModel || '';
+        const resolved = resolveProviderModel({
+          connection: activeProvider,
+          rawModel,
+          legacyModel: hasConnectionId ? null : legacyModel,
+          catalog: resolverCatalogFor(activeProvider),
+          settings: db.modelSettings,
+          liveModels: refreshedModels.get(activeProvider.id) || [],
+          allowLegacyBare: !hasConnectionId,
+        });
+        if (resolved.error) return sendJson(response, resolved.error, { error: resolved.code });
         const isCodex = activeProvider.presetId === 'codex';
-        const selectedModel = rawModel && rawModel !== 'ignored' &&
-          (!isCodex || managedModelById.has(rawModel))
-          ? rawModel
-          : activeProvider.modelId;
-        const selectedDescriptor = managedModelById.get(selectedModel);
-        const upstreamModel = isCodex
-          ? (selectedDescriptor?.upstreamModelId || selectedModel)
-          : selectedModel;
+        const selectedModel = resolved.modelId;
+        const upstreamModel = resolved.upstreamModelId;
         body.model = upstreamModel;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
@@ -631,7 +773,7 @@ try {
             db.usage.push({
               id: randomUUID(), timestamp: new Date().toISOString(),
               providerId: activeProvider.presetId || activeProvider.id,
-              connectionId: activeProvider.id, modelId: activeProvider.modelId,
+              connectionId: activeProvider.id, modelId: resolved.canonicalModel,
               status: 'error', promptTokens: 0, completionTokens: 0,
               cachedTokens: 0, estimatedCost: 0.0,
               latencyMs: Date.now() - startTime
@@ -651,19 +793,19 @@ try {
           const decoder = new TextDecoder();
           const usageParser = createSseUsageParser();
           const geminiTranslator = isGeminiCli
-            ? createGeminiSseTranslator(activeProvider.modelId)
+            ? createGeminiSseTranslator(selectedModel)
             : null;
           const anthropicTranslator = isAnthropicMessages
-            ? createAnthropicSseTranslator(activeProvider.modelId)
+            ? createAnthropicSseTranslator(selectedModel)
             : null;
           const geminiContentTranslator = isGeminiContent
-            ? createGeminiContentSseTranslator(activeProvider.modelId)
+            ? createGeminiContentSseTranslator(selectedModel)
             : null;
           const ollamaTranslator = isOllamaChat
-            ? createOllamaChatStreamTranslator(activeProvider.modelId)
+            ? createOllamaChatStreamTranslator(selectedModel)
             : null;
           const openAiResponsesTranslator = isOpenAiResponses
-            ? createOpenAiResponsesSseTranslator(activeProvider.modelId)
+            ? createOpenAiResponsesSseTranslator(selectedModel)
             : null;
           try {
             while (downstreamOpen) {
@@ -729,7 +871,7 @@ try {
             timestamp: new Date().toISOString(),
             providerId: activeProvider.presetId || activeProvider.id,
             connectionId: activeProvider.id,
-            modelId: selectedModel,
+            modelId: resolved.canonicalModel,
             status: upstreamResponse.ok ? 'success' : 'error',
             promptTokens: usage.promptTokens,
             completionTokens: usage.completionTokens,
@@ -757,15 +899,15 @@ try {
           }
           const upstreamData = JSON.parse(upstreamBody.toString('utf8'));
           const resData = isGeminiCli
-            ? geminiResponseToOpenAi(upstreamData, activeProvider.modelId)
+            ? geminiResponseToOpenAi(upstreamData, selectedModel)
             : isAnthropicMessages
-              ? anthropicResponseToOpenAi(upstreamData, activeProvider.modelId)
-              : isGeminiContent
-                ? geminiContentResponseToOpenAi(upstreamData, activeProvider.modelId)
+              ? anthropicResponseToOpenAi(upstreamData, selectedModel)
+            : isGeminiContent
+                ? geminiContentResponseToOpenAi(upstreamData, selectedModel)
                 : isOllamaChat
-                  ? ollamaChatResponseToOpenAi(upstreamData, activeProvider.modelId)
+                  ? ollamaChatResponseToOpenAi(upstreamData, selectedModel)
                   : isOpenAiResponses
-                    ? openAiResponsesResponseToOpenAi(upstreamData, activeProvider.modelId)
+                    ? openAiResponsesResponseToOpenAi(upstreamData, selectedModel)
                     : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
@@ -774,12 +916,15 @@ try {
             db.usage.push({
               id: randomUUID(),
               timestamp: new Date().toISOString(),
-              providerId: activeProvider.id,
-              modelId: activeProvider.modelId,
+              providerId: activeProvider.presetId || activeProvider.id,
+              connectionId: activeProvider.id,
+              modelId: resolved.canonicalModel,
+              status: 'success',
               promptTokens: usage.prompt_tokens,
               completionTokens: usage.completion_tokens,
-              cost: 0.0,
-              latency: Date.now() - startTime
+              cachedTokens: 0,
+              estimatedCost: 0.0,
+              latencyMs: Date.now() - startTime
             });
             saveDb(db);
           }
@@ -801,13 +946,56 @@ try {
     }
 
     if (request.method === 'GET' && url.pathname === '/internal/providers') {
-      return sendJson(response, 200, db.providers.map(({ apiKey, ...provider }) => provider));
+      return sendJson(response, 200, db.providers.map((provider) => ({
+        id: provider.id,
+        providerId: provider.presetId,
+        providerKey: provider.providerKey,
+        displayName: provider.name,
+        authMode: provider.authMode,
+        enabled: provider.enabled !== false,
+        priority: provider.priority || 0,
+        mobileMetadata: {
+          kind: provider.kind, baseUrl: provider.baseUrl, systemPrompt: provider.systemPrompt,
+          projectId: provider.projectId, accountId: provider.accountId,
+          transportKind: provider.transportKind, chatUrl: provider.chatUrl,
+          modelsUrl: provider.modelsUrl, authHeader: provider.authHeader,
+          authScheme: provider.authScheme, staticHeaders: provider.staticHeaders,
+        },
+      })));
+    }
+
+    if (url.pathname.startsWith('/internal/model-settings/')) {
+      const rawProviderKey = decodeURIComponent(url.pathname.slice('/internal/model-settings/'.length));
+      const definition = catalogByKey.get(rawProviderKey);
+      const providerKey = definition?.alias || definition?.id || rawProviderKey;
+      if (!definition && !db.providers.some((provider) => providerKeyFor(provider) === providerKey)) {
+        return sendJson(response, 400, { error: 'unknown_provider' });
+      }
+      if (request.method === 'GET') return sendJson(response, 200, db.modelSettings?.[providerKey] || {
+        customModels: [], disabledModelIds: [],
+      });
+      if (request.method === 'PUT') {
+        try {
+          const data = await parseJsonBody(request);
+          db.modelSettings = {
+            ...(db.modelSettings || {}),
+            [providerKey]: {
+              customModels: Array.isArray(data.customModels) ? data.customModels : [],
+              disabledModelIds: Array.isArray(data.disabledModelIds) ? data.disabledModelIds : [],
+            },
+          };
+          saveDb(db);
+          return sendJson(response, 200, { success: true });
+        } catch (_) {
+          return sendJson(response, 400, { error: 'Invalid JSON' });
+        }
+      }
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/providers') {
       try {
         const data = await parseJsonBody(request);
-        if (!data.id || !data.name || !data.baseUrl || !data.modelId) {
+        if (!data.id || !data.name || !data.baseUrl) {
           return sendJson(response, 400, { error: 'Missing required fields' });
         }
 
@@ -820,10 +1008,12 @@ try {
           name: data.name,
           kind: data.kind || 'openAiCompatible',
           presetId: data.presetId || data.id,
+          providerKey: providerKeyFor({ providerKey: data.providerKey, presetId: data.presetId || data.id }),
           baseUrl: data.baseUrl,
-          modelId: data.modelId,
           systemPrompt: data.systemPrompt || '',
           authMode: data.authMode || 'apiKey',
+          enabled: data.enabled !== false,
+          priority: Number.isFinite(data.priority) ? data.priority : 0,
           projectId: data.projectId || '',
           accountId: data.accountId || '',
           transportKind: data.transportKind,
@@ -831,9 +1021,7 @@ try {
           modelsUrl: data.modelsUrl,
           authHeader: data.authHeader,
           authScheme: data.authScheme,
-          models: Array.isArray(data.models) ? data.models : [],
-          customModels: Array.isArray(data.customModels) ? data.customModels : [],
-          hiddenModelIds: Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : [],
+
           staticHeaders: data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders
             : {},
@@ -842,6 +1030,10 @@ try {
           sourceToken: data.sourceToken || ''
         });
 
+        if (typeof data.modelId === 'string' && data.modelId.trim()) {
+          runtimeModelDefaults.set(data.id, data.modelId.trim());
+        }
+        applyLegacyModelSettings(db.providers.at(-1), data, db);
         saveDb(db);
         return sendJson(response, 201, { success: true });
       } catch (e) {
@@ -860,7 +1052,11 @@ try {
         const data = await parseJsonBody(request);
         if (data.name !== undefined) provider.name = data.name;
         if (data.baseUrl !== undefined) provider.baseUrl = data.baseUrl;
-        if (data.modelId !== undefined) provider.modelId = data.modelId;
+        if (data.enabled !== undefined) provider.enabled = data.enabled !== false;
+        if (Number.isFinite(data.priority)) provider.priority = data.priority;
+        if (typeof data.modelId === 'string' && data.modelId.trim()) {
+          runtimeModelDefaults.set(provider.id, data.modelId.trim());
+        }
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
         if (data.projectId !== undefined) provider.projectId = data.projectId;
         if (data.accountId !== undefined) provider.accountId = data.accountId;
@@ -869,9 +1065,7 @@ try {
         if (data.modelsUrl !== undefined) provider.modelsUrl = data.modelsUrl;
         if (data.authHeader !== undefined) provider.authHeader = data.authHeader;
         if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
-        if (data.models !== undefined) provider.models = Array.isArray(data.models) ? data.models : [];
-        if (data.customModels !== undefined) provider.customModels = Array.isArray(data.customModels) ? data.customModels : [];
-        if (data.hiddenModelIds !== undefined) provider.hiddenModelIds = Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : [];
+        applyLegacyModelSettings(provider, data, db);
         if (data.staticHeaders !== undefined) {
           provider.staticHeaders = data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders
@@ -902,6 +1096,7 @@ try {
 
       db.providers.splice(index, 1);
       runtimeSecrets.delete(id);
+      runtimeModelDefaults.delete(id);
       refreshedQuota.delete(id);
       delete db.quota[id];
       saveDb(db);
@@ -982,7 +1177,7 @@ try {
             providerId: provider.presetId || provider.id,
             baseUrl: provider.baseUrl,
             projectId: provider.projectId,
-            models: provider.models,
+            models: effectiveModelsFor(provider, db),
           },
           secrets: runtimeSecrets.get(provider.id) || {},
         });
@@ -1013,6 +1208,7 @@ try {
         quota: {}
       };
       runtimeSecrets.clear();
+      runtimeModelDefaults.clear();
       refreshedQuota.clear();
       saveDb(dbReset);
       return sendJson(response, 200, { success: true });

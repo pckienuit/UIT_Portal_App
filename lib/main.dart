@@ -7,6 +7,7 @@ import 'src/features/auth/auth_controller.dart';
 import 'src/features/auth/auth_providers.dart';
 import 'src/features/home/providers/widget_preferences_provider.dart';
 import 'src/features/ai_chat/application/ai_provider_controller.dart';
+import 'src/features/ai_chat/application/ai_provider_model_controller.dart';
 import 'src/features/ai_chat/application/router_runtime_service.dart';
 import 'src/features/ai_chat/data/ai_provider_repository.dart';
 import 'src/features/ai_chat/data/github_oauth_service.dart';
@@ -91,6 +92,12 @@ void main() async {
                 apiKey: apiKey,
                 sourceToken: sourceToken,
               );
+            }
+            final modelSettings = container
+                .read(aiProviderModelControllerProvider)
+                .settings;
+            for (final settings in modelSettings.values) {
+              await client.saveModelSettings(settings);
             }
 
             final activeId = repo.getActiveProviderId();

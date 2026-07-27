@@ -10,7 +10,7 @@ function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'uit-router-state-'));
 }
 
-test('persists schema v2 metadata without credentials or chat content', () => {
+test('persists schema v3 metadata without credentials or chat content', () => {
   const dataDir = tempDir();
   const store = createStateStore({ dataDir, now: () => new Date('2026-07-21T00:00:00.000Z') });
 
@@ -24,6 +24,13 @@ test('persists schema v2 metadata without credentials or chat content', () => {
       enabled: true,
       apiKey: 'sk-secret',
       accessToken: 'oauth-secret',
+      mobileMetadata: {
+        baseUrl: 'https://api.openai.com/v1',
+        modelId: 'nested-model',
+        models: [{ id: 'nested-static' }],
+        customModels: [{ id: 'nested-custom' }],
+        hiddenModelIds: ['nested-hidden'],
+      },
     }],
     activeRoute: { connectionId: 'conn-1', modelId: 'gpt-4o-mini', local: false },
     usage: [{
@@ -45,11 +52,57 @@ test('persists schema v2 metadata without credentials or chat content', () => {
   assert.doesNotMatch(raw, /sk-secret|oauth-secret|private prompt|private response/);
 
   const state = JSON.parse(raw);
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.equal(state.connections[0].providerId, 'openai');
   assert.equal(state.connections[0].apiKey, undefined);
+  assert.equal(state.connections[0].mobileMetadata.modelId, undefined);
+  assert.equal(state.connections[0].mobileMetadata.models, undefined);
+  assert.equal(state.connections[0].mobileMetadata.customModels, undefined);
+  assert.equal(state.connections[0].mobileMetadata.hiddenModelIds, undefined);
   assert.equal(state.usage[0].prompt, undefined);
   assert.equal(state.updatedAt, '2026-07-21T00:00:00.000Z');
+});
+
+test('migrates v2 connection model metadata into provider-scoped v3 settings', () => {
+  const dataDir = tempDir();
+  const statePath = path.join(dataDir, '9router_state.json');
+  fs.writeFileSync(statePath, JSON.stringify({
+    schemaVersion: 2,
+    connections: [
+      {
+        id: 'github-a', providerId: 'github', displayName: 'GitHub A',
+        authMode: 'oauth', modelId: 'gpt-5.4', enabled: true,
+        mobileMetadata: {
+          models: [{ id: 'gpt-5.4' }],
+          customModels: [{ id: ' shared-model ' }],
+          hiddenModelIds: [' disabled-model '],
+        },
+      },
+      {
+        id: 'github-b', providerId: 'github', displayName: 'GitHub B',
+        authMode: 'oauth', modelId: 'gpt-5.4', enabled: true,
+        mobileMetadata: {
+          customModels: [{ id: 'shared-model' }, { id: 'second-model' }],
+          hiddenModelIds: ['disabled-model', 'other-disabled'],
+        },
+      },
+    ],
+    activeRoute: { connectionId: 'github-a', modelId: 'gpt-5.4', local: false },
+    usage: [], quota: {},
+  }), 'utf8');
+
+  const state = createStateStore({ dataDir }).load();
+
+  assert.equal(state.schemaVersion, 3);
+  assert.deepEqual(state.modelSettings.github, {
+    customModels: [{ id: 'shared-model' }, { id: 'second-model' }],
+    disabledModelIds: ['disabled-model', 'other-disabled'],
+  });
+  assert.equal(state.connections[0].modelId, undefined);
+  assert.equal(state.connections[0].mobileMetadata.models, undefined);
+  assert.equal(state.connections[0].mobileMetadata.customModels, undefined);
+  assert.equal(state.connections[0].mobileMetadata.hiddenModelIds, undefined);
+  assert.equal(state.activeRoute.modelId, 'gpt-5.4');
 });
 
 test('quota normalization strips credential-like fields and malformed entries', () => {
@@ -107,7 +160,7 @@ test('backs up corrupt JSON before returning a fresh state', () => {
 
   const state = store.load();
 
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.deepEqual(state.connections, []);
   assert.equal(fs.existsSync(statePath), false);
   const backups = fs.readdirSync(dataDir).filter((name) => name.startsWith('9router_state.json.corrupt-'));
@@ -160,9 +213,11 @@ test('migrates legacy providers to connections without carrying api keys', () =>
 
   const state = store.load();
 
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.equal(state.connections[0].id, 'legacy-openai');
   assert.equal(state.connections[0].providerId, 'openai');
+  assert.equal(state.connections[0].providerKey, 'openai');
+  assert.equal(state.connections[0].modelId, undefined);
   assert.equal(state.connections[0].displayName, 'OpenAI');
   assert.equal(state.connections[0].authMode, 'apiKey');
   assert.deepEqual(state.connections[0].mobileMetadata, {
@@ -172,7 +227,7 @@ test('migrates legacy providers to connections without carrying api keys', () =>
   });
   assert.deepEqual(state.activeRoute, {
     connectionId: 'legacy-openai',
-    modelId: 'gpt-4o-mini',
+    modelId: 'openai/gpt-4o-mini',
     local: false,
   });
   assert.doesNotMatch(fs.readFileSync(statePath, 'utf8'), /must-not-survive/);
