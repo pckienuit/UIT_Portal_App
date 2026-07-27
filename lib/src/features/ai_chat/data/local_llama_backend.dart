@@ -41,7 +41,7 @@ class LocalLlamaBackend implements AiChatBackend {
   var _generating = false;
 
   @override
-  Future<AiConnectionResult> testConnection() async =>
+  Future<AiConnectionResult> testConnection({String? testModelId}) async =>
       const AiConnectionResult(success: true);
 
   @override

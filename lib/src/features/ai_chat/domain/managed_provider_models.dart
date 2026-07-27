@@ -1,6 +1,5 @@
 import 'ai_chat_backend.dart';
 import 'ai_chat_models.dart';
-import 'router_catalog.dart';
 
 class ManagedProviderModel {
   const ManagedProviderModel({
@@ -46,15 +45,7 @@ ManagedProviderModels resolveManagedProviderModels(
   List<AiModelOption> refreshedModels,
 ) {
   final antigravity = config.presetId == 'antigravity';
-  final staticModels = [
-    ...config.models.map(
-      (model) => AiModelOption(id: model.id, name: model.name),
-    ),
-    ...?RouterCatalog.byId(
-      config.presetId ?? '',
-    )?.models.map((model) => AiModelOption(id: model.id, name: model.name)),
-  ];
-  final lockedIds = staticModels.map((model) => model.id.trim()).toSet()
+  final lockedIds = config.models.map((model) => model.id.trim()).toSet()
     ..remove('');
   final hiddenIds = config.hiddenModelIds.map((id) => id.trim()).toSet();
   final managed = <String, ManagedProviderModel>{};
@@ -66,20 +57,28 @@ ManagedProviderModels resolveManagedProviderModels(
   }) {
     final id = model.id.trim();
     if (id.isEmpty) return;
-    final old = managed[id];
+    final existing = managed[id];
     managed[id] = ManagedProviderModel(
       id: id,
-      name: model.name.trim().isEmpty ? id : model.name.trim(),
-      capabilities: model.capabilities,
-      builtIn: builtIn || (old?.builtIn ?? false),
-      custom: custom || (old?.custom ?? false),
-      refreshed: false,
+      name:
+          existing?.name ??
+          (model.name.trim().isEmpty ? id : model.name.trim()),
+      capabilities: _hasCapabilities(model.capabilities)
+          ? model.capabilities
+          : existing?.capabilities ?? const AiModelCapabilities(),
+      builtIn: builtIn || (existing?.builtIn ?? false),
+      custom: custom || (existing?.custom ?? false),
+      refreshed: existing?.refreshed ?? false,
       hidden: hiddenIds.contains(id),
     );
   }
 
-  for (final model in staticModels) {
-    addManaged(model, builtIn: true, custom: false);
+  for (final model in config.models) {
+    addManaged(
+      AiModelOption(id: model.id, name: model.name),
+      builtIn: true,
+      custom: false,
+    );
   }
   if (!antigravity) {
     for (final model in config.customModels) {
@@ -95,7 +94,21 @@ ManagedProviderModels resolveManagedProviderModels(
   for (final model in refreshedModels) {
     final id = model.id.trim();
     if (id.isEmpty || (antigravity && !lockedIds.contains(id))) continue;
-    if (managed.containsKey(id)) continue;
+    final existing = managed[id];
+    if (existing != null) {
+      managed[id] = ManagedProviderModel(
+        id: existing.id,
+        name: existing.name,
+        capabilities: _hasCapabilities(model.capabilities)
+            ? model.capabilities
+            : existing.capabilities,
+        builtIn: existing.builtIn,
+        custom: existing.custom,
+        refreshed: true,
+        hidden: existing.hidden,
+      );
+      continue;
+    }
     refreshed[id] = ManagedProviderModel(
       id: id,
       name: model.name.trim().isEmpty ? id : model.name.trim(),
@@ -106,13 +119,40 @@ ManagedProviderModels resolveManagedProviderModels(
       hidden: hiddenIds.contains(id),
     );
   }
+  if (!antigravity) {
+    for (final id in hiddenIds) {
+      if (id.isEmpty || managed.containsKey(id) || refreshed.containsKey(id)) {
+        continue;
+      }
+      managed[id] = ManagedProviderModel(
+        id: id,
+        name: id,
+        capabilities: const AiModelCapabilities(),
+        builtIn: false,
+        custom: false,
+        refreshed: false,
+        hidden: true,
+      );
+    }
+  }
 
   final allManaged = managed.values.toList(growable: false);
+  final refreshedOnly = refreshed.values.toList(growable: false);
   return ManagedProviderModels(
     visible: allManaged.where((model) => !model.hidden).toList(growable: false),
-    hidden: allManaged.where((model) => model.hidden).toList(growable: false),
-    refreshed: refreshed.values
+    hidden: [
+      ...allManaged,
+      ...refreshedOnly,
+    ].where((model) => model.hidden).toList(growable: false),
+    refreshed: refreshedOnly
         .where((model) => !model.hidden)
         .toList(growable: false),
   );
 }
+
+bool _hasCapabilities(AiModelCapabilities capabilities) =>
+    capabilities.vision ||
+    capabilities.reasoning ||
+    capabilities.tools ||
+    capabilities.contextWindow != null ||
+    capabilities.maxOutput != null;

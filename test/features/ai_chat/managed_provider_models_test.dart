@@ -27,13 +27,20 @@ void main() {
     );
 
     expect(result.visible.map((model) => model.id), ['built-in']);
-    expect(result.hidden.map((model) => model.id), ['custom']);
+    expect(result.hidden.map((model) => model.id), [
+      'custom',
+      'hidden-refresh',
+    ]);
     expect(result.refreshed.map((model) => model.id), ['suggestion']);
     expect(result.visible.first.builtIn, isTrue);
-    expect(result.visible.first.refreshed, isFalse);
+    expect(result.visible.first.refreshed, isTrue);
+    expect(result.visible.first.capabilities.reasoning, isTrue);
     expect(result.visible.first.managed, isTrue);
     expect(result.refreshed.single.managed, isFalse);
-    expect(result.hidden.single.custom, isTrue);
+    expect(
+      result.hidden.firstWhere((model) => model.id == 'custom').custom,
+      isTrue,
+    );
   });
 
   test('Antigravity keeps exactly locked static ids', () {
