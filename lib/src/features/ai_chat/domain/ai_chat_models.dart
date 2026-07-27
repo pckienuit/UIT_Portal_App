@@ -40,6 +40,7 @@ class AiProviderConfig {
     this.authScheme,
     this.models = const [],
     this.customModels = const [],
+    this.hiddenModelIds = const [],
     this.staticHeaders = const {},
   });
 
@@ -62,6 +63,7 @@ class AiProviderConfig {
   final String? authScheme;
   final List<AiProviderModelDescriptor> models;
   final List<AiProviderModelDescriptor> customModels;
+  final List<String> hiddenModelIds;
   final Map<String, String> staticHeaders;
 
   Map<String, dynamic> toJson() => {
@@ -84,6 +86,7 @@ class AiProviderConfig {
     'authScheme': authScheme,
     'models': models.map((model) => model.toJson()).toList(),
     'customModels': customModels.map((model) => model.toJson()).toList(),
+    'hiddenModelIds': hiddenModelIds,
     'staticHeaders': staticHeaders,
   };
 
@@ -128,6 +131,11 @@ class AiProviderConfig {
                 )
                 .toList(growable: false) ??
             const [],
+        hiddenModelIds:
+            (json['hiddenModelIds'] as List<dynamic>?)
+                ?.map((id) => id.toString())
+                .toList(growable: false) ??
+            const [],
         staticHeaders:
             (json['staticHeaders'] as Map?)?.map(
               (key, value) => MapEntry(key.toString(), value.toString()),
@@ -153,6 +161,7 @@ class AiProviderConfig {
     String? Function()? authScheme,
     List<AiProviderModelDescriptor>? models,
     List<AiProviderModelDescriptor>? customModels,
+    List<String>? hiddenModelIds,
     Map<String, String>? staticHeaders,
   }) {
     return AiProviderConfig(
@@ -181,6 +190,7 @@ class AiProviderConfig {
       authScheme: authScheme != null ? authScheme() : this.authScheme,
       models: models ?? this.models,
       customModels: customModels ?? this.customModels,
+      hiddenModelIds: hiddenModelIds ?? this.hiddenModelIds,
       staticHeaders: staticHeaders ?? this.staticHeaders,
     );
   }

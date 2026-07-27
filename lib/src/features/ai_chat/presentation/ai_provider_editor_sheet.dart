@@ -183,12 +183,6 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
           errorMessage: result.errorMessage,
         );
 
-        if (result.success) {
-          final models = await backend.listModels();
-          if (models.isNotEmpty) {
-            notifier.updateProviderModels(config.id, models);
-          }
-        }
         await backend.dispose();
       } else {
         notifier.updateProviderHealth(

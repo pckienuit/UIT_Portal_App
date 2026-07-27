@@ -9,7 +9,6 @@ import '../domain/ai_chat_models.dart';
 import 'ai_context_consent_sheet.dart';
 import 'ai_model_picker_sheet.dart';
 import 'ai_provider_settings_screen.dart';
-import 'ai_provider_switcher_sheet.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
   const AiChatScreen({super.key});
@@ -80,7 +79,6 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       context: context,
       isScrollControlled: true,
       builder: (context) => AiModelPickerSheet(
-        providerId: null, // Global mode: hiển thị tất cả model khả dụng của tất cả provider
         currentModelId: activeProvider?.modelId ?? '',
         onModelSelected: (modelId, providerId) async {
           if (ref.read(aiChatControllerProvider).isGenerating) {

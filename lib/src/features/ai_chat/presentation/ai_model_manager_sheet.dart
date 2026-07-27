@@ -4,8 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
 import '../domain/ai_chat_backend.dart';
-import '../domain/ai_chat_models.dart';
-import '../domain/router_catalog.dart';
+import '../domain/managed_provider_models.dart';
 
 class AiModelManagerSheet extends ConsumerStatefulWidget {
   const AiModelManagerSheet({super.key, required this.providerId});
@@ -44,16 +43,16 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
     }
 
     final config = matches.first;
-    final catalog = _buildCatalog(
+    final catalog = resolveManagedProviderModels(
       config,
       state.models[config.id] ?? const <AiModelOption>[],
     );
     final query = _query.trim().toLowerCase();
     final visible =
-        catalog.where((model) => !model.hidden && model.matches(query)).toList()
+        catalog.visible.where((model) => model.matches(query)).toList()
           ..sort(_compareModels);
     final hidden =
-        catalog.where((model) => model.hidden && model.matches(query)).toList()
+        catalog.hidden.where((model) => model.matches(query)).toList()
           ..sort(_compareModels);
 
     return Padding(
@@ -105,7 +104,7 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
                                 ),
                               )
                             : const Icon(Icons.refresh),
-                        label: const Text('Làm mới danh mục'),
+                        label: const Text('Làm mới từ provider'),
                       ),
                     ),
                     if (config.presetId != 'antigravity') ...[
@@ -122,7 +121,7 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
                 ),
                 const SizedBox(height: PortalSpacing.md),
                 Expanded(
-                  child: catalog.isEmpty
+                  child: catalog.visible.isEmpty && catalog.hidden.isEmpty
                       ? const Center(
                           child: Text('Chưa có model trong danh mục.'),
                         )
@@ -134,6 +133,15 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
                               models: visible,
                               providerId: config.id,
                             ),
+                            if (catalog.refreshed.isNotEmpty) ...[
+                              const SizedBox(height: PortalSpacing.md),
+                              _ModelSection(
+                                title: 'Model tìm thấy từ provider',
+                                models: [...catalog.refreshed]
+                                  ..sort(_compareModels),
+                                providerId: config.id,
+                              ),
+                            ],
                             if (hidden.isNotEmpty) ...[
                               const SizedBox(height: PortalSpacing.md),
                               _ModelSection(
@@ -218,7 +226,7 @@ class _ModelSection extends ConsumerWidget {
   });
 
   final String title;
-  final List<_ManagedModel> models;
+  final List<ManagedProviderModel> models;
   final String providerId;
   final String? emptyText;
 
@@ -279,73 +287,5 @@ class _ModelSection extends ConsumerWidget {
   }
 }
 
-List<_ManagedModel> _buildCatalog(
-  AiProviderConfig config,
-  List<AiModelOption> refreshedModels,
-) {
-  final models = <String, _ManagedModel>{};
-
-  void merge(
-    String id,
-    String name, {
-    bool builtIn = false,
-    bool refreshed = false,
-    bool custom = false,
-  }) {
-    final modelId = id.trim();
-    if (modelId.isEmpty) return;
-    final existing = models[modelId];
-    models[modelId] = _ManagedModel(
-      id: modelId,
-      name: name.trim().isEmpty ? modelId : name.trim(),
-      builtIn: builtIn || (existing?.builtIn ?? false),
-      refreshed: refreshed || (existing?.refreshed ?? false),
-      custom: custom || (existing?.custom ?? false),
-      hidden: config.hiddenModelIds.contains(modelId),
-    );
-  }
-
-  for (final model in config.models) {
-    merge(model.id, model.name, builtIn: true);
-  }
-  for (final model
-      in RouterCatalog.byId(config.presetId ?? '')?.models ?? const []) {
-    merge(model.id, model.name, builtIn: true);
-  }
-  for (final model in refreshedModels) {
-    merge(model.id, model.name, refreshed: true);
-  }
-  for (final model in config.customModels) {
-    merge(model.id, model.name, custom: true);
-  }
-  for (final modelId in config.hiddenModelIds) {
-    merge(modelId, modelId);
-  }
-  return models.values.toList(growable: false);
-}
-
-int _compareModels(_ManagedModel left, _ManagedModel right) =>
+int _compareModels(ManagedProviderModel left, ManagedProviderModel right) =>
     left.name.toLowerCase().compareTo(right.name.toLowerCase());
-
-class _ManagedModel {
-  const _ManagedModel({
-    required this.id,
-    required this.name,
-    required this.builtIn,
-    required this.refreshed,
-    required this.custom,
-    required this.hidden,
-  });
-
-  final String id;
-  final String name;
-  final bool builtIn;
-  final bool refreshed;
-  final bool custom;
-  final bool hidden;
-
-  bool matches(String query) =>
-      query.isEmpty ||
-      id.toLowerCase().contains(query) ||
-      name.toLowerCase().contains(query);
-}
