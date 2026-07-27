@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
 import '../data/local_model_catalog.dart';
@@ -12,7 +14,9 @@ final localModelDirectoryProvider = FutureProvider<Directory>((ref) async {
   return Directory('${appSupport.path}/ai_models');
 });
 
-final localModelManagerProvider = FutureProvider<LocalModelManager>((ref) async {
+final localModelManagerProvider = FutureProvider<LocalModelManager>((
+  ref,
+) async {
   final dir = await ref.watch(localModelDirectoryProvider.future);
   return LocalModelManager(directory: dir);
 });
@@ -27,72 +31,58 @@ class LocalModelController extends Notifier<LocalModelProgress> {
   @override
   LocalModelProgress build() {
     _modelInfo = LocalModelCatalog.byId(modelId);
+    ref.onDispose(() => _manager?.cancelDownload(modelId));
     _init();
-    return const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+    return const LocalModelProgress(status: LocalModelStatus.verifying);
   }
 
   Future<void> _init() async {
     if (_modelInfo == null) return;
     _manager = await ref.watch(localModelManagerProvider.future);
-    
-    final exists = await _manager!.checkModelExists(_modelInfo!);
-    if (exists) {
-      state = const LocalModelProgress(status: LocalModelStatus.ready, progressPercent: 100.0);
-      
-      // Auto register/select local provider config if downloaded but not configured
-      final providerController = ref.read(aiProviderControllerProvider.notifier);
-      final hasLocalConfig = providerController.state.providers.any((p) => p.id == _modelInfo!.id);
-      if (!hasLocalConfig) {
-        final config = AiProviderConfig(
-          id: _modelInfo!.id,
-          name: _modelInfo!.name,
-          kind: AiBackendKind.localLlama,
-          baseUrl: '',
-          modelId: _modelInfo!.fileName,
-        );
-        await providerController.saveProvider(config);
-        // Switch chat controller provider to it as well if no active provider is set
-        final chatController = ref.read(aiChatControllerProvider.notifier);
-        if (chatController.state.activeProvider == null) {
-          await chatController.switchProvider(config);
-        }
-      }
-    } else {
+    if (!ref.mounted) return;
+
+    final inspection = await _manager!.inspectModel(_modelInfo!);
+    if (!ref.mounted) return;
+
+    final ready = switch (inspection) {
+      LocalModelInspection.missing => false,
+      LocalModelInspection.needsVerification => await _manager!.verifyModel(
+        _modelInfo!,
+      ),
+      LocalModelInspection.ready => true,
+    };
+    if (!ref.mounted) return;
+    if (!ready) {
       state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+      return;
     }
+    await _publishReady();
   }
 
   Future<void> startDownload() async {
     if (_manager == null || _modelInfo == null) return;
 
-    final stream = _manager!.downloadModel(
-      _modelInfo!,
-      onComplete: () {
-        ref.read(aiChatControllerProvider.notifier).switchProvider(
-          AiProviderConfig(
-            id: _modelInfo!.id,
-            name: _modelInfo!.name,
-            kind: AiBackendKind.localLlama,
-            baseUrl: '',
-            modelId: _modelInfo!.fileName,
-          ),
-        );
-      },
-    );
+    final stream = _manager!.downloadModel(_modelInfo!);
 
     await for (final progress in stream) {
-      state = progress;
+      if (!ref.mounted) return;
+      if (progress.status == LocalModelStatus.ready) {
+        await _publishReady(select: true);
+      } else {
+        state = progress;
+      }
     }
   }
 
   void cancelDownload() {
     _manager?.cancelDownload();
-    state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+    if (ref.mounted) {
+      state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+    }
   }
 
   Future<void> deleteModel() async {
     if (_manager == null || _modelInfo == null) return;
-    
     final aiController = ref.read(aiChatControllerProvider.notifier);
     if (aiController.state.activeProvider?.id == _modelInfo!.id) {
       await aiController.switchProvider(
@@ -105,12 +95,44 @@ class LocalModelController extends Notifier<LocalModelProgress> {
         ),
       );
     }
-    
     await _manager!.deleteModel(_modelInfo!);
-    state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+    if (ref.mounted) {
+      state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
+    }
+  }
+
+  Future<void> _publishReady({bool select = false}) async {
+    if (!ref.mounted || _modelInfo == null) return;
+    state = const LocalModelProgress(
+      status: LocalModelStatus.ready,
+      progressPercent: 100.0,
+    );
+
+    final model = _modelInfo!;
+    final config = AiProviderConfig(
+      id: model.id,
+      name: model.name,
+      kind: AiBackendKind.localLlama,
+      baseUrl: '',
+      modelId: model.fileName,
+    );
+    final providerController = ref.read(aiProviderControllerProvider.notifier);
+    final hasLocalConfig = providerController.state.providers.any(
+      (provider) => provider.id == model.id,
+    );
+    if (!hasLocalConfig) {
+      await providerController.saveProvider(config);
+      if (!ref.mounted) return;
+    }
+
+    final chatController = ref.read(aiChatControllerProvider.notifier);
+    if (select || chatController.state.activeProvider == null) {
+      await chatController.switchProvider(config);
+    }
   }
 }
 
-final localModelControllerProvider = NotifierProvider.family.autoDispose<LocalModelController, LocalModelProgress, String>((modelId) {
-  return LocalModelController(modelId);
-});
+final localModelControllerProvider = NotifierProvider.family
+    .autoDispose<LocalModelController, LocalModelProgress, String>(
+      LocalModelController.new,
+    );

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -8,6 +10,16 @@ import 'package:path/path.dart' as p;
 import 'local_model_catalog.dart';
 
 enum LocalModelStatus { notDownloaded, downloading, verifying, ready, error }
+
+enum LocalModelInspection { missing, needsVerification, ready }
+
+Future<String> _sha256File(String path) async => sha256
+    .bind(File(path).openRead())
+    .first
+    .then((digest) => digest.toString());
+
+Future<String> _sha256InIsolate(String path) =>
+    Isolate.run(() => _sha256File(path));
 
 class LocalModelProgress {
   const LocalModelProgress({
@@ -33,12 +45,66 @@ class LocalModelManager {
       File(p.join(directory.path, model.fileName));
   File _partFile(LocalModelInfo model) =>
       File(p.join(directory.path, '${model.fileName}.part'));
+  File _markerFile(LocalModelInfo model) =>
+      File(p.join(directory.path, '${model.fileName}.verified.json'));
+  File _markerTempFile(LocalModelInfo model) =>
+      File(p.join(directory.path, '${model.fileName}.verified.json.tmp'));
+
+  Future<LocalModelInspection> inspectModel(LocalModelInfo model) async {
+    final stat = await _modelFile(model).stat();
+    if (stat.type != FileSystemEntityType.file ||
+        stat.size != model.sizeBytes) {
+      return LocalModelInspection.missing;
+    }
+
+    try {
+      final marker = jsonDecode(await _markerFile(model).readAsString());
+      if (marker is Map<String, dynamic> &&
+          marker['schemaVersion'] == 1 &&
+          marker['sizeBytes'] == stat.size &&
+          marker['sha256'] == model.sha256.toLowerCase() &&
+          marker['modifiedAtMillis'] == stat.modified.millisecondsSinceEpoch) {
+        return LocalModelInspection.ready;
+      }
+    } on FileSystemException {
+      return LocalModelInspection.needsVerification;
+    } on FormatException {
+      return LocalModelInspection.needsVerification;
+    }
+    return LocalModelInspection.needsVerification;
+  }
+
+  Future<bool> verifyModel(LocalModelInfo model) async {
+    final file = _modelFile(model);
+    final before = await file.stat();
+    if (before.type != FileSystemEntityType.file ||
+        before.size != model.sizeBytes) {
+      await _deleteVerificationMarker(model);
+      return false;
+    }
+
+    final actualSha = await _sha256InIsolate(file.path);
+    final after = await file.stat();
+    final unchanged =
+        after.type == FileSystemEntityType.file &&
+        after.size == before.size &&
+        after.modified.millisecondsSinceEpoch ==
+            before.modified.millisecondsSinceEpoch;
+    if (!unchanged || actualSha != model.sha256.toLowerCase()) {
+      await _deleteVerificationMarker(model);
+      return false;
+    }
+
+    await _writeVerificationMarker(model, after);
+    return true;
+  }
 
   Future<bool> checkModelExists(LocalModelInfo model) async {
-    final file = _modelFile(model);
-    return await file.exists() &&
-        await file.length() == model.sizeBytes &&
-        await _sha256(file) == model.sha256.toLowerCase();
+    return switch (await inspectModel(model)) {
+      LocalModelInspection.missing => false,
+      LocalModelInspection.needsVerification => verifyModel(model),
+      LocalModelInspection.ready => true,
+    };
   }
 
   Stream<LocalModelProgress> downloadModel(
@@ -119,11 +185,14 @@ class LocalModelManager {
         if (await partFile.length() != model.sizeBytes) {
           throw Exception('Download chưa hoàn tất hoặc sai kích thước.');
         }
-        if (await _sha256(partFile) != model.sha256.toLowerCase()) {
+        if (await _sha256InIsolate(partFile.path) !=
+            model.sha256.toLowerCase()) {
           throw Exception('Kiểm tra SHA-256 thất bại. File tải xuống bị hỏng.');
         }
+        await _deleteVerificationMarker(model);
         if (await finalFile.exists()) await finalFile.delete();
         await partFile.rename(finalFile.path);
+        await _writeVerificationMarker(model, await finalFile.stat());
         controller.add(
           const LocalModelProgress(
             status: LocalModelStatus.ready,
@@ -175,10 +244,34 @@ class LocalModelManager {
     final part = _partFile(model);
     if (await file.exists()) await file.delete();
     if (await part.exists()) await part.delete();
+    await _deleteVerificationMarker(model);
   }
 
-  Future<String> _sha256(File file) async =>
-      sha256.bind(file.openRead()).first.then((digest) => digest.toString());
+  Future<void> _writeVerificationMarker(
+    LocalModelInfo model,
+    FileStat stat,
+  ) async {
+    final marker = _markerFile(model);
+    final temp = _markerTempFile(model);
+    await temp.writeAsString(
+      jsonEncode({
+        'schemaVersion': 1,
+        'sizeBytes': stat.size,
+        'sha256': model.sha256.toLowerCase(),
+        'modifiedAtMillis': stat.modified.millisecondsSinceEpoch,
+      }),
+      flush: true,
+    );
+    if (await marker.exists()) await marker.delete();
+    await temp.rename(marker.path);
+  }
+
+  Future<void> _deleteVerificationMarker(LocalModelInfo model) async {
+    final marker = _markerFile(model);
+    final temp = _markerTempFile(model);
+    if (await marker.exists()) await marker.delete();
+    if (await temp.exists()) await temp.delete();
+  }
 }
 
 class CanceledError implements Exception {
