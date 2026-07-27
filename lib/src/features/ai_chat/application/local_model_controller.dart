@@ -8,6 +8,7 @@ import '../application/ai_provider_controller.dart';
 import '../data/local_model_catalog.dart';
 import '../data/local_model_manager.dart';
 import '../domain/ai_chat_models.dart';
+import '../domain/ai_model_ref.dart';
 
 final localModelDirectoryProvider = FutureProvider<Directory>((ref) async {
   final appSupport = await getApplicationSupportDirectory();
@@ -83,18 +84,6 @@ class LocalModelController extends Notifier<LocalModelProgress> {
 
   Future<void> deleteModel() async {
     if (_manager == null || _modelInfo == null) return;
-    final aiController = ref.read(aiChatControllerProvider.notifier);
-    if (aiController.state.activeProvider?.id == _modelInfo!.id) {
-      await aiController.switchProvider(
-        AiProviderConfig(
-          id: 'temp',
-          name: 'OpenAI',
-          kind: AiBackendKind.openAiCompatible,
-          baseUrl: 'https://api.openai.com/v1',
-          modelId: 'gpt-4o-mini',
-        ),
-      );
-    }
     await _manager!.deleteModel(_modelInfo!);
     if (ref.mounted) {
       state = const LocalModelProgress(status: LocalModelStatus.notDownloaded);
@@ -114,7 +103,7 @@ class LocalModelController extends Notifier<LocalModelProgress> {
       name: model.name,
       kind: AiBackendKind.localLlama,
       baseUrl: '',
-      modelId: model.fileName,
+      presetId: 'local_qwen',
     );
     final providerController = ref.read(aiProviderControllerProvider.notifier);
     final hasLocalConfig = providerController.state.providers.any(
@@ -125,9 +114,11 @@ class LocalModelController extends Notifier<LocalModelProgress> {
       if (!ref.mounted) return;
     }
 
-    final chatController = ref.read(aiChatControllerProvider.notifier);
-    if (select || chatController.state.activeProvider == null) {
-      await chatController.switchProvider(config);
+    if (select || ref.read(aiChatControllerProvider).activeProvider == null) {
+      await ref.read(aiChatControllerProvider.notifier).selectConversationModel(
+            connectionId: config.id,
+            model: AiModelRef.parse('local_qwen/qwen-0.8b-local'),
+          );
     }
   }
 }

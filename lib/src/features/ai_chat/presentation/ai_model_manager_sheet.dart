@@ -12,13 +12,9 @@ import '../domain/router_catalog.dart';
 import '../domain/router_models.dart';
 
 class AiModelManagerSheet extends ConsumerStatefulWidget {
-  const AiModelManagerSheet({super.key, this.providerKey, this.providerId})
-    : assert(providerKey != null || providerId != null);
+  const AiModelManagerSheet({super.key, required this.providerKey});
 
-  final String? providerKey;
-
-  // ponytail: delete after Phase 6 updates every legacy caller.
-  final String? providerId;
+  final String providerKey;
 
   @override
   ConsumerState<AiModelManagerSheet> createState() =>
@@ -30,14 +26,7 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
   String _query = '';
   bool _refreshing = false;
 
-  String get _providerKey =>
-      widget.providerKey ??
-      providerKeyFor(
-        ref
-            .read(aiProviderControllerProvider)
-            .providers
-            .firstWhere((item) => item.id == widget.providerId),
-      );
+  String get _providerKey => widget.providerKey;
 
   @override
   void dispose() {
@@ -63,23 +52,12 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
     final config = matches.first;
     final definition = RouterCatalog.byId(config.presetId ?? '');
     final modelState = ref.watch(aiProviderModelControllerProvider);
-    final catalog = definition == null
-        ? resolveManagedProviderModelsForDefinition(
-            _customDefinition(config),
-            modelState.settings[_providerKey] ??
-                AiProviderModelSettings(providerKey: _providerKey),
-            modelState.discoveredModels[_providerKey] ??
-                state.models[config.id] ??
-                const <AiModelOption>[],
-          )
-        : resolveManagedProviderModelsForDefinition(
-            definition,
-            modelState.settings[_providerKey] ??
-                AiProviderModelSettings(providerKey: _providerKey),
-            modelState.discoveredModels[_providerKey] ??
-                state.models[config.id] ??
-                const <AiModelOption>[],
-          );
+    final catalog = resolveManagedProviderModelsForDefinition(
+      definition ?? _customDefinition(config),
+      modelState.settings[_providerKey] ??
+          AiProviderModelSettings(providerKey: _providerKey),
+      modelState.discoveredModels[_providerKey] ?? const <AiModelOption>[],
+    );
     final query = _query.trim().toLowerCase();
     List<ManagedProviderModel> matching(
       Iterable<ManagedProviderModel> models,
@@ -355,11 +333,10 @@ int _compareModels(ManagedProviderModel left, ManagedProviderModel right) =>
 
 RouterProviderDefinition _customDefinition(AiProviderConfig config) =>
     RouterProviderDefinition(
-      id: 'custom',
+      id: providerKeyFor(config),
+      alias: providerKeyFor(config),
       name: config.name,
       category: RouterProviderCategory.custom,
       authModes: const [RouterAuthMode.custom],
-      models: config.models
-          .map((model) => RouterModelDefinition(id: model.id, name: model.name))
-          .toList(growable: false),
+      passthroughModels: true,
     );

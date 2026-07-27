@@ -93,6 +93,9 @@ void main() async {
                 sourceToken: sourceToken,
               );
             }
+            await container
+                .read(aiProviderModelControllerProvider.notifier)
+                .migrateLegacy();
             final modelSettings = container
                 .read(aiProviderModelControllerProvider)
                 .settings;
@@ -100,11 +103,6 @@ void main() async {
               await client.saveModelSettings(settings);
             }
 
-            final activeId = repo.getActiveProviderId();
-            if (activeId != null &&
-                coreProviders.any((p) => p.id == activeId)) {
-              await client.setActiveProvider(activeId);
-            }
             debugPrint(
               'Synchronized ${coreProviders.length} provider connections with Core AI nội bộ.',
             );

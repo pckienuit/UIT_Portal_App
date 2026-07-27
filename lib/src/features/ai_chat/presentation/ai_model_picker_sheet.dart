@@ -6,10 +6,12 @@ import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
 import '../application/ai_provider_model_controller.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/ai_chat_models.dart';
 import '../domain/ai_model_ref.dart';
 import '../domain/ai_provider_model_settings.dart';
 import '../domain/managed_provider_models.dart';
 import '../domain/router_catalog.dart';
+import '../domain/router_models.dart';
 
 class GlobalModelOption {
   const GlobalModelOption({
@@ -66,25 +68,14 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     for (final config in providerState.providers) {
       final providerKey = providerKeyFor(config);
       if (!handledProviderKeys.add(providerKey)) continue;
-      final definition = RouterCatalog.byId(config.presetId ?? '');
-      final useLegacyCatalog =
-          definition == null ||
-          (definition.models.isEmpty &&
-              modelState.settings[providerKey] == null &&
-              modelState.discoveredModels[providerKey] == null);
-      final catalog = useLegacyCatalog
-          ? resolveManagedProviderModels(
-              config,
-              providerState.models[config.id] ?? const <AiModelOption>[],
-            )
-          : resolveManagedProviderModelsForDefinition(
-              definition,
-              modelState.settings[providerKey] ??
-                  AiProviderModelSettings(providerKey: providerKey),
-              modelState.discoveredModels[providerKey] ??
-                  providerState.models[config.id] ??
-                  const <AiModelOption>[],
-            );
+      final definition =
+          RouterCatalog.byId(config.presetId ?? '') ?? _customDefinition(config);
+      final catalog = resolveManagedProviderModelsForDefinition(
+        definition,
+        modelState.settings[providerKey] ??
+            AiProviderModelSettings(providerKey: providerKey),
+        modelState.discoveredModels[providerKey] ?? const <AiModelOption>[],
+      );
       for (final model in catalog.visible.where((model) => model.managed)) {
         allOptions.add(
           GlobalModelOption(
@@ -246,3 +237,13 @@ Widget _buildCapabilitiesChips(
   if (chips.isEmpty) return const SizedBox.shrink();
   return Wrap(spacing: PortalSpacing.xs, children: chips);
 }
+
+RouterProviderDefinition _customDefinition(AiProviderConfig config) =>
+    RouterProviderDefinition(
+      id: providerKeyFor(config),
+      alias: providerKeyFor(config),
+      name: config.name,
+      category: RouterProviderCategory.custom,
+      authModes: const [],
+      passthroughModels: true,
+    );

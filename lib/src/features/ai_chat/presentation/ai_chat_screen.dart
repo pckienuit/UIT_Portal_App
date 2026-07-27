@@ -150,7 +150,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 ),
                 child: ActionChip(
                   label: Text(
-                    '${state.activeProvider!.name} · ${conversation?.canonicalModelId ?? state.activeProvider!.modelId}',
+                    '${state.activeProvider!.name} · ${conversation?.canonicalModelId ?? 'Chọn model'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 10), // reduced size

@@ -10,11 +10,6 @@ import '../../domain/ai_chat_models.dart';
 import '../../domain/router_catalog.dart';
 import '../../domain/router_models.dart';
 
-String oauthDefaultModelId(RouterProviderDefinition definition) =>
-    definition.id == 'gemini-cli'
-    ? 'gemini-2.5-flash'
-    : definition.models.firstOrNull?.id ?? '';
-
 class GithubOAuthSheet extends ConsumerStatefulWidget {
   const GithubOAuthSheet({super.key, required this.definition});
 
@@ -140,9 +135,8 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
           'Provider không cấp refresh token. Cần đăng nhập lại khi token hết hạn.',
         );
       }
-      final modelId = oauthDefaultModelId(widget.definition);
       final baseUrl = widget.definition.defaultBaseUrl ?? '';
-      if (modelId.isEmpty || baseUrl.isEmpty) {
+      if (baseUrl.isEmpty) {
         throw const NativeOAuthException(
           'Provider thiếu model hoặc Base URL mobile.',
         );
@@ -153,7 +147,6 @@ class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
           name: widget.definition.name,
           kind: AiBackendKind.openAiCompatible,
           baseUrl: baseUrl,
-          modelId: modelId,
           presetId: widget.definition.id,
           authMode: 'oauth',
           credentialKind: credentialKind,

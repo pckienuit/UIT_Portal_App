@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
+import '../application/ai_provider_model_controller.dart';
 
 import '../domain/ai_chat_models.dart';
+import '../domain/ai_model_ref.dart';
 import '../domain/ai_provider_catalog.dart';
 import '../domain/ai_provider_validator.dart';
 import '../data/ai_provider_repository.dart';
@@ -38,8 +40,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     super.initState();
     _nameController.text = widget.config?.name ?? widget.preset.name;
     _baseUrlController.text = widget.config?.baseUrl ?? widget.preset.baseUrl;
-    _probeModelController.text =
-        widget.config?.modelId ?? widget.preset.defaultModelId;
+    _probeModelController.text = widget.preset.defaultModelId;
 
     if (widget.config != null) {
       ref.read(aiProviderRepositoryProvider).getApiKey(widget.config!.id).then((
@@ -80,7 +81,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       name: 'Test',
       kind: AiBackendKind.openAiCompatible,
       baseUrl: baseUrl,
-      modelId: modelId,
+      presetId: widget.preset.id,
     );
 
     final repo = ref.read(aiProviderRepositoryProvider);
@@ -90,7 +91,12 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       await repo.saveProvider(config, apiKey: key);
 
       final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
-      final backend = await factory.buildBackend(config);
+      final backend = await factory.buildBackend(
+        config,
+        model: AiModelRef.parse(
+          '${providerKeyFor(config)}/${modelId.isEmpty ? 'test-model' : modelId}',
+        ),
+      );
 
       if (backend != null) {
         final result = await backend.testConnection();
@@ -135,8 +141,6 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       name: _nameController.text.trim(),
       kind: AiBackendKind.openAiCompatible,
       baseUrl: baseUrl,
-      // ponytail: Phase 6 removes this legacy field after canonical chat routes migrate.
-      modelId: '',
       presetId: widget.preset.id,
       systemPrompt: widget.config?.systemPrompt,
       transportKind: widget.preset.transportKind,
@@ -149,7 +153,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       authHeader: widget.preset.authHeader,
       authScheme: widget.preset.authScheme,
       staticHeaders: widget.preset.staticHeaders,
-      models: widget.preset.models,
+
     );
 
     final key = _apiKeyController.text.trim();
@@ -157,49 +161,11 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     final keyToSave = key.isEmpty && widget.config != null ? null : key;
 
     await notifier.saveProvider(config, apiKey: keyToSave);
-    _testHealthInBackground(config, keyToSave ?? '');
-
     if (mounted) {
       Navigator.of(context).pop();
     }
   }
 
-  Future<void> _testHealthInBackground(
-    AiProviderConfig config,
-    String apiKey,
-  ) async {
-    final notifier = ref.read(aiProviderControllerProvider.notifier);
-    notifier.updateProviderHealth(config.id, AiProviderHealth.checking);
-
-    try {
-      final secureStorage = ref.read(secureStorageProvider);
-      final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
-      final backend = await factory.buildBackend(config);
-
-      if (backend != null) {
-        final result = await backend.testConnection();
-        notifier.updateProviderHealth(
-          config.id,
-          result.success ? AiProviderHealth.connected : AiProviderHealth.failed,
-          errorMessage: result.errorMessage,
-        );
-
-        await backend.dispose();
-      } else {
-        notifier.updateProviderHealth(
-          config.id,
-          AiProviderHealth.failed,
-          errorMessage: 'Không thể tạo backend',
-        );
-      }
-    } catch (e) {
-      notifier.updateProviderHealth(
-        config.id,
-        AiProviderHealth.failed,
-        errorMessage: e.toString(),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

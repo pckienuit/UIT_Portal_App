@@ -74,8 +74,6 @@ try {
 
   const stateStore = createStateStore({ dataDir: DATA_DIR });
   const runtimeSecrets = new Map();
-  // ponytail: legacy bare-model requests work only during current process; callers must send canonical model.
-  const runtimeModelDefaults = new Map();
   const refreshedModels = new Map();
   const refreshedQuota = new Set();
 
@@ -125,9 +123,6 @@ try {
         presetId: connection.providerId || connection.providerKey,
         providerKey: connection.providerKey,
         baseUrl: connection.mobileMetadata?.baseUrl || '',
-        ...(runtimeModelDefaults.has(connection.id)
-          ? { modelId: runtimeModelDefaults.get(connection.id) }
-          : {}),
         systemPrompt: connection.mobileMetadata?.systemPrompt || '',
         ...(connection.mobileMetadata?.projectId
           ? { projectId: connection.mobileMetadata.projectId }
@@ -171,23 +166,11 @@ try {
     const timestamp = new Date().toISOString();
     const active = db.providers.find((provider) => provider.active);
     const modelSettings = { ...(db.modelSettings || {}) };
-    for (const provider of db.providers) {
-      const definition = catalogByKey.get(provider.presetId || provider.id);
-      const providerKey = definition?.alias || definition?.id || provider.providerKey || provider.presetId || provider.id;
-      if (!modelSettings[providerKey]) {
-        modelSettings[providerKey] = {
-          customModels: provider.customModels || [],
-          disabledModelIds: provider.hiddenModelIds || [],
-        };
-      }
-    }
     return {
       connections: db.providers.map((provider) => ({
         id: provider.id,
         providerId: provider.presetId || provider.id,
-        providerKey: catalogByKey.get(provider.providerKey || provider.presetId || provider.id)?.alias ||
-          catalogByKey.get(provider.providerKey || provider.presetId || provider.id)?.id ||
-          provider.providerKey || provider.presetId || provider.id,
+        providerKey: providerKeyFor(provider),
         displayName: provider.name,
         authMode: provider.authMode || 'apiKey',
         enabled: provider.enabled !== false,
@@ -214,9 +197,6 @@ try {
       activeRoute: active
         ? {
             connectionId: active.id,
-            modelId: active.modelId
-              ? `${catalogByKey.get(active.providerKey || active.presetId || active.id)?.alias || active.providerKey || active.presetId || active.id}/${active.modelId}`
-              : undefined,
             local: false,
           }
         : null,
@@ -231,6 +211,22 @@ try {
     let migrated = false;
     const remappedSettings = {};
     for (const [rawKey, settings] of Object.entries(state.modelSettings || {})) {
+      if (rawKey === 'custom') {
+        const customConnections = state.connections.filter(
+          (connection) => connection.providerId === 'custom',
+        );
+        if (customConnections.length === 1) {
+          remappedSettings[customConnections[0].id] = {
+            customModels: [...(settings.customModels || [])],
+            disabledModelIds: [...(settings.disabledModelIds || [])],
+          };
+        }
+        // Multiple legacy custom endpoints share no safe routing identity.
+        // Drop their shared settings rather than leaking them across routes.
+        migrated = true;
+        continue;
+      }
+
       const definition = catalogByKey.get(rawKey);
       const providerKey = definition?.alias || definition?.id || rawKey;
       const target = remappedSettings[providerKey] || (remappedSettings[providerKey] = {
@@ -242,8 +238,11 @@ try {
     }
     if (migrated) state.modelSettings = remappedSettings;
     for (const connection of state.connections) {
-      const definition = catalogByKey.get(connection.providerKey || connection.providerId || connection.id);
-      const providerKey = definition?.alias || definition?.id || connection.providerKey || connection.providerId || connection.id;
+      const providerKey = providerKeyFor({
+        id: connection.id,
+        providerKey: connection.providerKey,
+        presetId: connection.providerId,
+      });
       if (connection.providerKey !== providerKey) {
         connection.providerKey = providerKey;
         migrated = true;
@@ -254,9 +253,6 @@ try {
 
   function saveDb(db) {
     for (const provider of db.providers) {
-      if (typeof provider.modelId === 'string' && provider.modelId.trim()) {
-        runtimeModelDefaults.set(provider.id, provider.modelId.trim());
-      }
       const current = runtimeSecrets.get(provider.id) || {};
       const runtimeToken = provider.apiKey || current.runtimeToken;
       const sourceToken = provider.sourceToken || current.sourceToken;
@@ -318,35 +314,6 @@ try {
     return `${provider.baseUrl.replace(/\/$/, '')}${path}`;
   }
 
-  function listedModels(provider, models, fallbackToModelId = false, ownedBy = provider.id, settings = {}) {
-    const hiddenSet = new Set((Array.isArray(settings.disabledModelIds) ? settings.disabledModelIds : [])
-      .filter((id) => typeof id === 'string' && id.trim())
-      .map((id) => id.trim()));
-    const custom = Array.isArray(settings.customModels) ? settings.customModels : [];
-    const combined = [...models, ...custom];
-    const entries = combined
-      .map((model) => typeof model === 'string'
-        ? { id: model }
-        : { ...model, id: model?.id, name: model?.name })
-      .filter((model) => typeof model.id === 'string' && model.id.trim())
-      .map((model) => ({ ...model, id: model.id.trim() }))
-      .filter((model) => !hiddenSet.has(model.id));
-    if (fallbackToModelId && !entries.length && typeof provider.modelId === 'string' &&
-        provider.modelId.trim() && !hiddenSet.has(provider.modelId.trim())) {
-      entries.push({ id: provider.modelId.trim() });
-    }
-    const ids = new Set();
-    return entries.filter((model) => {
-      if (ids.has(model.id)) return false;
-      ids.add(model.id);
-      return true;
-    }).map((model) => ({
-      ...model,
-      ...(typeof model.name === 'string' && model.name ? { name: model.name } : {}),
-      object: 'model',
-      owned_by: model.owned_by || ownedBy,
-    }));
-  }
 
   function settingsForProvider(provider, db) {
     const definition = catalogByKey.get(provider.providerKey || provider.presetId || provider.id);
@@ -354,12 +321,9 @@ try {
     return db.modelSettings?.[providerKey] || {};
   }
 
-  function configuredModels(provider, db) {
-    const definition = catalogByKey.get(provider.presetId || provider.id);
-    return listedModels(provider, definition?.models || [], true, provider.id, settingsForProvider(provider, db));
-  }
 
   function providerKeyFor(provider) {
+    if (provider.presetId === 'custom') return provider.id;
     const definition = catalogByKey.get(provider.providerKey || provider.presetId || provider.id);
     return definition?.alias || definition?.id || provider.providerKey || provider.presetId || provider.id;
   }
@@ -397,18 +361,6 @@ try {
     }));
   }
 
-  function applyLegacyModelSettings(provider, data, db) {
-    if (!Array.isArray(data.customModels) && !Array.isArray(data.hiddenModelIds)) return;
-    const providerKey = providerKeyFor(provider);
-    const current = db.modelSettings?.[providerKey] || {};
-    db.modelSettings = {
-      ...(db.modelSettings || {}),
-      [providerKey]: {
-        customModels: Array.isArray(data.customModels) ? data.customModels : current.customModels || [],
-        disabledModelIds: Array.isArray(data.hiddenModelIds) ? data.hiddenModelIds : current.disabledModelIds || [],
-      },
-    };
-  }
 
   const server = http.createServer(async (request, response) => {
     response.setHeader('Access-Control-Allow-Origin', '*');
@@ -609,14 +561,11 @@ try {
           return sendJson(response, 400, { error: 'No active provider connection configured' });
         }
         const requestedStream = body.stream === true || activeProvider.presetId === 'codex';
-        const legacyModel = runtimeModelDefaults.get(activeProvider.id);
-        const rawModel = (typeof body.model === 'string' && body.model.trim())
-          ? body.model.trim()
-          : legacyModel || '';
+        const rawModel = typeof body.model === 'string' ? body.model.trim() : '';
         const resolved = resolveProviderModel({
           connection: activeProvider,
           rawModel,
-          legacyModel: hasConnectionId ? null : legacyModel,
+          legacyModel: null,
           catalog: resolverCatalogFor(activeProvider),
           settings: db.modelSettings,
           liveModels: refreshedModels.get(activeProvider.id) || [],
@@ -1008,7 +957,11 @@ try {
           name: data.name,
           kind: data.kind || 'openAiCompatible',
           presetId: data.presetId || data.id,
-          providerKey: providerKeyFor({ providerKey: data.providerKey, presetId: data.presetId || data.id }),
+          providerKey: providerKeyFor({
+            id: data.id,
+            providerKey: data.providerKey,
+            presetId: data.presetId || data.id,
+          }),
           baseUrl: data.baseUrl,
           systemPrompt: data.systemPrompt || '',
           authMode: data.authMode || 'apiKey',
@@ -1030,10 +983,6 @@ try {
           sourceToken: data.sourceToken || ''
         });
 
-        if (typeof data.modelId === 'string' && data.modelId.trim()) {
-          runtimeModelDefaults.set(data.id, data.modelId.trim());
-        }
-        applyLegacyModelSettings(db.providers.at(-1), data, db);
         saveDb(db);
         return sendJson(response, 201, { success: true });
       } catch (e) {
@@ -1054,9 +1003,6 @@ try {
         if (data.baseUrl !== undefined) provider.baseUrl = data.baseUrl;
         if (data.enabled !== undefined) provider.enabled = data.enabled !== false;
         if (Number.isFinite(data.priority)) provider.priority = data.priority;
-        if (typeof data.modelId === 'string' && data.modelId.trim()) {
-          runtimeModelDefaults.set(provider.id, data.modelId.trim());
-        }
         if (data.systemPrompt !== undefined) provider.systemPrompt = data.systemPrompt;
         if (data.projectId !== undefined) provider.projectId = data.projectId;
         if (data.accountId !== undefined) provider.accountId = data.accountId;
@@ -1065,7 +1011,6 @@ try {
         if (data.modelsUrl !== undefined) provider.modelsUrl = data.modelsUrl;
         if (data.authHeader !== undefined) provider.authHeader = data.authHeader;
         if (data.authScheme !== undefined) provider.authScheme = data.authScheme;
-        applyLegacyModelSettings(provider, data, db);
         if (data.staticHeaders !== undefined) {
           provider.staticHeaders = data.staticHeaders && typeof data.staticHeaders === 'object'
             ? data.staticHeaders
@@ -1096,7 +1041,6 @@ try {
 
       db.providers.splice(index, 1);
       runtimeSecrets.delete(id);
-      runtimeModelDefaults.delete(id);
       refreshedQuota.delete(id);
       delete db.quota[id];
       saveDb(db);
@@ -1208,7 +1152,6 @@ try {
         quota: {}
       };
       runtimeSecrets.clear();
-      runtimeModelDefaults.clear();
       refreshedQuota.clear();
       saveDb(dbReset);
       return sendJson(response, 200, { success: true });

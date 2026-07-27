@@ -9,7 +9,7 @@ import '../domain/ai_chat_models.dart';
 import '../domain/ai_provider_model_settings.dart';
 import '../domain/router_catalog.dart';
 import '../../home/providers/widget_preferences_provider.dart';
-import 'ai_provider_controller.dart';
+import 'router_runtime_service.dart';
 
 final aiProviderModelRepositoryProvider = Provider<AiProviderModelRepository>((
   ref,
@@ -42,7 +42,7 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
   AiProviderModelState build() {
     _repository = ref.watch(aiProviderModelRepositoryProvider);
     final initial = AiProviderModelState(settings: _repository.listSettings());
-    unawaited(migrateLegacy(ref.read(aiProviderControllerProvider).providers));
+    unawaited(migrateLegacy());
     return initial;
   }
 
@@ -50,10 +50,9 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
       state.settings[providerKey] ??
       AiProviderModelSettings(providerKey: providerKey);
 
-  Future<void> migrateLegacy(List<AiProviderConfig> connections) async {
+  Future<void> migrateLegacy() async {
     final settings = await _repository.migrateLegacy(
-      connections,
-      providerKeyFor: providerKeyFor,
+      providerKeyFor: providerKeyForIds,
     );
     state = state.copyWith(settings: settings);
   }
@@ -146,12 +145,18 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
     state = state.copyWith(
       settings: {...state.settings, settings.providerKey: settings},
     );
+    if (ref.read(routerRuntimeServiceProvider).state == RouterState.ready) {
+      await ref.read(routerAdminClientProvider).saveModelSettings(settings);
+    }
   }
 }
 
-String providerKeyFor(AiProviderConfig connection) {
-  return RouterCatalog.byId(connection.presetId ?? '')?.providerKey ??
-      connection.id;
+String providerKeyFor(AiProviderConfig connection) =>
+    providerKeyForIds(connection.presetId ?? '', connection.id);
+
+String providerKeyForIds(String presetId, String connectionId) {
+  final definition = RouterCatalog.byId(presetId);
+  return definition?.id == 'custom' ? connectionId : definition?.providerKey ?? connectionId;
 }
 
 bool _invalidId(String id) =>

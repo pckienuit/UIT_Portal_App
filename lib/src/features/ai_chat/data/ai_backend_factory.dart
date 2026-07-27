@@ -58,9 +58,10 @@ class AiBackendFactory {
     }
     final runtimeState = ref.read(routerRuntimeServiceProvider) as RouterStatus;
     if (shouldUseEmbeddedCore(config, runtimeState)) {
+      if (model == null) return null;
       return OpenAiCompatibleBackend(
         baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
-        modelId: model?.canonicalId ?? config.modelId,
+        modelId: model.canonicalId,
         apiKey: runtimeState.bearer!,
         connectionId: config.id,
       );
@@ -68,11 +69,12 @@ class AiBackendFactory {
 
     switch (config.kind) {
       case AiBackendKind.openAiCompatible:
+        if (model == null) return null;
         final key =
             await secureStorage.read(key: 'ai_provider_key_${config.id}') ?? '';
         return OpenAiCompatibleBackend(
           baseUrl: config.baseUrl,
-          modelId: config.modelId,
+          modelId: model.modelId,
           apiKey: key,
         );
       case AiBackendKind.localLlama:

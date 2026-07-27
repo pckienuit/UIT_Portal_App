@@ -77,14 +77,6 @@ class AiChatController extends Notifier<AiChatState> {
         if (prev == null || !identical(prev.providers, next.providers)) {
           unawaited(_reloadConversationRuntime(conversation, next));
         }
-        return;
-      }
-
-      final previousConfig = prev == null ? null : _getActiveConfig(prev);
-      final nextConfig = _getActiveConfig(next);
-      if (previousConfig?.id != nextConfig?.id ||
-          previousConfig?.modelId != nextConfig?.modelId) {
-        unawaited(_handleActiveProviderChanged(next));
       }
     });
 
@@ -108,9 +100,6 @@ class AiChatController extends Notifier<AiChatState> {
   }
 
   AiChatState _init() {
-    final providerState = ref.read(aiProviderControllerProvider);
-    final activeConfig = _getActiveConfig(providerState);
-
     ref.read(chatHistoryStoreProvider.future).then((store) async {
       final history = await store.readHistory(
         providerKeyForConnection: (connectionId) {
@@ -146,17 +135,7 @@ class AiChatController extends Notifier<AiChatState> {
       }
     });
 
-    return AiChatState(activeProvider: activeConfig);
-  }
-
-  AiProviderConfig? _getActiveConfig(AiProviderState providerState) {
-    final activeId = providerState.activeProviderId;
-    if (activeId == null) return null;
-    try {
-      return providerState.providers.firstWhere((config) => config.id == activeId);
-    } catch (_) {
-      return null;
-    }
+    return AiChatState();
   }
 
   AiProviderConfig? _runtimeConfigForConversation(
@@ -180,7 +159,7 @@ class AiChatController extends Notifier<AiChatState> {
     if (!_isSelectableModel(config, model)) {
       return null;
     }
-    return config.copyWith(modelId: conversation.modelId);
+    return config;
   }
 
   Future<void> _reloadConversationRuntime(
@@ -204,22 +183,6 @@ class AiChatController extends Notifier<AiChatState> {
     }
   }
 
-  Future<void> _handleActiveProviderChanged(
-    AiProviderState providerState,
-  ) async {
-    final activeConfig = _getActiveConfig(providerState);
-    final model = activeConfig == null ? null : _legacyModelForConnection(activeConfig);
-    state = state.copyWith(
-      activeProvider: () => activeConfig,
-      errorMessage: () => null,
-    );
-
-    if (activeConfig != null && model != null) {
-      await _loadBackend(activeConfig, model: model);
-    } else {
-      await _clearBackend();
-    }
-  }
 
   Future<void> _loadBackend(
     AiProviderConfig config, {
@@ -266,12 +229,6 @@ class AiChatController extends Notifier<AiChatState> {
     await previousBackend?.dispose();
   }
 
-  Future<void> switchProvider(AiProviderConfig config) async {
-    await ref.read(aiProviderControllerProvider.notifier).saveProvider(config);
-    await ref
-        .read(aiProviderControllerProvider.notifier)
-        .selectActiveProvider(config.id);
-  }
 
   Future<void> selectConversationModel({
     required String connectionId,
@@ -326,15 +283,14 @@ class AiChatController extends Notifier<AiChatState> {
     }
     conversations.insert(0, conversation);
 
-    final runtimeConfig = targetConfig.copyWith(modelId: model.modelId);
     state = state.copyWith(
-      activeProvider: () => runtimeConfig,
+      activeProvider: () => targetConfig,
       activeConversation: () => conversation,
       conversations: conversations,
       errorMessage: () => null,
     );
 
-    final backendTransition = _loadBackend(runtimeConfig, model: model);
+    final backendTransition = _loadBackend(targetConfig, model: model);
     final store = await ref.read(chatHistoryStoreProvider.future);
     await store.writeHistory(conversations);
     await backendTransition;
@@ -374,14 +330,14 @@ class AiChatController extends Notifier<AiChatState> {
 
   Future<void> startNewConversation() async {
     final config = state.activeProvider;
-    if (config == null) return;
-    final model = _legacyModelForConnection(config);
-    if (model == null || !_isSelectableModel(config, model)) {
+    final current = state.activeConversation;
+    if (config == null || current == null) {
       state = state.copyWith(
         errorMessage: () => 'Hãy chọn model trước khi bắt đầu hội thoại.',
       );
       return;
     }
+    final model = _modelRef(current);
 
     final newConversation = AiConversation(
       id: 'conv-${DateTime.now().microsecondsSinceEpoch}',
@@ -402,7 +358,7 @@ class AiChatController extends Notifier<AiChatState> {
 
     final store = await ref.read(chatHistoryStoreProvider.future);
     await store.writeHistory(conversations);
-    await _loadBackend(config.copyWith(modelId: model.modelId), model: model);
+    await _loadBackend(config, model: model);
   }
 
   Future<void> switchConversation(String id) async {
@@ -645,19 +601,10 @@ class AiChatController extends Notifier<AiChatState> {
     final providerKey = providerKeyFor(config);
     if (model.providerKey != providerKey) return false;
 
-    final legacyModels = {
-      config.modelId,
-      ...config.models.map((item) => item.id),
-      ...config.customModels.map((item) => item.id),
-      ...?ref
-          .read(aiProviderControllerProvider)
-          .models[config.id]
-          ?.map((item) => item.id),
-    };
-    if (config.hiddenModelIds.contains(model.modelId)) return false;
-
     final definition = RouterCatalog.byId(config.presetId ?? '');
-    if (definition == null) return legacyModels.contains(model.modelId);
+    if (definition == null) {
+      return config.kind == AiBackendKind.localLlama;
+    }
 
     final modelState = ref.read(aiProviderModelControllerProvider);
     final catalog = resolveManagedProviderModelsForDefinition(
@@ -666,25 +613,12 @@ class AiChatController extends Notifier<AiChatState> {
           AiProviderModelSettings(providerKey: providerKey),
       modelState.discoveredModels[providerKey] ?? const [],
     );
-    return legacyModels.contains(model.modelId) ||
-        catalog.visible.any((item) => item.id == model.modelId);
+    return catalog.visible.any((item) => item.id == model.modelId);
   }
 
   AiModelRef _modelRef(AiConversation conversation) =>
       AiModelRef.parse(conversation.canonicalModelId);
 
-  AiModelRef? _legacyModelForConnection(AiProviderConfig config) {
-    final modelId = config.modelId.trim();
-    if (modelId.isEmpty) return null;
-    final providerKey = providerKeyFor(config);
-    try {
-      return AiModelRef.parse(
-        modelId.contains('/') ? modelId : '$providerKey/$modelId',
-      );
-    } on FormatException {
-      return null;
-    }
-  }
 
   Future<void> clearAllData() async {
     stopGeneration();

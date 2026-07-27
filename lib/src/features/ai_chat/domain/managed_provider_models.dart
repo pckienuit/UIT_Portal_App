@@ -1,7 +1,5 @@
 import 'ai_chat_backend.dart';
-import 'ai_chat_models.dart';
 import 'ai_provider_model_settings.dart';
-import 'router_catalog.dart';
 import 'router_models.dart';
 
 class ManagedProviderModel {
@@ -41,48 +39,6 @@ class ManagedProviderModels {
   final List<ManagedProviderModel> visible;
   final List<ManagedProviderModel> hidden;
   final List<ManagedProviderModel> refreshed;
-}
-
-ManagedProviderModels resolveManagedProviderModels(
-  AiProviderConfig config,
-  List<AiModelOption> refreshedModels,
-) {
-  final definition = RouterCatalog.byId(config.presetId ?? '');
-  if (definition == null) {
-    return resolveManagedProviderModelsForDefinition(
-      RouterProviderDefinition(
-        id: config.presetId ?? config.id,
-        name: config.name,
-        category: RouterProviderCategory.custom,
-        authModes: const [],
-        models: config.models
-            .map(
-              (model) => RouterModelDefinition(
-                id: model.id,
-                name: model.name,
-                upstreamModelId: model.upstreamModelId,
-                quotaFamily: model.quotaFamily,
-              ),
-            )
-            .toList(growable: false),
-      ),
-      AiProviderModelSettings(
-        providerKey: config.presetId ?? config.id,
-        customModels: config.customModels,
-        disabledModelIds: config.hiddenModelIds.toSet(),
-      ),
-      refreshedModels,
-    );
-  }
-  return resolveManagedProviderModelsForDefinition(
-    definition,
-    AiProviderModelSettings(
-      providerKey: definition.providerKey,
-      customModels: config.customModels,
-      disabledModelIds: config.hiddenModelIds.toSet(),
-    ),
-    refreshedModels,
-  );
 }
 
 ManagedProviderModels resolveManagedProviderModelsForDefinition(

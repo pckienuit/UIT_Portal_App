@@ -16,7 +16,6 @@ class AiProviderRepository {
   final FlutterSecureStorage secureStorage;
 
   static const String _kConfigsKey = 'ai_provider_configs_v1';
-  static const String _kActiveIdKey = 'ai_active_provider_id_v1';
   static const String _kSecretPrefix = 'ai_provider_key_';
   static const String _kSourcePrefix = 'ai_provider_source_';
 
@@ -33,17 +32,6 @@ class AiProviderRepository {
     }
   }
 
-  String? getActiveProviderId() {
-    return prefs.getString(_kActiveIdKey);
-  }
-
-  Future<void> setActiveProviderId(String? id) async {
-    if (id == null) {
-      await prefs.remove(_kActiveIdKey);
-    } else {
-      await prefs.setString(_kActiveIdKey, id);
-    }
-  }
 
   Future<void> saveProvider(
     AiProviderConfig config, {
@@ -91,9 +79,7 @@ class AiProviderRepository {
     await secureStorage.delete(key: '$_kSecretPrefix$id');
     await secureStorage.delete(key: '$_kSourcePrefix$id');
 
-    if (getActiveProviderId() == id) {
-      await setActiveProviderId(null);
-    }
+
   }
 
   Future<String?> getApiKey(String id) async {
@@ -111,7 +97,6 @@ class AiProviderRepository {
       await secureStorage.delete(key: '$_kSourcePrefix${p.id}');
     }
     await prefs.remove(_kConfigsKey);
-    await prefs.remove(_kActiveIdKey);
   }
 }
 

@@ -102,7 +102,7 @@ test('migrates v2 connection model metadata into provider-scoped v3 settings', (
   assert.equal(state.connections[0].mobileMetadata.models, undefined);
   assert.equal(state.connections[0].mobileMetadata.customModels, undefined);
   assert.equal(state.connections[0].mobileMetadata.hiddenModelIds, undefined);
-  assert.equal(state.activeRoute.modelId, 'gpt-5.4');
+  assert.equal(state.activeRoute.modelId, undefined);
 });
 
 test('quota normalization strips credential-like fields and malformed entries', () => {
@@ -227,8 +227,40 @@ test('migrates legacy providers to connections without carrying api keys', () =>
   });
   assert.deepEqual(state.activeRoute, {
     connectionId: 'legacy-openai',
-    modelId: 'openai/gpt-4o-mini',
     local: false,
   });
   assert.doesNotMatch(fs.readFileSync(statePath, 'utf8'), /must-not-survive/);
+});
+
+test('migrates legacy provider model settings but clears active model fallback', () => {
+  const dataDir = tempDir();
+  const statePath = path.join(dataDir, '9router_state.json');
+  fs.writeFileSync(statePath, JSON.stringify({
+    providers: [{
+      id: 'github-work',
+      name: 'GitHub Work',
+      presetId: 'github',
+      baseUrl: 'https://api.githubcopilot.com',
+      modelId: 'gpt-5.4',
+      customModels: [{ id: 'private', name: 'Private' }],
+      hiddenModelIds: ['retired'],
+      active: true,
+    }],
+    usage: [],
+    quota: {},
+  }), 'utf8');
+
+  const state = createStateStore({ dataDir }).load();
+
+  assert.deepEqual(state.modelSettings.github, {
+    customModels: [{ id: 'private', name: 'Private' }],
+    disabledModelIds: ['retired'],
+  });
+  assert.deepEqual(state.activeRoute, {
+    connectionId: 'github-work',
+    local: false,
+  });
+  assert.equal(state.connections[0].modelId, undefined);
+  assert.equal(state.connections[0].mobileMetadata.customModels, undefined);
+  assert.equal(state.connections[0].mobileMetadata.hiddenModelIds, undefined);
 });

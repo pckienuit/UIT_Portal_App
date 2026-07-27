@@ -36,7 +36,11 @@ class RouterAdminClient {
     );
   }
 
-  RouterAdminClient.forTest(Dio dio) : _dio = dio;
+  RouterAdminClient.forTest(
+    Dio dio, {
+    FlutterSecureStorage? secureStorage,
+  }) : _dio = dio,
+       secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   late final Ref ref;
   late final FlutterSecureStorage secureStorage;
@@ -168,27 +172,7 @@ class RouterAdminClient {
     }
   }
 
-  // Đặt connection active. 404 = resource chưa tồn tại trong core → thử upsert
-  // trước (idempotent), nếu vẫn miss thì coi như success (local đã đúng).
-  Future<bool> setActiveProvider(String id) async {
-    try {
-      final res = await _dio.patch(
-        '/internal/providers/$id',
-        data: {'active': true},
-      );
-      return res.statusCode == 200;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) return true;
-      if (e.error is _CoreUnavailableError) return true;
-      debugPrint('Failed to set active provider in core: $e');
-      return false;
-    } catch (e) {
-      debugPrint('Failed to set active provider in core: $e');
-      return false;
-    }
-  }
 
-  // Test connection
   Future<bool> testProvider(String id) async {
     try {
       // Đọc api key từ secure storage truyền qua header đặc biệt
@@ -291,8 +275,6 @@ AiProviderConfig _connectionFromCore(Map<String, dynamic> json) {
       orElse: () => AiBackendKind.openAiCompatible,
     ),
     baseUrl: mobile['baseUrl']?.toString() ?? '',
-    // ponytail: Phase 6 removes this legacy local fallback after chat routes migrate.
-    modelId: '',
     presetId: json['providerId']?.toString(),
     systemPrompt: mobile['systemPrompt']?.toString(),
     authMode: json['authMode']?.toString() ?? 'apiKey',
@@ -314,8 +296,6 @@ Map<String, dynamic> _connectionPayload(AiProviderConfig config) => {
   'name': config.name,
   'kind': config.kind.name,
   'baseUrl': config.baseUrl,
-  // ponytail: removed with Phase 6 canonical conversation routes.
-  'modelId': config.modelId,
   'presetId': config.presetId,
   'systemPrompt': config.systemPrompt,
   'authMode': config.authMode,

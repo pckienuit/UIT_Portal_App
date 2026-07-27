@@ -100,6 +100,12 @@ function normalizeConnection(input) {
   return connection;
 }
 
+function normalizeActiveRoute(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const connectionId = normalizeId(input.connectionId);
+  return connectionId ? { connectionId, local: input.local === true } : null;
+}
+
 function freshState(now) {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -126,7 +132,7 @@ function createStateStore({ dataDir, now = () => new Date() }) {
       schemaVersion: SCHEMA_VERSION,
       connections,
       modelSettings: normalizeModelSettings(input.modelSettings),
-      activeRoute: input.activeRoute ?? null,
+      activeRoute: normalizeActiveRoute(input.activeRoute),
       usage,
       quota: normalizeQuota(input.quota),
       updatedAt: now().toISOString(),
@@ -136,6 +142,22 @@ function createStateStore({ dataDir, now = () => new Date() }) {
   function migrateLegacy(input) {
     const providers = Array.isArray(input.providers) ? input.providers : [];
     const active = providers.find((provider) => provider.active);
+    const modelSettings = {};
+    for (const provider of providers) {
+      const providerKey = normalizeId(
+        provider.presetId === 'custom' ? provider.id : provider.presetId || provider.id,
+      );
+      if (!providerKey) continue;
+      const settings = modelSettings[providerKey] || (modelSettings[providerKey] = {
+        customModels: [], disabledModelIds: [],
+      });
+      settings.customModels.push(...(Array.isArray(provider.customModels)
+        ? provider.customModels
+        : []));
+      settings.disabledModelIds.push(...(Array.isArray(provider.hiddenModelIds)
+        ? provider.hiddenModelIds
+        : []));
+    }
     return {
       connections: providers.map((provider) => ({
         id: provider.id,
@@ -155,10 +177,10 @@ function createStateStore({ dataDir, now = () => new Date() }) {
       activeRoute: active
         ? {
             connectionId: active.id,
-            modelId: `${active.presetId || active.id}/${active.modelId}`,
             local: false,
           }
         : null,
+      modelSettings,
       usage: input.usage,
       quota: input.quota,
     };
@@ -168,7 +190,11 @@ function createStateStore({ dataDir, now = () => new Date() }) {
     const grouped = {};
     const connections = Array.isArray(input.connections) ? input.connections : [];
     for (const connection of connections) {
-      const providerKey = normalizeId(connection.providerKey || connection.providerId || connection.id);
+      const providerKey = normalizeId(
+        connection.providerId === 'custom'
+          ? connection.id
+          : connection.providerKey || connection.providerId || connection.id,
+      );
       if (!providerKey) continue;
       const settings = grouped[providerKey] || (grouped[providerKey] = {
         customModels: [], disabledModelIds: [],
@@ -187,7 +213,9 @@ function createStateStore({ dataDir, now = () => new Date() }) {
         const { modelId, ...rest } = connection;
         return {
           ...rest,
-          providerKey: connection.providerKey || connection.providerId || connection.id,
+          providerKey: connection.providerId === 'custom'
+            ? connection.id
+            : connection.providerKey || connection.providerId || connection.id,
           mobileMetadata: metadata,
         };
       }),

@@ -19,239 +19,81 @@ void main() {
     );
   });
 
-  test(
-    'saves and lists configs without exposing secret API key in prefs',
-    () async {
-      final config = AiProviderConfig(
-        id: 'prov-1',
-        name: 'OpenAI Test',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://api.openai.com/v1',
-        modelId: 'gpt-4o',
-        presetId: 'openai',
-      );
-
-      await repository.saveProvider(config, apiKey: 'sk-secret-key-value');
-
-      final list = repository.listProviders();
-      expect(list.length, 1);
-      expect(list.first.id, 'prov-1');
-      expect(list.first.name, 'OpenAI Test');
-      expect(list.first.presetId, 'openai');
-
-      // Chứng minh key không nằm trong shared preferences raw string
-      final rawPrefs = prefs.getString('ai_provider_configs_v1') ?? '';
-      expect(rawPrefs, isNot(contains('sk-secret-key-value')));
-
-      // Chứng minh key được lưu trong secure storage
-      final key = await repository.getApiKey('prov-1');
-      expect(key, 'sk-secret-key-value');
-    },
-  );
-
-  test('saves multiple different configs successfully', () async {
-    final c1 = AiProviderConfig(
-      id: 'prov-1',
-      name: 'P1',
+  test('persists connection metadata without model state or API key', () async {
+    final config = AiProviderConfig(
+      id: 'openai-1',
+      name: 'OpenAI',
       kind: AiBackendKind.openAiCompatible,
       baseUrl: 'https://api.openai.com/v1',
-      modelId: 'gpt-4o',
       presetId: 'openai',
     );
-    final c2 = AiProviderConfig(
-      id: 'prov-2',
-      name: 'P2',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'http://localhost:20128/v1',
-      modelId: 'gemini-3',
-      presetId: '9router',
-    );
 
-    await repository.saveProvider(c1, apiKey: 'key-1');
-    await repository.saveProvider(c2, apiKey: 'key-2');
+    await repository.saveProvider(config, apiKey: 'secret-sentinel');
 
-    final list = repository.listProviders();
-    expect(list.length, 2);
-    expect(list.any((e) => e.id == 'prov-1'), isTrue);
-    expect(list.any((e) => e.id == 'prov-2'), isTrue);
-
-    expect(await repository.getApiKey('prov-1'), 'key-1');
-    expect(await repository.getApiKey('prov-2'), 'key-2');
+    final raw = prefs.getString('ai_provider_configs_v1')!;
+    expect(raw, isNot(contains('secret-sentinel')));
+    expect(raw, isNot(contains('modelId')));
+    expect(raw, isNot(contains('customModels')));
+    expect(repository.listProviders().single.presetId, 'openai');
+    expect(await repository.getApiKey(config.id), 'secret-sentinel');
   });
 
-  test('active provider preferences management', () async {
-    expect(repository.getActiveProviderId(), isNull);
-
-    await repository.setActiveProviderId('prov-1');
-    expect(repository.getActiveProviderId(), 'prov-1');
-
-    await repository.setActiveProviderId(null);
-    expect(repository.getActiveProviderId(), isNull);
-  });
-
-  test(
-    'delete provider removes configuration and secure storage api key',
-    () async {
-      final config = AiProviderConfig(
-        id: 'prov-1',
-        name: 'OpenAI Test',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://api.openai.com/v1',
-        modelId: 'gpt-4o',
-      );
-
-      await repository.saveProvider(config, apiKey: 'secret');
-      await repository.setActiveProviderId('prov-1');
-
-      await repository.deleteProvider('prov-1');
-
-      expect(repository.listProviders(), isEmpty);
-      expect(await repository.getApiKey('prov-1'), isNull);
-      expect(repository.getActiveProviderId(), isNull);
-    },
-  );
-
-  test('clear all wipes out everything', () async {
-    final config = AiProviderConfig(
-      id: 'prov-1',
-      name: 'OpenAI Test',
+  test('deletes connection and both credential records', () async {
+    const config = AiProviderConfig(
+      id: 'github-1',
+      name: 'GitHub',
       kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://api.openai.com/v1',
-      modelId: 'gpt-4o',
+      baseUrl: 'https://api.githubcopilot.com',
+      presetId: 'github',
+      authMode: 'oauth',
+    );
+    await repository.saveProvider(
+      config,
+      oauthAccessToken: 'runtime',
+      oauthSourceToken: 'source',
     );
 
+    await repository.deleteProvider(config.id);
+
+    expect(repository.listProviders(), isEmpty);
+    expect(await repository.getApiKey(config.id), isNull);
+    expect(await repository.getOAuthSourceToken(config.id), isNull);
+  });
+
+  test('clearAll removes every connection and credential', () async {
+    const config = AiProviderConfig(
+      id: 'provider-1',
+      name: 'Provider',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://example.test/v1',
+    );
     await repository.saveProvider(config, apiKey: 'secret');
-    await repository.setActiveProviderId('prov-1');
 
     await repository.clearAll();
 
     expect(repository.listProviders(), isEmpty);
-    expect(await repository.getApiKey('prov-1'), isNull);
-    expect(repository.getActiveProviderId(), isNull);
+    expect(await repository.getApiKey(config.id), isNull);
   });
-
-  test(
-    'OAuth tokens stay in secure storage and never enter prefs JSON',
-    () async {
-      const config = AiProviderConfig(
-        id: 'github-oauth',
-        name: 'GitHub Copilot',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://api.githubcopilot.com',
-        modelId: 'gpt-5.4',
-        presetId: 'github',
-        authMode: 'oauth',
-        credentialKind: 'githubSourceToken',
-        tokenExpiresAt: null,
-      );
-
-      await repository.saveProvider(
-        config,
-        oauthAccessToken: 'oauth-secret',
-        oauthRefreshToken: 'refresh-secret',
-      );
-
-      expect(await repository.getApiKey(config.id), 'oauth-secret');
-      expect(await repository.getOAuthSourceToken(config.id), 'refresh-secret');
-      expect(
-        prefs.getString('ai_provider_configs_v1'),
-        isNot(contains('secret')),
-      );
-      expect(repository.listProviders().single.authMode, 'oauth');
-      expect(
-        repository.listProviders().single.credentialKind,
-        'githubSourceToken',
-      );
-    },
-  );
-
-  test('OAuth source and runtime tokens use separate secure keys', () async {
-    const config = AiProviderConfig(
-      id: 'github-oauth',
-      name: 'GitHub Copilot',
-      kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://api.githubcopilot.com',
-      modelId: 'gpt-5.4',
-      presetId: 'github',
-      authMode: 'oauth',
-    );
-
-    await repository.saveProvider(
-      config,
-      oauthAccessToken: 'copilot-runtime',
-      oauthSourceToken: 'github-source',
-    );
-
-    expect(await repository.getApiKey(config.id), 'copilot-runtime');
-    expect(await repository.getOAuthSourceToken(config.id), 'github-source');
-  });
-
-  test(
-    'delete removes runtime and source OAuth tokens but preserves other provider',
-    () async {
-      const target = AiProviderConfig(
-        id: 'provider-github',
-        name: 'GitHub',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://example.test',
-        modelId: 'm',
-        presetId: 'github',
-        authMode: 'oauth',
-      );
-      const keep = AiProviderConfig(
-        id: 'provider-gemini-cli',
-        name: 'Gemini',
-        kind: AiBackendKind.openAiCompatible,
-        baseUrl: 'https://example.test',
-        modelId: 'm',
-        presetId: 'gemini-cli',
-        authMode: 'oauth',
-      );
-      await repository.saveProvider(
-        target,
-        oauthAccessToken: 'runtime-target',
-        oauthSourceToken: 'source-target',
-      );
-      await repository.saveProvider(
-        keep,
-        oauthAccessToken: 'runtime-keep',
-        oauthSourceToken: 'source-keep',
-      );
-      await repository.setActiveProviderId(target.id);
-
-      await repository.deleteProvider(target.id);
-
-      expect(await repository.getApiKey(target.id), isNull);
-      expect(await repository.getOAuthSourceToken(target.id), isNull);
-      expect(repository.getActiveProviderId(), isNull);
-      expect(repository.listProviders().single.id, keep.id);
-      expect(await repository.getApiKey(keep.id), 'runtime-keep');
-      expect(await repository.getOAuthSourceToken(keep.id), 'source-keep');
-    },
-  );
 }
 
 class _FakeSecureStorage extends Fake implements FlutterSecureStorage {
-  final Map<String, String> _storage = {};
+  final Map<String, String> _values = {};
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
-    final name = invocation.memberName.toString();
-    if (name.contains('write')) {
-      final key = invocation.namedArguments[#key] as String;
+    final key = invocation.namedArguments[#key] as String?;
+    if (invocation.memberName == #write) {
       final value = invocation.namedArguments[#value] as String?;
       if (value == null) {
-        _storage.remove(key);
+        _values.remove(key);
       } else {
-        _storage[key] = value;
+        _values[key!] = value;
       }
       return Future<void>.value();
-    } else if (name.contains('read')) {
-      final key = invocation.namedArguments[#key] as String;
-      return Future<String?>.value(_storage[key]);
-    } else if (name.contains('delete')) {
-      final key = invocation.namedArguments[#key] as String;
-      _storage.remove(key);
+    }
+    if (invocation.memberName == #read) return Future<String?>.value(_values[key]);
+    if (invocation.memberName == #delete) {
+      _values.remove(key);
       return Future<void>.value();
     }
     return super.noSuchMethod(invocation);

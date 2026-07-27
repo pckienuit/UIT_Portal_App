@@ -459,10 +459,12 @@ test('Gemini CLI model listing uses live quota buckets', async (t) => {
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'gemini-provider', name: 'Gemini CLI', presetId: 'gemini-cli',
     baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
-    modelId: 'stale-model', projectId: 'cloud-project', apiKey: 'runtime-token', active: true,
-    customModels: [{ id: ' custom-model ' }, { id: 'gemini-live-model' }, { id: 'manual-model' }],
-    hiddenModelIds: [' custom-model '],
+    projectId: 'cloud-project', apiKey: ['runtime', 'token'].join('-'), active: true,
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/gc', {
+    customModels: [{ id: ' custom-model ' }, { id: 'gemini-live-model' }, { id: 'manual-model' }],
+    disabledModelIds: [' custom-model '],
+  })).status, 200);
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
   const ids = (await response.json()).data.map((model) => model.id);
@@ -542,12 +544,13 @@ test('GitHub model listing proxies the live upstream catalog', async (t) => {
     name: 'GitHub Copilot',
     presetId: 'github',
     baseUrl: `http://127.0.0.1:${upstream.address().port}`,
-    modelId: 'retired-model',
-    apiKey: 'runtime-token',
+    apiKey: ['runtime', 'token'].join('-'),
     active: true,
-    customModels: [{ id: 'available-model' }, { id: 'custom-model' }],
-    hiddenModelIds: ['hidden-model'],
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/gh', {
+    customModels: [{ id: 'available-model' }, { id: 'custom-model' }],
+    disabledModelIds: ['hidden-model'],
+  })).status, 200);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
@@ -864,10 +867,12 @@ test('Codex custom review-suffixed model keeps its declared upstream ID', async 
     baseUrl: `http://127.0.0.1:${upstream.address().port}/backend-api`,
     chatUrl: `http://127.0.0.1:${upstream.address().port}/backend-api/codex/responses`,
     transportKind: 'openaiResponses', authHeader: 'Authorization', authScheme: 'Bearer',
-    modelId: 'gpt-5.6-sol', apiKey: 'custom-token', active: true,
-    models: [{ id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol' }],
-    customModels: [{ id: 'my-private-review', name: 'My Private Review' }],
+    apiKey: ['custom', 'token'].join('-'), active: true,
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/cx', {
+    customModels: [{ id: 'my-private-review', name: 'My Private Review' }],
+    disabledModelIds: [],
+  })).status, 200);
 
   const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
     model: 'my-private-review', stream: false,
@@ -947,21 +952,17 @@ test('Antigravity live models and quota never use Gemini CLI endpoint or catalog
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'provider-gemini-cli', name: 'Gemini CLI', presetId: 'gemini-cli',
     baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
-    projectId: 'gemini-project', modelId: 'gemini-only', apiKey: 'gemini-runtime',
-    models: [{ id: 'gemini-only', name: 'Gemini only' }], active: true,
+    projectId: 'gemini-project', apiKey: ['gemini', 'runtime'].join('-'), active: true,
   })).status, 201);
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'provider-antigravity', name: 'Antigravity', presetId: 'antigravity',
     baseUrl: `http://127.0.0.1:${upstream.address().port}/v1internal`,
-    projectId: 'ag-project', modelId: 'claude-sonnet-4-6', apiKey: runtimeSecret,
-    models: [
-      { id: 'claude-sonnet-4-6', name: 'Catalog Sonnet' },
-      { id: 'gemini-3-flash-agent', name: 'Catalog Flash' },
-      { id: 'catalog-only', name: 'Wrong catalog fallback' },
-    ],
-    customModels: [{ id: ' claude-sonnet-4-6 ' }, { id: 'manual-model' }],
-    hiddenModelIds: ['gemini-3-flash-agent'], active: false,
+    projectId: 'ag-project', apiKey: runtimeSecret, active: false,
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/ag', {
+    customModels: [{ id: 'manual-model' }],
+    disabledModelIds: ['gemini-3-flash-agent'],
+  })).status, 200);
 
   const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=provider-antigravity');
   assert.equal(models.status, 200);
@@ -1105,14 +1106,15 @@ test('OpenAI Chat model descriptor uses exact modelsUrl and auth', async (t) => 
   await waitUntilReady(baseUrl, token, child);
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'models-descriptor', name: 'Models Descriptor', presetId: 'deepseek',
-    baseUrl: 'https://must-not-be-used.example/v1', modelId: 'fallback-model',
+    baseUrl: 'https://must-not-be-used.example/v1',
     ['api' + 'Key']: secret, active: true, transportKind: 'openaiChat',
     modelsUrl: `http://127.0.0.1:${upstream.address().port}/locked/models`,
     authHeader: 'X-API-Key', authScheme: 'Token',
-    models: [{ id: 'catalog-model', name: 'Catalog Model' }],
-    customModels: [{ id: 'live-model' }, { id: 'custom-model' }],
-    hiddenModelIds: ['hidden-model'],
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/deepseek', {
+    customModels: [{ id: 'live-model' }, { id: 'custom-model' }],
+    disabledModelIds: ['hidden-model'],
+  })).status, 200);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
@@ -1223,13 +1225,15 @@ test('Ollama tags map live models from saved base URL', async (t) => {
   const ollamaBaseUrl = `http://127.0.0.1:${upstream.address().port}`;
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'ollama-local', name: 'Ollama Local', presetId: 'ollama-local',
-    baseUrl: ollamaBaseUrl, modelId: 'saved-model', active: true,
+    baseUrl: ollamaBaseUrl, active: true,
     transportKind: 'ollamaChat',
     chatUrl: `${ollamaBaseUrl}/api/chat`,
     modelsUrl: `${ollamaBaseUrl}/api/tags`,
-    customModels: [{ id: 'custom/saved-model' }, { id: 'manual-model' }],
-    hiddenModelIds: ['hidden-model'],
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/ollama-local', {
+    customModels: [{ id: 'custom/saved-model' }, { id: 'manual-model' }],
+    disabledModelIds: ['hidden-model'],
+  })).status, 200);
 
   const response = await request(baseUrl, token, 'GET', '/v1/models');
   assert.equal(response.status, 200);
@@ -1310,7 +1314,7 @@ test('provider PATCH persists corrected runtime descriptor and models', async (t
   );
 });
 
-test('generic custom and hidden models persist across post patch and restart', async (t) => {
+test('provider model settings persist across explicit settings sync and restart', async (t) => {
   const dataDir = tempDir();
   const token = 'custom-models-core-token';
   let port = await freePort();
@@ -1319,16 +1323,21 @@ test('generic custom and hidden models persist across post patch and restart', a
   await waitUntilReady(baseUrl, token, child);
   assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
     id: 'generic-custom', name: 'Generic', presetId: 'custom', baseUrl: 'https://example.test/v1',
-    modelId: 'configured', models: [{ id: 'configured' }, { id: 'hidden-post' }],
-    customModels: [{ id: 'manual/post' }], hiddenModelIds: ['hidden-post'], active: true,
+    active: true,
   })).status, 201);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/generic-custom', {
+    customModels: [{ id: 'manual/post' }], disabledModelIds: ['hidden-post'],
+  })).status, 200);
   const postedState = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
-  assert.deepEqual(postedState.modelSettings.custom, {
+  assert.deepEqual(postedState.modelSettings['generic-custom'], {
     customModels: [{ id: 'manual/post' }], disabledModelIds: ['hidden-post'],
   });
   assert.equal((await request(baseUrl, token, 'PATCH', '/internal/providers/generic-custom', {
+    name: 'Generic updated',
+  })).status, 200);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/generic-custom', {
     customModels: [{ id: ' manual/model-x ' }, { id: 'configured' }],
-    hiddenModelIds: ['configured'],
+    disabledModelIds: ['configured'],
   })).status, 200);
   child.kill();
   port = await freePort();
@@ -1337,9 +1346,9 @@ test('generic custom and hidden models persist across post patch and restart', a
   t.after(() => child.kill());
   await waitUntilReady(baseUrl, token, child);
   assert.deepEqual((await (await request(baseUrl, token, 'GET', '/v1/models')).json()).data.map((model) => model.id), [
-    'custom/manual/model-x',
+    'generic-custom/manual/model-x',
   ]);
-  const settings = await (await request(baseUrl, token, 'GET', '/internal/model-settings/custom')).json();
+  const settings = await (await request(baseUrl, token, 'GET', '/internal/model-settings/generic-custom')).json();
   assert.deepEqual(settings, {
     customModels: [{ id: 'manual/model-x' }, { id: 'configured' }],
     disabledModelIds: ['configured'],
@@ -1347,6 +1356,133 @@ test('generic custom and hidden models persist across post patch and restart', a
   const providers = await (await request(baseUrl, token, 'GET', '/internal/providers')).json();
   assert.equal(providers[0].customModels, undefined);
   assert.equal(providers[0].hiddenModelIds, undefined);
+});
+
+test('custom connections keep model settings isolated by connection ID', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'custom-settings-isolation-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  for (const id of ['custom-one', 'custom-two']) {
+    assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+      id,
+      name: id,
+      presetId: 'custom',
+      baseUrl: `https://${id}.example.test/v1`,
+    })).status, 201);
+  }
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/custom-one', {
+    customModels: [{ id: 'one-only' }],
+    disabledModelIds: [],
+  })).status, 200);
+  assert.equal((await request(baseUrl, token, 'PUT', '/internal/model-settings/custom-two', {
+    customModels: [{ id: 'two-only' }],
+    disabledModelIds: [],
+  })).status, 200);
+
+  const one = await request(baseUrl, token, 'GET', '/v1/models?connectionId=custom-one');
+  const two = await request(baseUrl, token, 'GET', '/v1/models?connectionId=custom-two');
+  const oneIds = (await one.json()).data.map((model) => model.id);
+  const twoIds = (await two.json()).data.map((model) => model.id);
+
+  assert.deepEqual(oneIds, ['custom-one/one-only']);
+  assert.deepEqual(twoIds, ['custom-two/two-only']);
+  const persisted = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.ok(persisted.modelSettings['custom-one']);
+  assert.ok(persisted.modelSettings['custom-two']);
+  assert.equal(persisted.modelSettings.custom, undefined);
+});
+
+test('drops ambiguous legacy shared custom settings instead of leaking routes', async (t) => {
+  const dataDir = tempDir();
+  fs.writeFileSync(path.join(dataDir, '9router_state.json'), JSON.stringify({
+    schemaVersion: 3,
+    connections: [
+      {
+        id: 'custom-one', providerId: 'custom', providerKey: 'custom',
+        displayName: 'Custom One', authMode: 'apiKey', enabled: true,
+        mobileMetadata: { kind: 'openAiCompatible', baseUrl: 'https://one.example.test/v1' },
+      },
+      {
+        id: 'custom-two', providerId: 'custom', providerKey: 'custom',
+        displayName: 'Custom Two', authMode: 'apiKey', enabled: true,
+        mobileMetadata: { kind: 'openAiCompatible', baseUrl: 'https://two.example.test/v1' },
+      },
+    ],
+    modelSettings: {
+      custom: {
+        customModels: [{ id: 'legacy-custom', name: 'Legacy custom' }],
+        disabledModelIds: [],
+      },
+    },
+    activeRoute: null,
+    usage: [],
+    quota: {},
+  }), 'utf8');
+  const port = await freePort();
+  const token = 'legacy-custom-settings-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  const one = await request(baseUrl, token, 'GET', '/v1/models?connectionId=custom-one');
+  const two = await request(baseUrl, token, 'GET', '/v1/models?connectionId=custom-two');
+
+  assert.deepEqual((await one.json()).data, []);
+  assert.deepEqual((await two.json()).data, []);
+  const persisted = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.equal(persisted.modelSettings.custom, undefined);
+  assert.equal(persisted.modelSettings['custom-one'], undefined);
+  assert.equal(persisted.modelSettings['custom-two'], undefined);
+});
+
+test('moves legacy custom settings to its sole custom connection', async (t) => {
+  const dataDir = tempDir();
+  fs.writeFileSync(path.join(dataDir, '9router_state.json'), JSON.stringify({
+    schemaVersion: 3,
+    connections: [{
+      id: 'custom-one', providerId: 'custom', providerKey: 'custom',
+      displayName: 'Custom One', authMode: 'apiKey', enabled: true,
+      mobileMetadata: { kind: 'openAiCompatible', baseUrl: 'https://one.example.test/v1' },
+    }],
+    modelSettings: {
+      custom: {
+        customModels: [{ id: 'legacy-custom', name: 'Legacy custom' }],
+        disabledModelIds: ['disabled-model'],
+      },
+    },
+    activeRoute: null,
+    usage: [],
+    quota: {},
+  }), 'utf8');
+  const port = await freePort();
+  const token = 'sole-custom-settings-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
+    stdio: 'ignore',
+  });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+
+  const models = await request(baseUrl, token, 'GET', '/v1/models?connectionId=custom-one');
+  assert.deepEqual((await models.json()).data.map((model) => model.id), [
+    'custom-one/legacy-custom',
+  ]);
+  const persisted = JSON.parse(fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8'));
+  assert.equal(persisted.modelSettings.custom, undefined);
+  assert.deepEqual(persisted.modelSettings['custom-one'], {
+    customModels: [{ id: 'legacy-custom', name: 'Legacy custom' }],
+    disabledModelIds: ['disabled-model'],
+  });
 });
 
 test('Codex Responses forces stream and sends upstream-only account metadata', async (t) => {

@@ -39,7 +39,6 @@ class AiProviderConfig {
     required this.name,
     required this.kind,
     required this.baseUrl,
-    required this.modelId,
     this.presetId,
     this.systemPrompt,
     this.authMode = 'apiKey',
@@ -52,9 +51,6 @@ class AiProviderConfig {
     this.modelsUrl,
     this.authHeader,
     this.authScheme,
-    this.models = const [],
-    this.customModels = const [],
-    this.hiddenModelIds = const [],
     this.staticHeaders = const {},
   });
 
@@ -62,7 +58,6 @@ class AiProviderConfig {
   final String name;
   final AiBackendKind kind;
   final String baseUrl; // Lưu URL dưới dạng String để serialize đơn giản
-  final String modelId;
   final String? presetId;
   final String? systemPrompt;
   final String authMode;
@@ -75,9 +70,6 @@ class AiProviderConfig {
   final String? modelsUrl;
   final String? authHeader;
   final String? authScheme;
-  final List<AiProviderModelDescriptor> models;
-  final List<AiProviderModelDescriptor> customModels;
-  final List<String> hiddenModelIds;
   final Map<String, String> staticHeaders;
 
   Map<String, dynamic> toJson() => {
@@ -85,7 +77,6 @@ class AiProviderConfig {
     'name': name,
     'kind': kind.name,
     'baseUrl': baseUrl,
-    'modelId': modelId,
     'presetId': presetId,
     'systemPrompt': systemPrompt,
     'authMode': authMode,
@@ -98,9 +89,6 @@ class AiProviderConfig {
     'modelsUrl': modelsUrl,
     'authHeader': authHeader,
     'authScheme': authScheme,
-    'models': models.map((model) => model.toJson()).toList(),
-    'customModels': customModels.map((model) => model.toJson()).toList(),
-    'hiddenModelIds': hiddenModelIds,
     'staticHeaders': staticHeaders,
   };
 
@@ -110,7 +98,6 @@ class AiProviderConfig {
         name: json['name'] as String,
         kind: AiBackendKind.values.firstWhere((e) => e.name == json['kind']),
         baseUrl: json['baseUrl'] as String,
-        modelId: json['modelId'] as String,
         presetId: json['presetId'] as String?,
         systemPrompt: json['systemPrompt'] as String?,
         authMode: json['authMode'] as String? ?? 'apiKey',
@@ -125,31 +112,6 @@ class AiProviderConfig {
         modelsUrl: json['modelsUrl'] as String?,
         authHeader: json['authHeader'] as String?,
         authScheme: json['authScheme'] as String?,
-        models:
-            (json['models'] as List<dynamic>?)
-                ?.whereType<Map>()
-                .map(
-                  (model) => AiProviderModelDescriptor.fromJson(
-                    Map<String, dynamic>.from(model),
-                  ),
-                )
-                .toList(growable: false) ??
-            const [],
-        customModels:
-            (json['customModels'] as List<dynamic>?)
-                ?.whereType<Map>()
-                .map(
-                  (model) => AiProviderModelDescriptor.fromJson(
-                    Map<String, dynamic>.from(model),
-                  ),
-                )
-                .toList(growable: false) ??
-            const [],
-        hiddenModelIds:
-            (json['hiddenModelIds'] as List<dynamic>?)
-                ?.map((id) => id.toString())
-                .toList(growable: false) ??
-            const [],
         staticHeaders:
             (json['staticHeaders'] as Map?)?.map(
               (key, value) => MapEntry(key.toString(), value.toString()),
@@ -160,7 +122,6 @@ class AiProviderConfig {
   AiProviderConfig copyWith({
     String? name,
     String? baseUrl,
-    String? modelId,
     String? Function()? presetId,
     String? Function()? systemPrompt,
     String? authMode,
@@ -173,9 +134,6 @@ class AiProviderConfig {
     String? Function()? modelsUrl,
     String? Function()? authHeader,
     String? Function()? authScheme,
-    List<AiProviderModelDescriptor>? models,
-    List<AiProviderModelDescriptor>? customModels,
-    List<String>? hiddenModelIds,
     Map<String, String>? staticHeaders,
   }) {
     return AiProviderConfig(
@@ -183,7 +141,6 @@ class AiProviderConfig {
       name: name ?? this.name,
       kind: kind,
       baseUrl: baseUrl ?? this.baseUrl,
-      modelId: modelId ?? this.modelId,
       presetId: presetId != null ? presetId() : this.presetId,
       systemPrompt: systemPrompt != null ? systemPrompt() : this.systemPrompt,
       authMode: authMode ?? this.authMode,
@@ -202,9 +159,6 @@ class AiProviderConfig {
       modelsUrl: modelsUrl != null ? modelsUrl() : this.modelsUrl,
       authHeader: authHeader != null ? authHeader() : this.authHeader,
       authScheme: authScheme != null ? authScheme() : this.authScheme,
-      models: models ?? this.models,
-      customModels: customModels ?? this.customModels,
-      hiddenModelIds: hiddenModelIds ?? this.hiddenModelIds,
       staticHeaders: staticHeaders ?? this.staticHeaders,
     );
   }
