@@ -14,7 +14,13 @@ test('converts OpenAI Chat request to OpenAI Responses input', () => {
     'gpt-5.4',
   );
   assert.equal(req.model, 'gpt-5.4');
-  assert.deepEqual(req.input, [{ role: 'user', content: 'hello codex' }]);
+  assert.deepEqual(req.input, [
+    {
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text: 'hello codex' }],
+    },
+  ]);
 });
 
 test('converts OpenAI Responses payload to OpenAI Chat Completions format', () => {
