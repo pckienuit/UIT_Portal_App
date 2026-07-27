@@ -34,15 +34,7 @@ class OpenAiCompatibleBackend implements AiChatBackend {
   Future<AiConnectionResult> testConnection({String? testModelId}) async {
     try {
       final targetModel = testModelId ?? modelId;
-      var endpoint = AiProviderValidator.endpoint(baseUrl, 'chat/completions');
-      if (connectionId != null) {
-        endpoint = endpoint.replace(
-          queryParameters: {
-            ...endpoint.queryParameters,
-            'connectionId': connectionId!,
-          },
-        );
-      }
+      final endpoint = _endpoint('chat/completions');
       final response = await _dio.postUri(
         endpoint,
         data: {
@@ -161,10 +153,7 @@ class OpenAiCompatibleBackend implements AiChatBackend {
 
     Future<void> run() async {
       try {
-        final endpoint = AiProviderValidator.endpoint(
-          baseUrl,
-          'chat/completions',
-        );
+        final endpoint = _endpoint('chat/completions');
         final response = await _dio.postUri<ResponseBody>(
           endpoint,
           data: body,
@@ -248,6 +237,19 @@ class OpenAiCompatibleBackend implements AiChatBackend {
   @override
   Future<void> dispose() async {
     await cancel();
+  }
+
+  Uri _endpoint(String path) {
+    final endpoint = AiProviderValidator.endpoint(baseUrl, path);
+    final exactConnectionId = connectionId;
+    if (exactConnectionId == null) return endpoint;
+
+    return endpoint.replace(
+      queryParameters: {
+        ...endpoint.queryParameters,
+        'connectionId': exactConnectionId,
+      },
+    );
   }
 
   String _handleDioError(dynamic e) {

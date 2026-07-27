@@ -183,6 +183,43 @@ void main() {
       expect(events[1].content, ' world');
       expect(events[2].type, AiStreamEventType.done);
     });
+
+    test('streamChat sends encoded exact connectionId and requested model', () async {
+      const sseContent = 'data: [DONE]\n\n';
+      final adapter = _StaticAdapter(statusCode: 200, responseBody: sseContent);
+      final dio = Dio()..httpClientAdapter = adapter;
+      final backend = OpenAiCompatibleBackend(
+        baseUrl: 'http://localhost/v1',
+        modelId: 'fallback-model',
+        apiKey: 'test-key',
+        connectionId: 'provider/id + exact',
+        dio: dio,
+      );
+      final request = AiChatRequest(
+        config: _FakeProviderConfig(),
+        apiKey: 'test-key',
+        modelId: 'conversation-model',
+        messages: [
+          AiChatMessage(
+            id: '1',
+            role: AiMessageRole.user,
+            content: 'Hi',
+            createdAt: DateTime.now(),
+            status: AiMessageStatus.complete,
+          ),
+        ],
+      );
+
+      await backend.streamChat(request).toList();
+
+      expect(
+        adapter.requestUri,
+        Uri.parse(
+          'http://localhost/v1/chat/completions?connectionId=provider%2Fid+%2B+exact',
+        ),
+      );
+      expect((adapter.requestBody as Map<String, dynamic>)['model'], 'conversation-model');
+    });
   });
 }
 
