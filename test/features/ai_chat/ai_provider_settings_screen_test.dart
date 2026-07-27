@@ -474,7 +474,8 @@ void main() {
     expect(find.text('Đã đăng nhập'), findsOneWidget);
     expect(find.text('Đăng xuất'), findsOneWidget);
     expect(find.text('Đổi tài khoản'), findsOneWidget);
-    expect(find.text('Model: gpt-5.4'), findsOneWidget);
+    expect(find.text('Model: gpt-5.4'), findsNothing);
+    expect(find.text('Đang dùng'), findsNothing);
   });
 
   testWidgets('connected Antigravity opens model manager', (tester) async {
@@ -554,8 +555,11 @@ void main() {
         .single;
     expect(config.modelId, 'gpt-current');
     expect(config.hiddenModelIds, isEmpty);
-    expect(prefs.getString('ai_provider_model_settings_v1'), contains('gpt-next'));
-    expect(find.text('Model đã ẩn'), findsOneWidget);
+    expect(
+      prefs.getString('ai_provider_model_settings_v1'),
+      contains('gpt-next'),
+    );
+    expect(find.text('Disabled models', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('API-key deletion confirms, labels action, and bounds failure', (

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_controller.dart';
-import '../domain/ai_chat_backend.dart';
+
 import '../domain/ai_chat_models.dart';
 import '../domain/ai_provider_catalog.dart';
 import '../domain/ai_provider_validator.dart';
@@ -26,7 +26,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
   final _nameController = TextEditingController();
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
-  final _modelIdController = TextEditingController();
+  final _probeModelController = TextEditingController();
 
   bool _obscureApiKey = true;
   bool _isTesting = false;
@@ -38,7 +38,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     super.initState();
     _nameController.text = widget.config?.name ?? widget.preset.name;
     _baseUrlController.text = widget.config?.baseUrl ?? widget.preset.baseUrl;
-    _modelIdController.text =
+    _probeModelController.text =
         widget.config?.modelId ?? widget.preset.defaultModelId;
 
     if (widget.config != null) {
@@ -57,7 +57,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     _nameController.dispose();
     _baseUrlController.dispose();
     _apiKeyController.dispose();
-    _modelIdController.dispose();
+    _probeModelController.dispose();
     super.dispose();
   }
 
@@ -73,7 +73,7 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
     final baseUrl = AiProviderValidator.normalizeBaseUrl(
       _baseUrlController.text,
     );
-    final modelId = _modelIdController.text.trim();
+    final modelId = _probeModelController.text.trim();
 
     final config = AiProviderConfig(
       id: 'test-conn-temp',
@@ -135,7 +135,8 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
       name: _nameController.text.trim(),
       kind: AiBackendKind.openAiCompatible,
       baseUrl: baseUrl,
-      modelId: _modelIdController.text.trim(),
+      // ponytail: Phase 6 removes this legacy field after canonical chat routes migrate.
+      modelId: '',
       presetId: widget.preset.id,
       systemPrompt: widget.config?.systemPrompt,
       transportKind: widget.preset.transportKind,
@@ -301,60 +302,12 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                         },
                       ),
                       SizedBox(height: PortalSpacing.md),
-                      Builder(
-                        builder: (context) {
-                          if (widget.preset.id != 'custom') {
-                            return const SizedBox.shrink();
-                          }
-                          final customModels =
-                              widget.config?.customModels ??
-                              const <AiProviderModelDescriptor>[];
-                          final allPresetModels = <AiModelOption>[
-                            ...customModels.map(
-                              (model) =>
-                                  AiModelOption(id: model.id, name: model.name),
-                            ),
-                            ...widget.preset.models.map(
-                              (model) =>
-                                  AiModelOption(id: model.id, name: model.name),
-                            ),
-                          ];
-                          final seen = <String>{};
-                          final uniqueModels = allPresetModels
-                              .where((m) => seen.add(m.id))
-                              .toList();
-                          if (uniqueModels.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-                          return DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            initialValue:
-                                uniqueModels.any(
-                                  (m) => m.id == _modelIdController.text.trim(),
-                                )
-                                ? _modelIdController.text.trim()
-                                : (uniqueModels.first.id),
-                            decoration: const InputDecoration(
-                              labelText: 'Model mặc định',
-                            ),
-                            hint: const Text('Chọn model từ danh sách'),
-                            items: uniqueModels
-                                .map<DropdownMenuItem<String>>(
-                                  (m) => DropdownMenuItem<String>(
-                                    value: m.id,
-                                    child: Text('${m.name} (${m.id})'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _modelIdController.text = val;
-                                });
-                              }
-                            },
-                          );
-                        },
+                      TextFormField(
+                        controller: _probeModelController,
+                        decoration: const InputDecoration(
+                          labelText: 'Model dùng để thử kết nối',
+                          hintText: 'Để trống nếu provider tự chọn',
+                        ),
                       ),
                     ],
                   ),

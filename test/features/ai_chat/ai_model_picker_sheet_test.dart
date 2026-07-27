@@ -225,8 +225,8 @@ void main() {
 
     expect(find.text('Làm mới từ provider'), findsOneWidget);
     expect(find.text('Built in'), findsOneWidget);
-    expect(find.text('Suggested model'), findsOneWidget);
-    expect(find.text('Đã làm mới'), findsOneWidget);
+    expect(find.text('Suggested model', skipOffstage: false), findsOneWidget);
+    expect(find.text('Đã làm mới', skipOffstage: false), findsOneWidget);
     expect(
       container.read(aiProviderControllerProvider).providers.single.modelId,
       'built-in',

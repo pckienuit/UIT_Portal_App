@@ -13,9 +13,7 @@ class AiProviderCard extends ConsumerWidget {
     required this.onConnect,
     required this.onEdit,
     required this.onDelete,
-    required this.onSelect,
     this.onManageModels,
-    required this.isActive,
     this.deleteLabel = 'Xóa',
   });
 
@@ -24,9 +22,7 @@ class AiProviderCard extends ConsumerWidget {
   final VoidCallback onConnect;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onSelect;
   final VoidCallback? onManageModels;
-  final bool isActive;
   final String deleteLabel;
 
   @override
@@ -48,13 +44,10 @@ class AiProviderCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: PortalSpacing.sm),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isActive ? colorScheme.primary : colorScheme.outlineVariant,
-          width: isActive ? 2.0 : 1.0,
-        ),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: InkWell(
-        onTap: hasConfig ? onSelect : onConnect,
+        onTap: hasConfig ? onEdit : onConnect,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(PortalSpacing.md),
@@ -66,14 +59,10 @@ class AiProviderCard extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: isActive
-                        ? colorScheme.primaryContainer
-                        : colorScheme.surfaceContainerHighest,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
                     child: Icon(
                       _getIconForPreset(preset.id),
-                      color: isActive
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: PortalSpacing.md),
@@ -94,37 +83,9 @@ class AiProviderCard extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (isActive) ...[
-                              const SizedBox(width: PortalSpacing.xs),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Đang dùng',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                         if (hasConfig) ...[
-                          Text(
-                            'Model: ${config!.modelId}',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: PortalSpacing.xxs),
                           _buildHealthBadge(context, health, error),
                         ] else ...[
                           Text(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/foundations/portal_spacing.dart';
 
+import '../../application/ai_provider_model_controller.dart';
 import '../../application/ai_provider_controller.dart';
 
 import '../../data/local_model_catalog.dart';
@@ -187,21 +188,17 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
             AiProviderCard(
               preset: preset,
               config: config,
-              isActive: state.activeProviderId == config.id,
               onConnect: () => _openEditor(preset),
               onEdit: () => _openEditor(preset, config: config),
               onDelete: () => _deleteApiKey(notifier, config.id),
-              onSelect: () => notifier.selectActiveProvider(config.id),
               onManageModels: () => _openModelManager(config),
               deleteLabel: 'Xóa API key',
             ),
           AiProviderCard(
             preset: preset,
-            isActive: false,
             onConnect: () => _openEditor(preset),
             onEdit: () {},
             onDelete: () {},
-            onSelect: () {},
           ),
         ],
       );
@@ -211,11 +208,9 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
     return AiProviderCard(
       preset: preset,
       config: config,
-      isActive: config != null && state.activeProviderId == config.id,
       onConnect: () => _openEditor(preset),
       onEdit: () => _openEditor(preset, config: config),
       onDelete: () => _deleteApiKey(notifier, config!.id),
-      onSelect: () => notifier.selectActiveProvider(config!.id),
       onManageModels: config != null ? () => _openModelManager(config) : null,
       deleteLabel: 'Xóa API key',
     );
@@ -310,8 +305,6 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const Text('Đã đăng nhập'),
-            Text('Model: ${config.modelId}'),
-            if (state.activeProviderId == config.id) const Text('Đang dùng'),
             Wrap(
               spacing: PortalSpacing.sm,
               children: [
@@ -386,7 +379,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => AiModelManagerSheet(providerId: config.id),
+      builder: (_) => AiModelManagerSheet(providerKey: providerKeyFor(config)),
     );
   }
 
