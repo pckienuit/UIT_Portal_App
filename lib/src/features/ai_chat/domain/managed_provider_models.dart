@@ -1,5 +1,6 @@
 import 'ai_chat_backend.dart';
 import 'ai_chat_models.dart';
+import 'router_catalog.dart';
 
 class ManagedProviderModel {
   const ManagedProviderModel({
@@ -45,7 +46,15 @@ ManagedProviderModels resolveManagedProviderModels(
   List<AiModelOption> refreshedModels,
 ) {
   final antigravity = config.presetId == 'antigravity';
-  final lockedIds = config.models.map((model) => model.id.trim()).toSet()
+  final staticModels = [
+    ...config.models.map(
+      (model) => AiModelOption(id: model.id, name: model.name),
+    ),
+    ...?RouterCatalog.byId(
+      config.presetId ?? '',
+    )?.models.map((model) => AiModelOption(id: model.id, name: model.name)),
+  ];
+  final lockedIds = staticModels.map((model) => model.id.trim()).toSet()
     ..remove('');
   final hiddenIds = config.hiddenModelIds.map((id) => id.trim()).toSet();
   final managed = <String, ManagedProviderModel>{};
@@ -73,12 +82,8 @@ ManagedProviderModels resolveManagedProviderModels(
     );
   }
 
-  for (final model in config.models) {
-    addManaged(
-      AiModelOption(id: model.id, name: model.name),
-      builtIn: true,
-      custom: false,
-    );
+  for (final model in staticModels) {
+    addManaged(model, builtIn: true, custom: false);
   }
   if (!antigravity) {
     for (final model in config.customModels) {

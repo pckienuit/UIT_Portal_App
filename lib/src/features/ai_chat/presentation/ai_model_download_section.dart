@@ -88,7 +88,7 @@ class AiModelDownloadSection extends ConsumerWidget {
                   SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: Icon(Icons.verified_user_outlined, size: 16),
                   ),
                   SizedBox(width: PortalSpacing.sm),
                   Expanded(
