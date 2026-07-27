@@ -19,9 +19,9 @@ const RESPONSES_API_ALLOWLIST = new Set([
   'text',
 ]);
 
-function openAiToOpenAiResponses(body, model) {
+function openAiToOpenAiResponses(body, model, options = {}) {
   let resolvedModel = model || body.model;
-  const isCodex = resolvedModel && /codex/i.test(resolvedModel);
+  const isCodex = options.isCodex === true || (resolvedModel && /codex/i.test(resolvedModel));
 
   let effortFromModel = null;
   if (isCodex) {

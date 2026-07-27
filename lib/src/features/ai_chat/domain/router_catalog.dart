@@ -115,8 +115,12 @@ class RouterCatalog {
       authScheme: () => definition.authScheme,
       models: definition.models
           .map(
-            (model) =>
-                AiProviderModelDescriptor(id: model.id, name: model.name),
+            (model) => AiProviderModelDescriptor(
+              id: model.id,
+              name: model.name,
+              upstreamModelId: model.upstreamModelId,
+              quotaFamily: model.quotaFamily,
+            ),
           )
           .toList(growable: false),
       customModels: config.customModels,

@@ -124,10 +124,11 @@ test('quota-enabled providers keep their own documented adapter contract', () =>
     ),
     false,
   );
-  for (const id of ['gemini-cli', 'github', 'openrouter']) {
+  for (const id of ['codex', 'gemini-cli', 'github', 'openrouter']) {
     assert.equal(byId.get(id).quotaSupported, true, id);
   }
-  for (const id of ['codex', 'grok-cli', 'openai', 'deepseek', 'groq', 'mistral']) {
+  assert.equal(byId.get('codex').quotaAdapter, 'codex');
+  for (const id of ['grok-cli', 'openai', 'deepseek', 'groq', 'mistral']) {
     assert.equal(byId.get(id).quotaSupported, false, id);
   }
 });

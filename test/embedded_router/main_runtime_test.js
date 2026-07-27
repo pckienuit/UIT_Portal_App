@@ -790,6 +790,117 @@ test('OpenAI Chat descriptor uses exact URL, auth, stream modes, sanitized error
   assert.doesNotMatch(log, /Bearer\s+/i);
 });
 
+test('Codex routes Sol review through Responses with upstream model ID', async (t) => {
+  const received = [];
+  const secret = 'codex-runtime-sentinel';
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    received.push({ url: request.url, headers: request.headers, body: JSON.parse(raw) });
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end('data: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1}}}\n\n');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'codex-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-codex', name: 'Codex', presetId: 'codex', authMode: 'oauth',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/backend-api`,
+    chatUrl: `http://127.0.0.1:${upstream.address().port}/backend-api/codex/responses`,
+    transportKind: 'openaiResponses', authHeader: 'Authorization', authScheme: 'Bearer',
+    modelId: 'gpt-5.6-sol', apiKey: secret, active: true,
+    models: [{ id: 'gpt-5.6-sol-review', name: 'GPT 5.6 Sol Review', upstreamModelId: 'gpt-5.6-sol', quotaFamily: 'review' }],
+  })).status, 201);
+
+  const result = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'gpt-5.6-sol-review', stream: false,
+    messages: [{ role: 'user', content: 'review this' }],
+  });
+  assert.equal(result.status, 200);
+  await result.text();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(received.length, 1);
+  assert.equal(received[0].url, '/backend-api/codex/responses');
+  assert.equal(received[0].headers.originator, 'codex_cli_rs');
+  assert.equal(received[0].body.model, 'gpt-5.6-sol');
+  assert.equal(received[0].body.store, false);
+  assert.deepEqual(received[0].body.input, [{
+    type: 'message', role: 'user', content: [{ type: 'input_text', text: 'review this' }],
+  }]);
+  const state = fs.readFileSync(path.join(dataDir, '9router_state.json'), 'utf8');
+  assert.doesNotMatch(state, new RegExp(secret));
+});
+
+test('Codex custom review-suffixed model keeps its declared upstream ID', async (t) => {
+  const seen = {};
+  const upstream = require('node:http').createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += chunk;
+    Object.assign(seen, { body: JSON.parse(raw), headers: request.headers });
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end('data: {"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":1}}}\n\n');
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  t.after(() => upstream.close());
+
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'codex-custom-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-codex-custom', name: 'Codex', presetId: 'codex',
+    baseUrl: `http://127.0.0.1:${upstream.address().port}/backend-api`,
+    chatUrl: `http://127.0.0.1:${upstream.address().port}/backend-api/codex/responses`,
+    transportKind: 'openaiResponses', authHeader: 'Authorization', authScheme: 'Bearer',
+    modelId: 'gpt-5.6-sol', apiKey: 'custom-token', active: true,
+    models: [{ id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol' }],
+    customModels: [{ id: 'my-private-review', name: 'My Private Review' }],
+  })).status, 201);
+
+  const response = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'my-private-review', stream: false,
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(response.status, 200);
+  await response.text();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(seen.body.model, 'my-private-review');
+  assert.equal(seen.body.store, false);
+  assert.equal(seen.headers.originator, 'codex_cli_rs');
+});
+
+test('Codex model listing keeps static catalog when live discovery has no credential', async (t) => {
+  const dataDir = tempDir();
+  const port = await freePort();
+  const token = 'codex-static-core-token';
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await waitUntilReady(baseUrl, token, child);
+  assert.equal((await request(baseUrl, token, 'POST', '/internal/providers', {
+    id: 'provider-codex-static', name: 'Codex', presetId: 'codex',
+    baseUrl: 'https://chatgpt.com/backend-api', modelId: 'gpt-5.6-sol',
+    transportKind: 'openaiResponses',
+    models: [{ id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol' }], active: true,
+  })).status, 201);
+
+  const models = await request(baseUrl, token, 'GET', '/v1/models');
+  assert.equal(models.status, 200);
+  assert.deepEqual((await models.json()).data, [{
+    id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol', object: 'model', owned_by: 'provider-codex-static',
+  }]);
+});
+
 test('Antigravity live models and quota never use Gemini CLI endpoint or catalog', async (t) => {
   const requests = [];
   const upstream = require('node:http').createServer((request, response) => {

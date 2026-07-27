@@ -99,6 +99,47 @@ void main() {
     },
   );
 
+  test('hydrates review model upstream metadata from catalog', () async {
+    await RouterCatalog.load(
+      jsonEncode({
+        'providers': [
+          {
+            'id': 'codex',
+            'name': 'Codex',
+            'category': 'oauth',
+            'disposition': 'ready',
+            'mobileSupported': true,
+            'androidAuth': 'loopback',
+            'nativeStatus': 'ready',
+            'transportKind': 'openaiResponses',
+            'chatUrl': 'https://example.test/responses',
+            'models': [
+              {
+                'id': 'gpt-5.6-sol-review',
+                'name': 'GPT 5.6 Sol Review',
+                'upstreamModelId': 'gpt-5.6-sol',
+                'quotaFamily': 'review',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const config = AiProviderConfig(
+      id: 'provider-codex',
+      name: 'Codex',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://chatgpt.com/backend-api',
+      modelId: 'gpt-5.6-sol-review',
+      presetId: 'codex',
+    );
+
+    final hydrated = RouterCatalog.hydrateConfig(config);
+
+    expect(hydrated.models.single.upstreamModelId, 'gpt-5.6-sol');
+    expect(hydrated.models.single.quotaFamily, 'review');
+  });
+
   test('does not mutate config without a catalog preset', () {
     const config = AiProviderConfig(
       id: 'custom-1',

@@ -23,6 +23,27 @@ test('converts OpenAI Chat request to OpenAI Responses input', () => {
   ]);
 });
 
+test('treats non-Codex-named model as Codex when provider mode is explicit', () => {
+  const req = openAiToOpenAiResponses(
+    { messages: [{ role: 'user', content: 'hello Sol' }] },
+    'gpt-5.6-sol',
+    { isCodex: true },
+  );
+
+  assert.equal(req.model, 'gpt-5.6-sol');
+  assert.equal(req.store, false);
+  assert.equal(typeof req.instructions, 'string');
+  assert.ok(req.instructions.length > 0);
+  assert.deepEqual(req.reasoning, { effort: 'low', summary: 'auto' });
+  assert.deepEqual(req.include, ['reasoning.encrypted_content']);
+  assert.equal(req.prompt_cache_key, 'codex-gpt-5.6-sol');
+  assert.deepEqual(req.input, [{
+    type: 'message',
+    role: 'user',
+    content: [{ type: 'input_text', text: 'hello Sol' }],
+  }]);
+});
+
 test('converts OpenAI Responses payload to OpenAI Chat Completions format', () => {
   const res = openAiResponsesResponseToOpenAi(
     {

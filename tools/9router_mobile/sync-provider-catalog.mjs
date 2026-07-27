@@ -162,7 +162,14 @@ function run() {
         const kindMatch = m[0].match(/\bkind\s*:\s*["']([^"']+)["']/);
         if (kindMatch && kindMatch[1] !== 'llm') continue;
         if (idMatch && nameMatch) {
-          models.push({ id: idMatch[1], name: nameMatch[1] });
+          const upstreamModelId = m[0].match(/\bupstreamModelId\s*:\s*["']([^"']+)["']/)?.[1];
+          const quotaFamily = m[0].match(/\bquotaFamily\s*:\s*["']([^"']+)["']/)?.[1];
+          models.push({
+            id: idMatch[1],
+            name: nameMatch[1],
+            ...(upstreamModelId ? { upstreamModelId } : {}),
+            ...(quotaFamily ? { quotaFamily } : {}),
+          });
         }
       }
       if (id === 'gemini-cli') {

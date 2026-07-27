@@ -154,19 +154,33 @@ enum RouterTransportKind {
 }
 
 class RouterModelDefinition {
-  const RouterModelDefinition({required this.id, required this.name});
+  const RouterModelDefinition({
+    required this.id,
+    required this.name,
+    this.upstreamModelId,
+    this.quotaFamily,
+  });
 
   final String id;
   final String name;
+  final String? upstreamModelId;
+  final String? quotaFamily;
 
   factory RouterModelDefinition.fromJson(Map<String, dynamic> json) {
     return RouterModelDefinition(
       id: json['id'] as String,
       name: json['name'] as String,
+      upstreamModelId: json['upstreamModelId'] as String?,
+      quotaFamily: json['quotaFamily'] as String?,
     );
   }
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name};
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'upstreamModelId': upstreamModelId,
+    'quotaFamily': quotaFamily,
+  };
 }
 
 class RouterProviderDefinition {

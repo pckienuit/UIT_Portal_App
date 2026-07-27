@@ -5,17 +5,31 @@ enum AiMessageRole { system, user, assistant }
 enum AiMessageStatus { complete, streaming, failed, cancelled }
 
 class AiProviderModelDescriptor {
-  const AiProviderModelDescriptor({required this.id, required this.name});
+  const AiProviderModelDescriptor({
+    required this.id,
+    required this.name,
+    this.upstreamModelId,
+    this.quotaFamily,
+  });
 
   final String id;
   final String name;
+  final String? upstreamModelId;
+  final String? quotaFamily;
 
-  Map<String, String> toJson() => {'id': id, 'name': name};
+  Map<String, String?> toJson() => {
+    'id': id,
+    'name': name,
+    'upstreamModelId': upstreamModelId,
+    'quotaFamily': quotaFamily,
+  };
 
   factory AiProviderModelDescriptor.fromJson(Map<String, dynamic> json) =>
       AiProviderModelDescriptor(
         id: json['id'] as String,
         name: json['name'] as String? ?? json['id'] as String,
+        upstreamModelId: json['upstreamModelId'] as String?,
+        quotaFamily: json['quotaFamily'] as String?,
       );
 }
 

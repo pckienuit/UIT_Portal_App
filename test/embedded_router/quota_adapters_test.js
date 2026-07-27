@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   fetchQuota,
   listAntigravityModels,
+  listCodexModels,
   listGeminiModels,
 } = require('../../android/app/src/main/assets/nodejs-project/quota_adapters');
 
@@ -26,6 +27,70 @@ function parseDartQuotaSchema(payload) {
   }
   return payload;
 }
+
+test('Codex model refresh uses current client version and creates review variants', async () => {
+  let request;
+  const models = await listCodexModels({
+    runtimeToken: 'codex-token',
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return jsonResponse(200, { data: [{ id: 'gpt-5.6-sol', display_name: 'GPT 5.6 Sol' }] });
+    },
+  });
+
+  assert.equal(request.url, 'https://chatgpt.com/backend-api/codex/models?client_version=0.144.6');
+  assert.equal(request.options.headers.authorization, 'Bearer codex-token');
+  assert.equal(request.options.headers.originator, 'codex_cli_rs');
+  assert.deepEqual(models, [
+    { id: 'gpt-5.6-sol', name: 'GPT 5.6 Sol' },
+    { id: 'gpt-5.6-sol-review', name: 'GPT 5.6 Sol Review', upstreamModelId: 'gpt-5.6-sol', quotaFamily: 'review' },
+  ]);
+});
+
+test('Codex quota exposes session, weekly, and review windows', async () => {
+  let request;
+  const result = await fetchQuota({
+    connection: {
+      id: 'provider-codex',
+      providerId: 'codex',
+      baseUrl: 'https://chatgpt.com/backend-api',
+    },
+    secrets: { runtimeToken: 'codex-token' },
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return jsonResponse(200, {
+        plan_type: 'pro',
+        rate_limit: {
+          primary_window: { used_percent: 20, reset_at: '2026-07-28T01:00:00Z' },
+          secondary_window: { percent_used: 40, resets_at: '2026-08-03T01:00:00Z' },
+        },
+        code_review_rate_limit: {
+          primary_window: { used_percent: 60, reset_at: '2026-07-28T02:00:00Z' },
+          secondary_window: { used_percent: 80, reset_at: '2026-08-03T02:00:00Z' },
+        },
+      });
+    },
+    now: () => new Date('2026-07-27T12:00:00Z'),
+  });
+
+  assert.equal(request.url, 'https://chatgpt.com/backend-api/wham/usage');
+  assert.equal(request.options.headers.authorization, 'Bearer codex-token');
+  assert.equal(request.options.headers.originator, 'codex_cli_rs');
+  assert.deepEqual(parseDartQuotaSchema(result), {
+    status: 'fresh',
+    connectionId: 'provider-codex',
+    providerId: 'codex',
+    source: 'codex.backend-api/wham/usage',
+    plan: 'pro',
+    fetchedAt: '2026-07-27T12:00:00.000Z',
+    entries: [
+      { id: 'session', label: 'Session', used: 20, total: 100, remaining: 80, remainingPercent: 80, unit: 'percent', resetAt: '2026-07-28T01:00:00.000Z', unlimited: false },
+      { id: 'weekly', label: 'Weekly', used: 40, total: 100, remaining: 60, remainingPercent: 60, unit: 'percent', resetAt: '2026-08-03T01:00:00.000Z', unlimited: false },
+      { id: 'review_session', label: 'Review session', used: 60, total: 100, remaining: 40, remainingPercent: 40, unit: 'percent', resetAt: '2026-07-28T02:00:00.000Z', unlimited: false },
+      { id: 'review_weekly', label: 'Review weekly', used: 80, total: 100, remaining: 20, remainingPercent: 20, unit: 'percent', resetAt: '2026-08-03T02:00:00.000Z', unlimited: false },
+    ],
+  });
+});
 
 test('Gemini quota reports only upstream percentage and reset without fake totals', async () => {
   let request;

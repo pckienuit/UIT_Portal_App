@@ -103,6 +103,112 @@ async function retrieveAntigravityModels({ baseUrl, projectId, runtimeToken, fet
   };
 }
 
+const CODEX_MODELS_URL = 'https://chatgpt.com/backend-api/codex/models?client_version=0.144.6';
+
+async function listCodexModels({ runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
+  if (!runtimeToken) {
+    throw new QuotaError('missing_credential', 401, 'Model credential unavailable', 'error');
+  }
+  const payload = await fetchJson(CODEX_MODELS_URL, {
+    method: 'GET',
+    headers: {
+      authorization: `Bearer ${runtimeToken}`,
+      accept: 'application/json',
+      originator: 'codex_cli_rs',
+    },
+  }, fetchImpl, timeoutMs);
+  const rawModels = Array.isArray(payload)
+    ? payload
+    : (payload?.data || payload?.models || payload?.results || []);
+  if (!Array.isArray(rawModels)) {
+    throw new QuotaError('malformed', 502, 'Model payload malformed');
+  }
+  const models = [];
+  const ids = new Set();
+  for (const raw of rawModels) {
+    const id = typeof raw === 'string' ? raw : raw?.id || raw?.slug || raw?.model || raw?.name;
+    if (typeof id !== 'string' || !id.trim() || ids.has(id.trim())) continue;
+    const normalizedId = id.trim();
+    ids.add(normalizedId);
+    const name = typeof raw === 'object' && typeof (raw.display_name || raw.displayName || raw.name) === 'string'
+      ? (raw.display_name || raw.displayName || raw.name)
+      : normalizedId;
+    models.push({ id: normalizedId, name });
+    if ((raw?.type || 'llm') !== 'image' && !normalizedId.toLowerCase().includes('embed')) {
+      models.push({
+        id: `${normalizedId}-review`,
+        name: `${name} Review`,
+        upstreamModelId: normalizedId,
+        quotaFamily: 'review',
+      });
+    }
+  }
+  if (!models.length) throw new QuotaError('malformed', 502, 'Model payload malformed');
+  return models;
+}
+
+function codexQuotaWindow(id, label, window) {
+  if (!window || typeof window !== 'object') return null;
+  const used = numberOrNull(window.used_percent ?? window.percent_used);
+  if (used == null) return null;
+  const clampedUsed = Math.max(0, Math.min(100, used));
+  return {
+    id,
+    label,
+    used: clampedUsed,
+    total: 100,
+    remaining: 100 - clampedUsed,
+    remainingPercent: 100 - clampedUsed,
+    unit: 'percent',
+    resetAt: dateOrNull(window.reset_at ?? window.resets_at ?? window.resetAt),
+    unlimited: false,
+  };
+}
+
+function codexRateLimit(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  return payload.rate_limit && typeof payload.rate_limit === 'object'
+    ? payload.rate_limit
+    : payload;
+}
+
+function codexReviewRateLimit(payload) {
+  if (payload?.code_review_rate_limit || payload?.review_rate_limit) {
+    return payload.code_review_rate_limit || payload.review_rate_limit;
+  }
+  const byLimitId = payload?.rate_limits_by_limit_id;
+  if (byLimitId && typeof byLimitId === 'object' && !Array.isArray(byLimitId)) {
+    return byLimitId.code_review || byLimitId.codex_review || byLimitId.review || null;
+  }
+  const additional = Array.isArray(payload?.additional_rate_limits)
+    ? payload.additional_rate_limits
+    : [];
+  return additional.find((entry) => String(
+    entry?.limit_name || entry?.metered_feature || entry?.id || '',
+  ).toLowerCase().includes('review')) || null;
+}
+
+function normalizeCodex(connection, payload, now) {
+  const normal = codexRateLimit(
+    payload.rate_limit || payload.rate_limits || payload.rate_limits_by_limit_id?.codex,
+  );
+  const review = codexRateLimit(codexReviewRateLimit(payload));
+  const entries = [
+    codexQuotaWindow('session', 'Session', normal?.primary_window || normal?.primary),
+    codexQuotaWindow('weekly', 'Weekly', normal?.secondary_window || normal?.secondary),
+    codexQuotaWindow('review_session', 'Review session', review?.primary_window || review?.primary),
+    codexQuotaWindow('review_weekly', 'Review weekly', review?.secondary_window || review?.secondary),
+  ].filter(Boolean);
+  if (!entries.length) throw new QuotaError('malformed', 502, 'Quota payload malformed');
+  return snapshot(
+    connection,
+    payload.plan_type || payload.summary?.plan || null,
+    entries,
+    now,
+    'codex.backend-api/wham/usage',
+  );
+}
+
 async function listGeminiModels({ baseUrl, projectId, runtimeToken, fetchImpl = fetch, timeoutMs = 10000 }) {
   const payload = await retrieveGeminiQuota({
     baseUrl, projectId, runtimeToken, fetchImpl, timeoutMs,
@@ -305,10 +411,19 @@ async function fetchQuota({
     return normalizeOpenRouter(connection, payload, now);
   }
   if (connection.providerId === 'codex') {
-    // Codex usage is reported by the upstream ChatGPT client, not this router.
-    throw new QuotaError('unsupported', 501, 'Codex usage is reported by the upstream client, not the router.');
+    if (!secrets.runtimeToken) {
+      throw new QuotaError('missing_credential', 401, 'Quota credential unavailable', 'error');
+    }
+    const payload = await fetchJson(`${connection.baseUrl.replace(/\/$/, '')}/wham/usage`, {
+      headers: {
+        authorization: `Bearer ${secrets.runtimeToken}`,
+        accept: 'application/json',
+        originator: 'codex_cli_rs',
+      },
+    }, fetchImpl, timeoutMs);
+    return normalizeCodex(connection, payload, now);
   }
   throw new QuotaError('unsupported', 501, 'Quota is not available for this provider');
 }
 
-module.exports = { fetchQuota, listAntigravityModels, listGeminiModels, QuotaError };
+module.exports = { fetchQuota, listAntigravityModels, listCodexModels, listGeminiModels, QuotaError };

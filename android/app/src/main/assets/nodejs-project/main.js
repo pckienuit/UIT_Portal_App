@@ -5,7 +5,7 @@ const { timingSafeEqual, randomUUID } = require('node:crypto');
 const { createStateStore } = require('./state_store');
 const { createSseUsageParser } = require('./sse_usage');
 const { waitForDrainOrClose, writeWithBackpressure } = require('./stream_backpressure');
-const { fetchQuota, listAntigravityModels, listGeminiModels } = require('./quota_adapters');
+const { fetchQuota, listAntigravityModels, listCodexModels, listGeminiModels } = require('./quota_adapters');
 const {
   openAiToGeminiCli,
   geminiResponseToOpenAi,
@@ -62,6 +62,7 @@ try {
 
   const stateStore = createStateStore({ dataDir: DATA_DIR });
   const runtimeSecrets = new Map();
+  const refreshedModels = new Map();
   const refreshedQuota = new Set();
 
   const quotaSources = {
@@ -346,6 +347,19 @@ try {
           // fallback to configured models below
         }
       }
+      if (activeProvider.presetId === 'codex' && activeProvider.apiKey) {
+        try {
+          const models = await listCodexModels({ runtimeToken: activeProvider.apiKey });
+          if (models.length > 0) {
+            refreshedModels.set(activeProvider.id, models);
+            return sendJson(response, 200, {
+              data: listedModels(activeProvider, models, false, 'codex'),
+            });
+          }
+        } catch (_) {
+          // Static catalog remains usable when Codex discovery fails.
+        }
+      }
       if (activeProvider.presetId === 'antigravity') {
         if (!activeProvider.apiKey) {
           return sendJson(response, 502, { error: 'upstream_models_unavailable' });
@@ -453,19 +467,28 @@ try {
         let body = await parseJsonBody(request);
         const requestedStream = body.stream === true || activeProvider.presetId === 'codex';
         const rawModel = (typeof body.model === 'string' && body.model.trim()) ? body.model.trim() : '';
-        const catalogModelIds = new Set((activeProvider.models || []).map((model) =>
-          typeof model === 'string' ? model : model?.id,
-        ));
+        const managedModels = [
+          ...(Array.isArray(activeProvider.models) ? activeProvider.models : []),
+          ...(Array.isArray(activeProvider.customModels) ? activeProvider.customModels : []),
+          ...(refreshedModels.get(activeProvider.id) || []),
+        ].map((model) => typeof model === 'string' ? { id: model } : model)
+          .filter((model) => typeof model?.id === 'string' && model.id.trim())
+          .map((model) => ({ ...model, id: model.id.trim() }));
+        const managedModelById = new Map(managedModels.map((model) => [model.id, model]));
+        const isCodex = activeProvider.presetId === 'codex';
         const selectedModel = rawModel && rawModel !== 'ignored' &&
-          (activeProvider.presetId !== 'codex' || catalogModelIds.has(rawModel))
+          (!isCodex || managedModelById.has(rawModel))
           ? rawModel
           : activeProvider.modelId;
-        body.model = selectedModel;
+        const selectedDescriptor = managedModelById.get(selectedModel);
+        const upstreamModel = isCodex
+          ? (selectedDescriptor?.upstreamModelId || selectedModel)
+          : selectedModel;
+        body.model = upstreamModel;
         const isGeminiCli = activeProvider.presetId === 'gemini-cli' || activeProvider.presetId === 'antigravity';
         const isAnthropicMessages = activeProvider.transportKind === 'anthropicMessages';
         const isGeminiContent = activeProvider.transportKind === 'geminiContent';
         const isOllamaChat = activeProvider.transportKind === 'ollamaChat';
-        const isCodex = activeProvider.presetId === 'codex' || (typeof selectedModel === 'string' && selectedModel.toLowerCase().includes('codex'));
         const isOpenAiResponses = activeProvider.transportKind === 'openaiResponses' || isCodex;
 
         const headers = {
@@ -497,7 +520,7 @@ try {
           body = openAiToOllamaChat(body, selectedModel);
         }
         if (isOpenAiResponses) {
-          body = openAiToOpenAiResponses(body, selectedModel);
+          body = openAiToOpenAiResponses(body, upstreamModel, { isCodex });
           if (isCodex) body.stream = true;
         }
 
@@ -706,7 +729,7 @@ try {
             timestamp: new Date().toISOString(),
             providerId: activeProvider.presetId || activeProvider.id,
             connectionId: activeProvider.id,
-            modelId: activeProvider.modelId,
+            modelId: selectedModel,
             status: upstreamResponse.ok ? 'success' : 'error',
             promptTokens: usage.promptTokens,
             completionTokens: usage.completionTokens,

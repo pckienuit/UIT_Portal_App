@@ -37,6 +37,7 @@
       "modelsUrl": null,
       "authHeader": "Authorization",
       "authScheme": "Bearer",
+      "quotaAdapter": "codex",
       "tokenRefresh": "refreshToken",
       "defaultBaseUrl": "https://chatgpt.com/backend-api"
     },
