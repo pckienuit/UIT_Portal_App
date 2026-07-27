@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../ai_chat_providers.dart';
 import '../data/ai_provider_repository.dart';
 import '../data/router_admin_client.dart';
 import 'router_runtime_service.dart';
@@ -274,11 +273,8 @@ class AiProviderController extends Notifier<AiProviderState> {
     }
 
     await _repository.deleteProvider(id);
-    try {
-      await (await ref.read(
-        chatHistoryStoreProvider.future,
-      )).deleteForProvider(id);
-    } catch (_) {}
+    // ponytail: Phase 6 keeps old conversations visible but route-unavailable.
+    // Do not delete history or silently reroute it after an account is removed.
 
     final providers = _repository.listProviders();
     String? activeId = _repository.getActiveProviderId();

@@ -25,7 +25,8 @@ void main() {
     final convo = AiConversation(
       id: 'c-1',
       title: 'Test',
-      providerId: 'p-1',
+      connectionId: 'p-1',
+      providerKey: 'p',
       modelId: 'm-1',
       messages: [
         AiChatMessage(
@@ -52,7 +53,8 @@ void main() {
       return AiConversation(
         id: 'c-$i',
         title: 'Title $i',
-        providerId: 'p-1',
+        connectionId: 'p-1',
+        providerKey: 'p',
         modelId: 'm-1',
         messages: List.generate(120, (m) {
           return AiChatMessage(
@@ -96,22 +98,33 @@ void main() {
     expect(backupFound, isTrue);
   });
 
-  test('deletes only conversations scoped to one provider', () async {
-    AiConversation conversation(String id, String providerId) => AiConversation(
-      id: id,
-      title: id,
-      providerId: providerId,
-      modelId: 'model',
-      messages: const [],
-      updatedAt: DateTime(2026),
+  test('migrates v1 provider ID into an exact canonical route', () async {
+    final file = File('${tempDir.path}/conversations.json');
+    await file.writeAsString(
+      '''
+      {
+        "version": 1,
+        "conversations": [{
+          "id": "legacy-github",
+          "title": "Legacy",
+          "providerId": "github-account-1",
+          "modelId": "gpt-5.4",
+          "messages": [],
+          "updatedAt": "2026-07-27T00:00:00.000"
+        }]
+      }
+      ''',
+      flush: true,
     );
-    await store.writeHistory([
-      conversation('target', 'provider-github'),
-      conversation('keep', 'provider-gemini-cli'),
-    ]);
 
-    await store.deleteForProvider('provider-github');
+    final history = await store.readHistory(
+      providerKeyForConnection: (connectionId) =>
+          connectionId == 'github-account-1' ? 'gh' : null,
+    );
 
-    expect((await store.readHistory()).map((item) => item.id), ['keep']);
+    expect(history.single.connectionId, 'github-account-1');
+    expect(history.single.providerKey, 'gh');
+    expect(history.single.modelId, 'gpt-5.4');
   });
+
 }

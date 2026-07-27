@@ -74,13 +74,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   void _showModelPicker() {
-    final activeProvider = ref.read(aiChatControllerProvider).activeProvider;
+    final state = ref.read(aiChatControllerProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => AiModelPickerSheet(
-        currentModelId: activeProvider?.modelId ?? '',
-        onModelSelected: (modelId, providerId) async {
+        currentModelId: state.activeConversation?.canonicalModelId ?? '',
+        onModelSelected: (connectionId, model) async {
           if (ref.read(aiChatControllerProvider).isGenerating) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -91,11 +91,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             );
             return;
           }
-          if (providerId != null && providerId.isNotEmpty) {
-            await ref
-                .read(aiChatControllerProvider.notifier)
-                .selectConversationModel(providerId, modelId);
-          }
+          await ref
+              .read(aiChatControllerProvider.notifier)
+              .selectConversationModel(
+                connectionId: connectionId,
+                model: model,
+              );
         },
       ),
     );
@@ -149,7 +150,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 ),
                 child: ActionChip(
                   label: Text(
-                    '${state.activeProvider!.name} · ${state.activeProvider!.modelId}',
+                    '${state.activeProvider!.name} · ${conversation?.canonicalModelId ?? state.activeProvider!.modelId}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 10), // reduced size

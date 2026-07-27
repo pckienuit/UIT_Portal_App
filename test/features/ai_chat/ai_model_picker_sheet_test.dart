@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_model_manager_sheet.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_model_picker_sheet.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -157,8 +158,8 @@ void main() {
         ],
       ),
     ]);
-    String? selectedModel;
-    String? selectedProvider;
+    String? selectedCanonicalModel;
+    String? selectedConnection;
     final container = ProviderContainer(
       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
     );
@@ -170,10 +171,10 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: AiModelPickerSheet(
-              currentModelId: 'built-in',
-              onModelSelected: (modelId, providerId) async {
-                selectedModel = modelId;
-                selectedProvider = providerId;
+              currentModelId: 'provider-one/built-in',
+              onModelSelected: (connectionId, model) async {
+                selectedCanonicalModel = model.canonicalId;
+                selectedConnection = connectionId;
               },
             ),
           ),
@@ -184,12 +185,78 @@ void main() {
     await tester.tap(find.text('Custom model'));
     await tester.pump();
 
-    expect(selectedModel, 'custom-model');
-    expect(selectedProvider, 'provider-one');
+    expect(selectedCanonicalModel, 'provider-one/custom-model');
+    expect(selectedConnection, 'provider-one');
     expect(
       container.read(aiProviderControllerProvider).providers.single.modelId,
       'built-in',
     );
+  });
+
+  testWidgets('picker groups shared provider accounts onto first connection', (
+    tester,
+  ) async {
+    await RouterCatalog.load(
+      jsonEncode({
+        'providers': [
+          {
+            'id': 'github',
+            'alias': 'gh',
+            'name': 'GitHub',
+            'category': 'oauth',
+            'disposition': 'ready',
+            'mobileSupported': true,
+            'androidAuth': 'device',
+            'nativeStatus': 'ready',
+            'transportKind': 'githubCopilot',
+            'chatUrl': 'https://example.test/chat',
+            'models': [
+              {'id': 'shared-model', 'name': 'Shared model'},
+            ],
+          },
+        ],
+      }),
+    );
+    await _seedProviders(prefs, [
+      _provider(
+        id: 'github-first',
+        modelId: 'shared-model',
+        presetId: 'github',
+      ),
+      _provider(
+        id: 'github-second',
+        modelId: 'shared-model',
+        presetId: 'github',
+      ),
+    ]);
+    String? selectedConnection;
+    final container = ProviderContainer(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: AiModelPickerSheet(
+              currentModelId: '',
+              onModelSelected: (connectionId, _) async {
+                selectedConnection = connectionId;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final sharedModel = find.text('Shared model');
+    expect(sharedModel, findsOneWidget);
+    await tester.tap(sharedModel);
+    await tester.pump();
+    expect(selectedConnection, 'github-first');
   });
 
   testWidgets('manager shows cached refresh as suggestion with exact label', (
@@ -199,6 +266,7 @@ void main() {
       _provider(
         id: 'provider-one',
         modelId: 'built-in',
+        presetId: 'legacy-custom',
         models: const [
           {'id': 'built-in', 'name': 'Built in'},
         ],

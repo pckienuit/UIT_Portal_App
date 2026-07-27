@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import '../application/router_runtime_service.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+import '../domain/ai_model_ref.dart';
 import 'local_llama_backend.dart';
 import 'local_model_catalog.dart';
 import 'openai_compatible_backend.dart';
@@ -28,7 +29,10 @@ class AiBackendFactory {
   static String embeddedCoreBaseUrl(String runtimeBaseUrl) =>
       '${runtimeBaseUrl.replaceFirst(RegExp(r'/$'), '')}/v1';
 
-  Future<AiChatBackend?> buildBackend(AiProviderConfig config) async {
+  Future<AiChatBackend?> buildBackend(
+    AiProviderConfig config, {
+    AiModelRef? model,
+  }) async {
     final repository =
         ref.read(aiProviderRepositoryProvider) as AiProviderRepository;
 
@@ -56,7 +60,7 @@ class AiBackendFactory {
     if (shouldUseEmbeddedCore(config, runtimeState)) {
       return OpenAiCompatibleBackend(
         baseUrl: embeddedCoreBaseUrl(runtimeState.baseUrl!),
-        modelId: config.modelId,
+        modelId: model?.canonicalId ?? config.modelId,
         apiKey: runtimeState.bearer!,
         connectionId: config.id,
       );

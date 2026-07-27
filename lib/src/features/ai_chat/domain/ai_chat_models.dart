@@ -246,7 +246,8 @@ class AiConversation {
   const AiConversation({
     required this.id,
     required this.title,
-    required this.providerId,
+    required this.connectionId,
+    required this.providerKey,
     required this.modelId,
     required this.messages,
     required this.updatedAt,
@@ -254,26 +255,35 @@ class AiConversation {
 
   final String id;
   final String title;
-  final String providerId;
+  final String connectionId;
+  final String providerKey;
   final String modelId;
   final List<AiChatMessage> messages;
   final DateTime updatedAt;
 
+  String get canonicalModelId => '$providerKey/$modelId';
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
-    'providerId': providerId,
+    'connectionId': connectionId,
+    'providerKey': providerKey,
     'modelId': modelId,
     'messages': messages.map((m) => m.toJson()).toList(),
     'updatedAt': updatedAt.toIso8601String(),
   };
 
-  factory AiConversation.fromJson(Map<String, dynamic> json) {
+  factory AiConversation.fromJson(
+    Map<String, dynamic> json, {
+    String? legacyProviderKey,
+  }) {
     final messagesList = json['messages'] as List<dynamic>? ?? [];
     return AiConversation(
       id: json['id'] as String,
       title: json['title'] as String,
-      providerId: json['providerId'] as String,
+      connectionId:
+          json['connectionId']?.toString() ?? json['providerId']?.toString() ?? '',
+      providerKey: json['providerKey']?.toString() ?? legacyProviderKey ?? '',
       modelId: json['modelId'] as String,
       messages: messagesList
           .map((e) => AiChatMessage.fromJson(e as Map<String, dynamic>))
@@ -281,4 +291,21 @@ class AiConversation {
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
+
+  AiConversation copyWith({
+    String? title,
+    String? connectionId,
+    String? providerKey,
+    String? modelId,
+    List<AiChatMessage>? messages,
+    DateTime? updatedAt,
+  }) => AiConversation(
+    id: id,
+    title: title ?? this.title,
+    connectionId: connectionId ?? this.connectionId,
+    providerKey: providerKey ?? this.providerKey,
+    modelId: modelId ?? this.modelId,
+    messages: messages ?? this.messages,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 }

@@ -4,21 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
 import '../application/ai_provider_controller.dart';
+import '../application/ai_provider_model_controller.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/ai_model_ref.dart';
+import '../domain/ai_provider_model_settings.dart';
 import '../domain/managed_provider_models.dart';
+import '../domain/router_catalog.dart';
 
 class GlobalModelOption {
   const GlobalModelOption({
-    required this.providerId,
+    required this.connectionId,
     required this.providerName,
-    required this.modelId,
+    required this.model,
     required this.modelName,
     this.capabilities = const AiModelCapabilities(),
   });
 
-  final String providerId;
+  final String connectionId;
   final String providerName;
-  final String modelId;
+  final AiModelRef model;
   final String modelName;
   final AiModelCapabilities capabilities;
 }
@@ -31,7 +35,7 @@ class AiModelPickerSheet extends ConsumerStatefulWidget {
   });
 
   final String currentModelId;
-  final Future<void> Function(String modelId, String? providerId)
+  final Future<void> Function(String connectionId, AiModelRef model)
   onModelSelected;
 
   @override
@@ -55,19 +59,38 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     final providerState = ref.watch(aiProviderControllerProvider);
     final activeProvider = ref.watch(aiChatControllerProvider).activeProvider;
+    final modelState = ref.watch(aiProviderModelControllerProvider);
     final allOptions = <GlobalModelOption>[];
+    final handledProviderKeys = <String>{};
 
     for (final config in providerState.providers) {
-      final catalog = resolveManagedProviderModels(
-        config,
-        providerState.models[config.id] ?? const <AiModelOption>[],
-      );
+      final providerKey = providerKeyFor(config);
+      if (!handledProviderKeys.add(providerKey)) continue;
+      final definition = RouterCatalog.byId(config.presetId ?? '');
+      final useLegacyCatalog =
+          definition == null ||
+          (definition.models.isEmpty &&
+              modelState.settings[providerKey] == null &&
+              modelState.discoveredModels[providerKey] == null);
+      final catalog = useLegacyCatalog
+          ? resolveManagedProviderModels(
+              config,
+              providerState.models[config.id] ?? const <AiModelOption>[],
+            )
+          : resolveManagedProviderModelsForDefinition(
+              definition,
+              modelState.settings[providerKey] ??
+                  AiProviderModelSettings(providerKey: providerKey),
+              modelState.discoveredModels[providerKey] ??
+                  providerState.models[config.id] ??
+                  const <AiModelOption>[],
+            );
       for (final model in catalog.visible.where((model) => model.managed)) {
         allOptions.add(
           GlobalModelOption(
-            providerId: config.id,
+            connectionId: config.id,
             providerName: config.name,
-            modelId: model.id,
+            model: AiModelRef.parse('$providerKey/${model.id}'),
             modelName: model.name,
             capabilities: model.capabilities,
           ),
@@ -77,7 +100,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
 
     final query = _searchQuery.toLowerCase();
     final filteredOptions = allOptions.where((option) {
-      return option.modelId.toLowerCase().contains(query) ||
+      return option.model.modelId.toLowerCase().contains(query) ||
           option.modelName.toLowerCase().contains(query) ||
           option.providerName.toLowerCase().contains(query);
     }).toList();
@@ -143,11 +166,13 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                         itemBuilder: (context, index) {
                           final option = filteredOptions[index];
                           final isSelected = _selectedOption != null
-                              ? _selectedOption!.providerId ==
-                                        option.providerId &&
-                                    _selectedOption!.modelId == option.modelId
-                              : activeProvider?.id == option.providerId &&
-                                    widget.currentModelId == option.modelId;
+                              ? _selectedOption!.connectionId ==
+                                        option.connectionId &&
+                                    _selectedOption!.model.canonicalId ==
+                                        option.model.canonicalId
+                              : activeProvider?.id == option.connectionId &&
+                                    widget.currentModelId ==
+                                        option.model.canonicalId;
                           return ListTile(
                             title: Text(
                               option.modelName,
@@ -161,7 +186,7 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${option.modelId} • Provider: ${option.providerName}',
+                                  '${option.model.canonicalId} • Provider: ${option.providerName}',
                                   style: textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -178,8 +203,8 @@ class _AiModelPickerSheetState extends ConsumerState<AiModelPickerSheet> {
                             onTap: () async {
                               setState(() => _selectedOption = option);
                               await widget.onModelSelected(
-                                option.modelId,
-                                option.providerId,
+                                option.connectionId,
+                                option.model,
                               );
                               if (context.mounted &&
                                   Navigator.of(context).canPop()) {

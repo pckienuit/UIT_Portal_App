@@ -1,13 +1,20 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../ai_chat_providers.dart';
-import '../../auth/auth_providers.dart';
+
 import '../../auth/auth_controller.dart';
+import '../../auth/auth_providers.dart';
+import '../ai_chat_providers.dart';
 import '../data/ai_backend_factory.dart';
 import '../data/ai_provider_repository.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
+import '../domain/ai_model_ref.dart';
+import '../domain/ai_provider_model_settings.dart';
+import '../domain/managed_provider_models.dart';
+import '../domain/router_catalog.dart';
 import 'ai_provider_controller.dart';
+import 'ai_provider_model_controller.dart';
 
 List<AiChatMessage> completedMessagesForRequest(
   Iterable<AiChatMessage> messages,
@@ -68,7 +75,7 @@ class AiChatController extends Notifier<AiChatState> {
       final conversation = state.activeConversation;
       if (conversation != null) {
         if (prev == null || !identical(prev.providers, next.providers)) {
-          _reloadConversationRuntime(conversation, next);
+          unawaited(_reloadConversationRuntime(conversation, next));
         }
         return;
       }
@@ -77,13 +84,12 @@ class AiChatController extends Notifier<AiChatState> {
       final nextConfig = _getActiveConfig(next);
       if (previousConfig?.id != nextConfig?.id ||
           previousConfig?.modelId != nextConfig?.modelId) {
-        _handleActiveProviderChanged(next);
+        unawaited(_handleActiveProviderChanged(next));
       }
     });
 
     final authState = ref.watch(authControllerProvider);
     if (authState.status == AuthStatus.signedOut) {
-      // Đăng xuất: Clear file history bất đồng bộ, trả về state rỗng ngay lập tức
       Future.microtask(() async {
         if (!ref.mounted) return;
         _streamSub?.cancel();
@@ -104,30 +110,39 @@ class AiChatController extends Notifier<AiChatState> {
   AiChatState _init() {
     final providerState = ref.read(aiProviderControllerProvider);
     final activeConfig = _getActiveConfig(providerState);
-    if (activeConfig != null) {
-      unawaited(_loadBackend(activeConfig));
-    }
 
     ref.read(chatHistoryStoreProvider.future).then((store) async {
-      final history = await store.readHistory();
-      if (ref.mounted) {
-        final restoredConversation = history.isEmpty ? null : history.first;
-        final runtimeConfig = restoredConversation == null
-            ? state.activeProvider
-            : _runtimeConfigForConversation(
-                ref.read(aiProviderControllerProvider),
-                restoredConversation,
-              );
-        state = state.copyWith(
-          conversations: history,
-          activeProvider: () => runtimeConfig,
-          activeConversation: () => restoredConversation,
-        );
-        if (runtimeConfig != null) {
-          await _loadBackend(runtimeConfig);
-        } else if (restoredConversation != null) {
-          await _clearBackend();
-        }
+      final history = await store.readHistory(
+        providerKeyForConnection: (connectionId) {
+          final config = ref
+              .read(aiProviderControllerProvider)
+              .providers
+              .where((item) => item.id == connectionId)
+              .firstOrNull;
+          return config == null ? null : providerKeyFor(config);
+        },
+      );
+      if (!ref.mounted) return;
+
+      final restoredConversation = history.isEmpty ? null : history.first;
+      final runtimeConfig = restoredConversation == null
+          ? state.activeProvider
+          : _runtimeConfigForConversation(
+              ref.read(aiProviderControllerProvider),
+              restoredConversation,
+            );
+      state = state.copyWith(
+        conversations: history,
+        activeProvider: () => runtimeConfig,
+        activeConversation: () => restoredConversation,
+        errorMessage: () => restoredConversation != null && runtimeConfig == null
+            ? 'Connection cho hội thoại không còn khả dụng. Hãy chọn model lại.'
+            : null,
+      );
+      if (runtimeConfig != null && restoredConversation != null) {
+        await _activateConversationRoute(restoredConversation);
+      } else if (restoredConversation != null) {
+        await _clearBackend();
       }
     });
 
@@ -138,7 +153,7 @@ class AiChatController extends Notifier<AiChatState> {
     final activeId = providerState.activeProviderId;
     if (activeId == null) return null;
     try {
-      return providerState.providers.firstWhere((e) => e.id == activeId);
+      return providerState.providers.firstWhere((config) => config.id == activeId);
     } catch (_) {
       return null;
     }
@@ -149,9 +164,23 @@ class AiChatController extends Notifier<AiChatState> {
     AiConversation conversation,
   ) {
     final config = providerState.providers
-        .where((item) => item.id == conversation.providerId)
+        .where(
+          (item) =>
+              item.id == conversation.connectionId &&
+              providerKeyFor(item) == conversation.providerKey,
+        )
         .firstOrNull;
-    return config?.copyWith(modelId: conversation.modelId);
+    if (config == null) return null;
+    AiModelRef model;
+    try {
+      model = _modelRef(conversation);
+    } on FormatException {
+      return null;
+    }
+    if (!_isSelectableModel(config, model)) {
+      return null;
+    }
+    return config.copyWith(modelId: conversation.modelId);
   }
 
   Future<void> _reloadConversationRuntime(
@@ -165,11 +194,11 @@ class AiChatController extends Notifier<AiChatState> {
     state = state.copyWith(
       activeProvider: () => runtimeConfig,
       errorMessage: () => runtimeConfig == null
-          ? 'Conversation provider no longer exists.'
+          ? 'Connection cho hội thoại không còn khả dụng. Hãy chọn model lại.'
           : null,
     );
     if (runtimeConfig != null) {
-      await _loadBackend(runtimeConfig);
+      await _loadBackend(runtimeConfig, model: _modelRef(conversation));
     } else {
       await _clearBackend();
     }
@@ -179,23 +208,27 @@ class AiChatController extends Notifier<AiChatState> {
     AiProviderState providerState,
   ) async {
     final activeConfig = _getActiveConfig(providerState);
+    final model = activeConfig == null ? null : _legacyModelForConnection(activeConfig);
     state = state.copyWith(
       activeProvider: () => activeConfig,
       errorMessage: () => null,
     );
 
-    if (activeConfig != null) {
-      await _loadBackend(activeConfig);
+    if (activeConfig != null && model != null) {
+      await _loadBackend(activeConfig, model: model);
     } else {
       await _clearBackend();
     }
   }
 
-  Future<void> _loadBackend(AiProviderConfig config) async {
+  Future<void> _loadBackend(
+    AiProviderConfig config, {
+    required AiModelRef model,
+  }) async {
     final generation = ++_backendGeneration;
     final previousBackend = _activeBackend;
     _activeBackend = null;
-    final transition = _buildBackend(config, previousBackend, generation);
+    final transition = _buildBackend(config, previousBackend, generation, model);
     _backendTransition = transition;
     try {
       await transition;
@@ -210,13 +243,14 @@ class AiChatController extends Notifier<AiChatState> {
     AiProviderConfig config,
     AiChatBackend? previousBackend,
     int generation,
+    AiModelRef model,
   ) async {
     await previousBackend?.dispose();
     if (!ref.mounted || generation != _backendGeneration) return;
 
     final secureStorage = ref.read(secureStorageProvider);
     final factory = AiBackendFactory(ref: ref, secureStorage: secureStorage);
-    final backend = await factory.buildBackend(config);
+    final backend = await factory.buildBackend(config, model: model);
     if (!ref.mounted || generation != _backendGeneration) {
       await backend?.dispose();
       return;
@@ -239,26 +273,32 @@ class AiChatController extends Notifier<AiChatState> {
         .selectActiveProvider(config.id);
   }
 
-  Future<void> selectConversationModel(
-    String providerId,
-    String modelId,
-  ) async {
+  Future<void> selectConversationModel({
+    required String connectionId,
+    required AiModelRef model,
+  }) async {
     if (state.isGenerating) return;
 
     final providerState = ref.read(aiProviderControllerProvider);
     final targetConfig = providerState.providers
-        .where((p) => p.id == providerId)
+        .where((config) => config.id == connectionId)
         .firstOrNull;
-    if (targetConfig == null) return;
-
-    final managedModelIds = {
-      targetConfig.modelId,
-      ...targetConfig.models.map((model) => model.id),
-      ...targetConfig.customModels.map((model) => model.id),
-      ...?providerState.models[providerId]?.map((model) => model.id),
-    };
-    if (!managedModelIds.contains(modelId) ||
-        targetConfig.hiddenModelIds.contains(modelId)) {
+    if (targetConfig == null) {
+      state = state.copyWith(
+        errorMessage: () => 'Connection đã chọn không còn tồn tại.',
+      );
+      return;
+    }
+    if (providerKeyFor(targetConfig) != model.providerKey) {
+      state = state.copyWith(
+        errorMessage: () => 'Route model không khớp connection đã chọn.',
+      );
+      return;
+    }
+    if (!_isSelectableModel(targetConfig, model)) {
+      state = state.copyWith(
+        errorMessage: () => 'Model không còn khả dụng. Hãy chọn model khác.',
+      );
       return;
     }
 
@@ -267,17 +307,16 @@ class AiChatController extends Notifier<AiChatState> {
         ? AiConversation(
             id: 'conv-${DateTime.now().microsecondsSinceEpoch}',
             title: 'New conversation',
-            providerId: providerId,
-            modelId: modelId,
+            connectionId: connectionId,
+            providerKey: model.providerKey,
+            modelId: model.modelId,
             messages: const [],
             updatedAt: DateTime.now(),
           )
-        : AiConversation(
-            id: current.id,
-            title: current.title,
-            providerId: providerId,
-            modelId: modelId,
-            messages: current.messages,
+        : current.copyWith(
+            connectionId: connectionId,
+            providerKey: model.providerKey,
+            modelId: model.modelId,
             updatedAt: DateTime.now(),
           );
     final conversations = List<AiConversation>.from(state.conversations);
@@ -287,7 +326,7 @@ class AiChatController extends Notifier<AiChatState> {
     }
     conversations.insert(0, conversation);
 
-    final runtimeConfig = targetConfig.copyWith(modelId: modelId);
+    final runtimeConfig = targetConfig.copyWith(modelId: model.modelId);
     state = state.copyWith(
       activeProvider: () => runtimeConfig,
       activeConversation: () => conversation,
@@ -295,21 +334,33 @@ class AiChatController extends Notifier<AiChatState> {
       errorMessage: () => null,
     );
 
-    final backendTransition = _loadBackend(runtimeConfig);
+    final backendTransition = _loadBackend(runtimeConfig, model: model);
     final store = await ref.read(chatHistoryStoreProvider.future);
     await store.writeHistory(conversations);
     await backendTransition;
   }
 
   Future<bool> _activateConversationRoute(AiConversation conversation) async {
+    AiModelRef model;
+    try {
+      model = _modelRef(conversation);
+    } on FormatException {
+      state = state.copyWith(
+        errorMessage: () => 'Route model của hội thoại không hợp lệ. Hãy chọn model lại.',
+      );
+      await _clearBackend();
+      return false;
+    }
     final runtimeConfig = _runtimeConfigForConversation(
       ref.read(aiProviderControllerProvider),
       conversation,
     );
     if (runtimeConfig == null) {
       state = state.copyWith(
-        errorMessage: () => 'Conversation provider no longer exists.',
+        errorMessage: () =>
+            'Connection hoặc model của hội thoại không còn khả dụng. Hãy chọn model lại.',
       );
+      await _clearBackend();
       return false;
     }
     state = state.copyWith(
@@ -317,32 +368,41 @@ class AiChatController extends Notifier<AiChatState> {
       activeConversation: () => conversation,
       errorMessage: () => null,
     );
-    await _loadBackend(runtimeConfig);
+    await _loadBackend(runtimeConfig, model: model);
     return true;
   }
 
   Future<void> startNewConversation() async {
-    if (state.activeProvider == null) return;
+    final config = state.activeProvider;
+    if (config == null) return;
+    final model = _legacyModelForConnection(config);
+    if (model == null || !_isSelectableModel(config, model)) {
+      state = state.copyWith(
+        errorMessage: () => 'Hãy chọn model trước khi bắt đầu hội thoại.',
+      );
+      return;
+    }
 
-    final newConv = AiConversation(
+    final newConversation = AiConversation(
       id: 'conv-${DateTime.now().microsecondsSinceEpoch}',
       title: 'Hội thoại mới',
-      providerId: state.activeProvider!.id,
-      modelId: state.activeProvider!.modelId,
-      messages: [],
+      connectionId: config.id,
+      providerKey: model.providerKey,
+      modelId: model.modelId,
+      messages: const [],
       updatedAt: DateTime.now(),
     );
-
-    final List<AiConversation> list = List.from(state.conversations)
-      ..insert(0, newConv);
+    final conversations = List<AiConversation>.from(state.conversations)
+      ..insert(0, newConversation);
     state = state.copyWith(
-      conversations: list,
-      activeConversation: () => newConv,
+      conversations: conversations,
+      activeConversation: () => newConversation,
       errorMessage: () => null,
     );
 
     final store = await ref.read(chatHistoryStoreProvider.future);
-    await store.writeHistory(list);
+    await store.writeHistory(conversations);
+    await _loadBackend(config.copyWith(modelId: model.modelId), model: model);
   }
 
   Future<void> switchConversation(String id) async {
@@ -356,22 +416,18 @@ class AiChatController extends Notifier<AiChatState> {
   }
 
   Future<void> deleteConversation(String id) async {
-    final list = List<AiConversation>.from(state.conversations)
-      ..removeWhere((e) => e.id == id);
-
-    AiConversation? newActive;
-    if (state.activeConversation?.id == id) {
-      newActive = list.isNotEmpty ? list.first : null;
-    } else {
-      newActive = state.activeConversation;
-    }
+    final conversations = List<AiConversation>.from(state.conversations)
+      ..removeWhere((conversation) => conversation.id == id);
 
     final deletedActiveConversation = state.activeConversation?.id == id;
-    state = state.copyWith(conversations: list, errorMessage: () => null);
+    final nextActive = deletedActiveConversation
+        ? (conversations.isEmpty ? null : conversations.first)
+        : state.activeConversation;
+    state = state.copyWith(conversations: conversations, errorMessage: () => null);
 
     if (deletedActiveConversation) {
-      if (newActive != null) {
-        await _activateConversationRoute(newActive);
+      if (nextActive != null) {
+        await _activateConversationRoute(nextActive);
       } else {
         state = state.copyWith(
           activeProvider: () => null,
@@ -382,7 +438,7 @@ class AiChatController extends Notifier<AiChatState> {
     }
 
     final store = await ref.read(chatHistoryStoreProvider.future);
-    await store.writeHistory(list);
+    await store.writeHistory(conversations);
   }
 
   Future<void> sendMessage(
@@ -390,68 +446,59 @@ class AiChatController extends Notifier<AiChatState> {
     AiPortalContextSnapshot? contextSnapshot,
   }) async {
     if (state.isGenerating || text.trim().isEmpty) return;
+
+    var conversation = state.activeConversation;
+    if (conversation == null) {
+      await startNewConversation();
+      conversation = state.activeConversation;
+    } else if (!await _activateConversationRoute(conversation)) {
+      return;
+    }
+    if (conversation == null) return;
+
     final backendTransition = _backendTransition;
     if (backendTransition != null) {
       try {
         await backendTransition;
       } catch (_) {}
     }
-    if (state.activeProvider == null || _activeBackend == null) {
+    if (_activeBackend == null || state.activeProvider == null) {
       state = state.copyWith(
-        errorMessage: () => 'Chưa cấu hình mô hình trợ lý AI.',
+        errorMessage: () =>
+            'Connection hoặc model của hội thoại không còn khả dụng. Hãy chọn model lại.',
       );
       return;
     }
 
-    var currentConv = state.activeConversation;
-    if (currentConv == null) {
-      await startNewConversation();
-      currentConv = state.activeConversation;
-    } else if (currentConv.providerId != state.activeProvider!.id ||
-        currentConv.modelId != state.activeProvider!.modelId) {
-      if (!await _activateConversationRoute(currentConv)) return;
-    }
-    if (currentConv == null) return;
-
-    final userMsg = AiChatMessage(
+    final userMessage = AiChatMessage(
       id: 'msg-usr-${DateTime.now().microsecondsSinceEpoch}',
       role: AiMessageRole.user,
       content: text,
       createdAt: DateTime.now(),
       status: AiMessageStatus.complete,
     );
-
-    final updatedMessages = List<AiChatMessage>.from(currentConv.messages)
-      ..add(userMsg);
+    final updatedMessages = List<AiChatMessage>.from(conversation.messages)
+      ..add(userMessage);
     final requestMessages = completedMessagesForRequest(updatedMessages);
-
-    final title = currentConv.messages.isEmpty
+    final title = conversation.messages.isEmpty
         ? (text.length > 48 ? '${text.substring(0, 48)}...' : text)
-        : currentConv.title;
+        : conversation.title;
 
-    var updatedConvo = AiConversation(
-      id: currentConv.id,
+    var updatedConversation = conversation.copyWith(
       title: title,
-      providerId: currentConv.providerId,
-      modelId: currentConv.modelId,
       messages: updatedMessages,
       updatedAt: DateTime.now(),
     );
-
-    _updateConversationInList(updatedConvo);
+    _updateConversationInList(updatedConversation);
     state = state.copyWith(isGenerating: true, errorMessage: () => null);
 
-    final assistantMsgId = 'msg-ast-${DateTime.now().microsecondsSinceEpoch}';
+    final assistantMessageId = 'msg-ast-${DateTime.now().microsecondsSinceEpoch}';
     var assistantContent = '';
-    updatedConvo = AiConversation(
-      id: updatedConvo.id,
-      title: updatedConvo.title,
-      providerId: updatedConvo.providerId,
-      modelId: updatedConvo.modelId,
+    updatedConversation = updatedConversation.copyWith(
       messages: [
         ...updatedMessages,
         AiChatMessage(
-          id: assistantMsgId,
+          id: assistantMessageId,
           role: AiMessageRole.assistant,
           content: '',
           createdAt: DateTime.now(),
@@ -460,55 +507,45 @@ class AiChatController extends Notifier<AiChatState> {
       ],
       updatedAt: DateTime.now(),
     );
-    _updateConversationInList(updatedConvo);
+    _updateConversationInList(updatedConversation);
 
-    final req = AiChatRequest(
+    final request = AiChatRequest(
       config: state.activeProvider!,
       apiKey: '',
       messages: requestMessages,
       context: contextSnapshot,
-      modelId: updatedConvo.modelId,
+      modelId: updatedConversation.canonicalModelId,
     );
 
     _streamSub = _activeBackend!
-        .streamChat(req)
+        .streamChat(request)
         .listen(
           (event) {
             if (!ref.mounted) return;
-            if (event.type == AiStreamEventType.chunk &&
-                event.content != null) {
+            if (event.type == AiStreamEventType.chunk && event.content != null) {
               assistantContent += event.content!;
-
-              final astMsg = AiChatMessage(
-                id: assistantMsgId,
+              final assistantMessage = AiChatMessage(
+                id: assistantMessageId,
                 role: AiMessageRole.assistant,
                 content: assistantContent,
                 createdAt: DateTime.now(),
                 status: AiMessageStatus.streaming,
               );
-
-              final messagesWithStream = List<AiChatMessage>.from(
-                updatedMessages,
-              )..add(astMsg);
-              updatedConvo = AiConversation(
-                id: updatedConvo.id,
-                title: updatedConvo.title,
-                providerId: updatedConvo.providerId,
-                modelId: updatedConvo.modelId,
-                messages: messagesWithStream,
+              updatedConversation = updatedConversation.copyWith(
+                messages: [...updatedMessages, assistantMessage],
                 updatedAt: DateTime.now(),
               );
-              _updateConversationInList(updatedConvo);
+              _updateConversationInList(updatedConversation);
             } else if (event.type == AiStreamEventType.done) {
               _finalizeActiveConversation(
-                assistantMsgId,
+                assistantMessageId,
                 assistantContent,
                 AiMessageStatus.complete,
               );
             } else if (event.type == AiStreamEventType.error) {
               state = state.copyWith(errorMessage: () => event.errorMessage);
               _finalizeActiveConversation(
-                assistantMsgId,
+                assistantMessageId,
                 assistantContent.isEmpty
                     ? (event.errorMessage ?? 'Có lỗi xảy ra.')
                     : assistantContent,
@@ -516,24 +553,22 @@ class AiChatController extends Notifier<AiChatState> {
               );
             }
           },
-          onError: (err) {
+          onError: (error) {
             if (!ref.mounted) return;
-            state = state.copyWith(errorMessage: () => err.toString());
+            state = state.copyWith(errorMessage: () => error.toString());
             _finalizeActiveConversation(
-              assistantMsgId,
+              assistantMessageId,
               assistantContent,
               AiMessageStatus.failed,
             );
           },
           onDone: () {
-            if (!ref.mounted) return;
-            if (state.isGenerating) {
-              _finalizeActiveConversation(
-                assistantMsgId,
-                assistantContent,
-                AiMessageStatus.complete,
-              );
-            }
+            if (!ref.mounted || !state.isGenerating) return;
+            _finalizeActiveConversation(
+              assistantMessageId,
+              assistantContent,
+              AiMessageStatus.complete,
+            );
           },
         );
   }
@@ -543,14 +578,14 @@ class AiChatController extends Notifier<AiChatState> {
     _streamSub = null;
     _activeBackend?.cancel();
 
-    if (state.activeConversation != null &&
-        state.activeConversation!.messages.isNotEmpty) {
-      final lastMsg = state.activeConversation!.messages.last;
-      if (lastMsg.role == AiMessageRole.assistant &&
-          lastMsg.status == AiMessageStatus.streaming) {
+    final conversation = state.activeConversation;
+    if (conversation != null && conversation.messages.isNotEmpty) {
+      final lastMessage = conversation.messages.last;
+      if (lastMessage.role == AiMessageRole.assistant &&
+          lastMessage.status == AiMessageStatus.streaming) {
         _finalizeActiveConversation(
-          lastMsg.id,
-          lastMsg.content,
+          lastMessage.id,
+          lastMessage.content,
           AiMessageStatus.cancelled,
         );
       }
@@ -559,39 +594,29 @@ class AiChatController extends Notifier<AiChatState> {
   }
 
   void _finalizeActiveConversation(
-    String msgId,
+    String messageId,
     String content,
-    AiMessageStatus finalStatus,
+    AiMessageStatus status,
   ) {
     _streamSub?.cancel();
     _streamSub = null;
 
-    final current = state.activeConversation;
-    if (current == null) return;
-
-    final cleanedMessages = List<AiChatMessage>.from(current.messages)
-      ..removeWhere((m) => m.id == msgId);
-
-    final finalAstMsg = AiChatMessage(
-      id: msgId,
-      role: AiMessageRole.assistant,
-      content: content,
-      createdAt: DateTime.now(),
-      status: finalStatus,
+    final conversation = state.activeConversation;
+    if (conversation == null) return;
+    final messages = List<AiChatMessage>.from(conversation.messages)
+      ..removeWhere((message) => message.id == messageId)
+      ..add(
+        AiChatMessage(
+          id: messageId,
+          role: AiMessageRole.assistant,
+          content: content,
+          createdAt: DateTime.now(),
+          status: status,
+        ),
+      );
+    _updateConversationInList(
+      conversation.copyWith(messages: messages, updatedAt: DateTime.now()),
     );
-
-    cleanedMessages.add(finalAstMsg);
-
-    final finalConv = AiConversation(
-      id: current.id,
-      title: current.title,
-      providerId: current.providerId,
-      modelId: current.modelId,
-      messages: cleanedMessages,
-      updatedAt: DateTime.now(),
-    );
-
-    _updateConversationInList(finalConv);
     state = state.copyWith(isGenerating: false);
 
     ref.read(chatHistoryStoreProvider.future).then((store) {
@@ -601,20 +626,64 @@ class AiChatController extends Notifier<AiChatState> {
     });
   }
 
-  void _updateConversationInList(AiConversation convo) {
-    final list = List<AiConversation>.from(state.conversations);
-    final index = list.indexWhere((e) => e.id == convo.id);
+  void _updateConversationInList(AiConversation conversation) {
+    final conversations = List<AiConversation>.from(state.conversations);
+    final index = conversations.indexWhere((item) => item.id == conversation.id);
     if (index >= 0) {
-      list.removeAt(index);
+      conversations.removeAt(index);
     }
-    list.insert(0, convo);
-
+    conversations.insert(0, conversation);
     state = state.copyWith(
-      conversations: list,
-      activeConversation: () => convo.id == state.activeConversation?.id
-          ? convo
+      conversations: conversations,
+      activeConversation: () => conversation.id == state.activeConversation?.id
+          ? conversation
           : state.activeConversation,
     );
+  }
+
+  bool _isSelectableModel(AiProviderConfig config, AiModelRef model) {
+    final providerKey = providerKeyFor(config);
+    if (model.providerKey != providerKey) return false;
+
+    final legacyModels = {
+      config.modelId,
+      ...config.models.map((item) => item.id),
+      ...config.customModels.map((item) => item.id),
+      ...?ref
+          .read(aiProviderControllerProvider)
+          .models[config.id]
+          ?.map((item) => item.id),
+    };
+    if (config.hiddenModelIds.contains(model.modelId)) return false;
+
+    final definition = RouterCatalog.byId(config.presetId ?? '');
+    if (definition == null) return legacyModels.contains(model.modelId);
+
+    final modelState = ref.read(aiProviderModelControllerProvider);
+    final catalog = resolveManagedProviderModelsForDefinition(
+      definition,
+      modelState.settings[providerKey] ??
+          AiProviderModelSettings(providerKey: providerKey),
+      modelState.discoveredModels[providerKey] ?? const [],
+    );
+    return legacyModels.contains(model.modelId) ||
+        catalog.visible.any((item) => item.id == model.modelId);
+  }
+
+  AiModelRef _modelRef(AiConversation conversation) =>
+      AiModelRef.parse(conversation.canonicalModelId);
+
+  AiModelRef? _legacyModelForConnection(AiProviderConfig config) {
+    final modelId = config.modelId.trim();
+    if (modelId.isEmpty) return null;
+    final providerKey = providerKeyFor(config);
+    try {
+      return AiModelRef.parse(
+        modelId.contains('/') ? modelId : '$providerKey/$modelId',
+      );
+    } on FormatException {
+      return null;
+    }
   }
 
   Future<void> clearAllData() async {
@@ -628,6 +697,4 @@ class AiChatController extends Notifier<AiChatState> {
 }
 
 final aiChatControllerProvider =
-    NotifierProvider<AiChatController, AiChatState>(() {
-      return AiChatController();
-    });
+    NotifierProvider<AiChatController, AiChatState>(AiChatController.new);

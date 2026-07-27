@@ -87,7 +87,8 @@ void main() {
       final conversation = AiConversation(
         id: 'conv-1',
         title: 'Greeting conversation',
-        providerId: 'openai-custom',
+        connectionId: 'openai-custom',
+        providerKey: 'custom-lab',
         modelId: 'gpt-4o-mini',
         messages: [
           AiChatMessage(
@@ -113,7 +114,9 @@ void main() {
 
       expect(decoded.id, conversation.id);
       expect(decoded.title, conversation.title);
-      expect(decoded.providerId, conversation.providerId);
+      expect(decoded.connectionId, conversation.connectionId);
+      expect(decoded.providerKey, conversation.providerKey);
+      expect(decoded.canonicalModelId, 'custom-lab/gpt-4o-mini');
       expect(decoded.modelId, conversation.modelId);
       expect(decoded.messages.length, conversation.messages.length);
       expect(decoded.messages.first.content, 'Hello');

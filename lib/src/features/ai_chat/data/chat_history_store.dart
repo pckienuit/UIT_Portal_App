@@ -14,15 +14,28 @@ class ChatHistoryStore {
 
   File get _file => File(p.join(directory.path, _fileName));
 
-  Future<List<AiConversation>> readHistory() async {
+  Future<List<AiConversation>> readHistory({
+    String? Function(String connectionId)? providerKeyForConnection,
+  }) async {
     final file = _file;
     if (!await file.exists()) return [];
     try {
       final content = await file.readAsString(encoding: utf8);
       final data = jsonDecode(content) as Map<String, dynamic>;
+      final version = data['version'] as int? ?? 1;
       final list = data['conversations'] as List<dynamic>? ?? [];
       return list
-          .map((e) => AiConversation.fromJson(e as Map<String, dynamic>))
+          .map((entry) {
+            final json = Map<String, dynamic>.from(entry as Map);
+            final connectionId =
+                json['connectionId']?.toString() ?? json['providerId']?.toString() ?? '';
+            return AiConversation.fromJson(
+              json,
+              legacyProviderKey: version < 2
+                  ? providerKeyForConnection?.call(connectionId)
+                  : null,
+            );
+          })
           .toList();
     } catch (e) {
       // Backup corrupted file
@@ -49,7 +62,8 @@ class ChatHistoryStore {
       return AiConversation(
         id: c.id,
         title: c.title,
-        providerId: c.providerId,
+        connectionId: c.connectionId,
+        providerKey: c.providerKey,
         modelId: c.modelId,
         messages: messages,
         updatedAt: c.updatedAt,
@@ -62,7 +76,7 @@ class ChatHistoryStore {
         : processed;
 
     final data = {
-      'version': 1,
+      'version': 2,
       'conversations': finalHistory.map((e) => e.toJson()).toList(),
     };
 
@@ -81,12 +95,4 @@ class ChatHistoryStore {
     }
   }
 
-  Future<void> deleteForProvider(String providerId) async {
-    final history = await readHistory();
-    await writeHistory(
-      history
-          .where((conversation) => conversation.providerId != providerId)
-          .toList(),
-    );
-  }
 }

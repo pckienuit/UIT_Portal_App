@@ -198,7 +198,7 @@ void main() {
       final request = AiChatRequest(
         config: _FakeProviderConfig(),
         apiKey: 'test-key',
-        modelId: 'conversation-model',
+        modelId: 'gh/conversation-model',
         messages: [
           AiChatMessage(
             id: '1',
@@ -218,7 +218,10 @@ void main() {
           'http://localhost/v1/chat/completions?connectionId=provider%2Fid+%2B+exact',
         ),
       );
-      expect((adapter.requestBody as Map<String, dynamic>)['model'], 'conversation-model');
+      expect(
+        (adapter.requestBody as Map<String, dynamic>)['model'],
+        'gh/conversation-model',
+      );
     });
   });
 }
