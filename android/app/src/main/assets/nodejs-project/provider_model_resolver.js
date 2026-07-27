@@ -49,6 +49,7 @@ function resolveProviderModel({
   settings = {},
   liveModels = [],
   allowLegacyBare = true,
+  allowUnknownModel = false,
 }) {
   const requested = parseCanonicalModel(rawModel);
   if (!requested) return { error: 400, code: 'invalid_model' };
@@ -77,7 +78,9 @@ function resolveProviderModel({
   });
   const descriptor = models.find((model) => model.id.trim() === selectedModelId);
   const passthrough = provider.passthroughModels || connection.transportKind === 'ollamaChat';
-  if (!descriptor && !passthrough) return { error: 400, code: 'unknown_model' };
+  if (!descriptor && !passthrough && !allowUnknownModel) {
+    return { error: 400, code: 'unknown_model' };
+  }
   return {
     connection,
     provider,

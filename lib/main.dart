@@ -99,7 +99,10 @@ void main() async {
             final modelSettings = container
                 .read(aiProviderModelControllerProvider)
                 .settings;
-            for (final settings in modelSettings.values) {
+            for (final settings in modelSettingsForConnections(
+              modelSettings.values,
+              coreProviders,
+            )) {
               await client.saveModelSettings(settings);
             }
 

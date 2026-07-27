@@ -21,7 +21,7 @@ class ManagedProviderModel {
   final bool refreshed;
   final bool hidden;
 
-  bool get managed => builtIn || custom;
+  bool get managed => builtIn || custom || refreshed;
 
   bool matches(String query) =>
       query.isEmpty ||
@@ -46,11 +46,6 @@ ManagedProviderModels resolveManagedProviderModelsForDefinition(
   AiProviderModelSettings settings,
   List<AiModelOption> refreshedModels,
 ) {
-  final staticModels = definition.models.map(
-    (model) => AiModelOption(id: model.id, name: model.name),
-  );
-  final lockedIds = staticModels.map((model) => model.id.trim()).toSet()
-    ..remove('');
   final hiddenIds = settings.disabledModelIds.map((id) => id.trim()).toSet();
   final managed = <String, ManagedProviderModel>{};
 
@@ -64,9 +59,9 @@ ManagedProviderModels resolveManagedProviderModelsForDefinition(
     final existing = managed[id];
     managed[id] = ManagedProviderModel(
       id: id,
-      name:
-          existing?.name ??
-          (model.name.trim().isEmpty ? id : model.name.trim()),
+      name: model.name.trim().isEmpty
+          ? existing?.name ?? id
+          : model.name.trim(),
       capabilities: _hasCapabilities(model.capabilities)
           ? model.capabilities
           : existing?.capabilities ?? const AiModelCapabilities(),
@@ -77,78 +72,59 @@ ManagedProviderModels resolveManagedProviderModelsForDefinition(
     );
   }
 
-  for (final model in staticModels) {
-    addManaged(model, builtIn: true, custom: false);
+  for (final model in definition.models) {
+    addManaged(
+      AiModelOption(id: model.id, name: model.name),
+      builtIn: true,
+      custom: false,
+    );
   }
-  if (definition.id != 'antigravity') {
-    for (final model in settings.customModels) {
-      addManaged(
-        AiModelOption(id: model.id, name: model.name),
-        builtIn: false,
-        custom: true,
-      );
-    }
+  for (final model in settings.customModels) {
+    addManaged(
+      AiModelOption(id: model.id, name: model.name),
+      builtIn: false,
+      custom: true,
+    );
   }
 
-  final refreshed = <String, ManagedProviderModel>{};
   for (final model in refreshedModels) {
     final id = model.id.trim();
-    if (id.isEmpty ||
-        (definition.id == 'antigravity' && !lockedIds.contains(id))) {
-      continue;
-    }
+    if (id.isEmpty) continue;
     final existing = managed[id];
-    if (existing != null) {
-      managed[id] = ManagedProviderModel(
-        id: existing.id,
-        name: existing.name,
-        capabilities: _hasCapabilities(model.capabilities)
-            ? model.capabilities
-            : existing.capabilities,
-        builtIn: existing.builtIn,
-        custom: existing.custom,
-        refreshed: true,
-        hidden: existing.hidden,
-      );
-      continue;
-    }
-    refreshed[id] = ManagedProviderModel(
+    managed[id] = ManagedProviderModel(
       id: id,
-      name: model.name.trim().isEmpty ? id : model.name.trim(),
-      capabilities: model.capabilities,
-      builtIn: false,
-      custom: false,
+      name: model.name.trim().isEmpty
+          ? existing?.name ?? id
+          : model.name.trim(),
+      capabilities: _hasCapabilities(model.capabilities)
+          ? model.capabilities
+          : existing?.capabilities ?? const AiModelCapabilities(),
+      builtIn: existing?.builtIn ?? false,
+      custom: existing?.custom ?? false,
       refreshed: true,
       hidden: hiddenIds.contains(id),
     );
   }
-  if (definition.id != 'antigravity') {
-    for (final id in hiddenIds) {
-      if (id.isEmpty || managed.containsKey(id) || refreshed.containsKey(id)) {
-        continue;
-      }
-      managed[id] = ManagedProviderModel(
-        id: id,
-        name: id,
-        capabilities: const AiModelCapabilities(),
-        builtIn: false,
-        custom: false,
-        refreshed: false,
-        hidden: true,
-      );
-    }
+  for (final id in hiddenIds) {
+    if (id.isEmpty || managed.containsKey(id)) continue;
+    managed[id] = ManagedProviderModel(
+      id: id,
+      name: id,
+      capabilities: const AiModelCapabilities(),
+      builtIn: false,
+      custom: false,
+      refreshed: false,
+      hidden: true,
+    );
   }
 
   final allManaged = managed.values.toList(growable: false);
-  final refreshedOnly = refreshed.values.toList(growable: false);
   return ManagedProviderModels(
     visible: allManaged.where((model) => !model.hidden).toList(growable: false),
-    hidden: [
-      ...allManaged,
-      ...refreshedOnly,
-    ].where((model) => model.hidden).toList(growable: false),
-    refreshed: refreshedOnly
+    hidden: allManaged.where((model) => model.hidden).toList(growable: false),
+    refreshed: allManaged
         .where((model) => !model.hidden)
+        .where((model) => model.refreshed)
         .toList(growable: false),
   );
 }

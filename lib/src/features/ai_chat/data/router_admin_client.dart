@@ -92,6 +92,41 @@ class RouterAdminClient {
         .toList(growable: false);
   }
 
+  Future<bool> testModel({
+    required String connectionId,
+    required String providerKey,
+    required String modelId,
+  }) async {
+    final trimmedConnectionId = connectionId.trim();
+    final trimmedProviderKey = providerKey.trim();
+    final trimmedModelId = modelId.trim();
+    if (trimmedConnectionId.isEmpty ||
+        trimmedProviderKey.isEmpty ||
+        trimmedModelId.isEmpty) {
+      return false;
+    }
+
+    try {
+      final res = await _dio.post(
+        '/v1/chat/completions',
+        queryParameters: {'connectionId': trimmedConnectionId},
+        data: {
+          'model': '$trimmedProviderKey/$trimmedModelId',
+          'messages': [
+            {'role': 'user', 'content': 'Reply with OK.'},
+          ],
+          'max_tokens': 1,
+          'stream': false,
+        },
+        options: Options(headers: {'x-model-probe': 'true'}),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('Model test failed for $trimmedConnectionId: $e');
+      return false;
+    }
+  }
+
   Future<bool> saveModelSettings(AiProviderModelSettings settings) async {
     try {
       final res = await _dio.put(

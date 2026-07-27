@@ -364,7 +364,7 @@ try {
 
   const server = http.createServer(async (request, response) => {
     response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Model-Probe');
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
 
     if (request.method === 'OPTIONS') {
@@ -539,6 +539,7 @@ try {
           });
         }
 
+        const isModelProbe = request.headers['x-model-probe'] === 'true';
         let body = await parseJsonBody(request);
         const requestedModel = parseCanonicalModel(body.model);
         if (!hasConnectionId && requestedModel?.providerKey) {
@@ -570,6 +571,7 @@ try {
           settings: db.modelSettings,
           liveModels: refreshedModels.get(activeProvider.id) || [],
           allowLegacyBare: !hasConnectionId,
+          allowUnknownModel: isModelProbe,
         });
         if (resolved.error) return sendJson(response, resolved.error, { error: resolved.code });
         const isCodex = activeProvider.presetId === 'codex';
@@ -719,15 +721,17 @@ try {
             response.removeListener('error', closeDownstream);
             const errorBody = Buffer.from(await upstreamResponse.arrayBuffer());
             sendSanitizedUpstreamError(response, upstreamResponse, errorBody, activeProvider);
-            db.usage.push({
-              id: randomUUID(), timestamp: new Date().toISOString(),
-              providerId: activeProvider.presetId || activeProvider.id,
-              connectionId: activeProvider.id, modelId: resolved.canonicalModel,
-              status: 'error', promptTokens: 0, completionTokens: 0,
-              cachedTokens: 0, estimatedCost: 0.0,
-              latencyMs: Date.now() - startTime
-            });
-            saveDb(db);
+            if (!isModelProbe) {
+              db.usage.push({
+                id: randomUUID(), timestamp: new Date().toISOString(),
+                providerId: activeProvider.presetId || activeProvider.id,
+                connectionId: activeProvider.id, modelId: resolved.canonicalModel,
+                status: 'error', promptTokens: 0, completionTokens: 0,
+                cachedTokens: 0, estimatedCost: 0.0,
+                latencyMs: Date.now() - startTime
+              });
+              saveDb(db);
+            }
             return;
           }
 
@@ -815,20 +819,22 @@ try {
           }
           response.end();
 
-          db.usage.push({
-            id: randomUUID(),
-            timestamp: new Date().toISOString(),
-            providerId: activeProvider.presetId || activeProvider.id,
-            connectionId: activeProvider.id,
-            modelId: resolved.canonicalModel,
-            status: upstreamResponse.ok ? 'success' : 'error',
-            promptTokens: usage.promptTokens,
-            completionTokens: usage.completionTokens,
-            cachedTokens: usage.cachedTokens,
-            estimatedCost: 0.0,
-            latencyMs: Date.now() - startTime
-          });
-          saveDb(db);
+          if (!isModelProbe) {
+            db.usage.push({
+              id: randomUUID(),
+              timestamp: new Date().toISOString(),
+              providerId: activeProvider.presetId || activeProvider.id,
+              connectionId: activeProvider.id,
+              modelId: resolved.canonicalModel,
+              status: upstreamResponse.ok ? 'success' : 'error',
+              promptTokens: usage.promptTokens,
+              completionTokens: usage.completionTokens,
+              cachedTokens: usage.cachedTokens,
+              estimatedCost: 0.0,
+              latencyMs: Date.now() - startTime
+            });
+            saveDb(db);
+          }
           return;
         } else {
           const upstreamResponse = await fetch(targetUrl, {
@@ -860,7 +866,7 @@ try {
                     : upstreamData;
           sendJson(response, upstreamResponse.status, resData);
 
-          if (upstreamResponse.ok) {
+          if (upstreamResponse.ok && !isModelProbe) {
             const usage = resData.usage || { prompt_tokens: 0, completion_tokens: 0 };
             db.usage.push({
               id: randomUUID(),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_provider_model_controller.dart';
 import '../application/ai_provider_controller.dart';
+import '../data/router_admin_client.dart';
 import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import '../domain/ai_provider_model_settings.dart';
@@ -64,9 +65,7 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
     ) =>
         models.where((model) => model.matches(query)).toList()
           ..sort(_compareModels);
-    final builtIn = matching(catalog.visible.where((model) => model.builtIn));
-    final live = matching(catalog.refreshed);
-    final custom = matching(catalog.visible.where((model) => model.custom));
+    final models = matching(catalog.visible);
     final hidden = matching(catalog.hidden);
 
     return Padding(
@@ -126,25 +125,19 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
                           label: const Text('Làm mới từ provider'),
                         ),
                       ),
-                      if (config.presetId != 'antigravity') ...[
-                        const SizedBox(width: PortalSpacing.sm),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _addCustomModel,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Thêm model'),
-                          ),
+                      const SizedBox(width: PortalSpacing.sm),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _addCustomModel,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Thêm model'),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: PortalSpacing.md),
                   Expanded(
-                    child:
-                        builtIn.isEmpty &&
-                            live.isEmpty &&
-                            custom.isEmpty &&
-                            hidden.isEmpty
+                    child: models.isEmpty && hidden.isEmpty
                         ? const Center(
                             child: Text('Chưa có model trong danh mục.'),
                           )
@@ -153,24 +146,10 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 _ModelSection(
-                                  title: 'Built-in models',
-                                  emptyText: 'Không có model built-in phù hợp.',
-                                  models: builtIn,
-                                  providerKey: _providerKey,
-                                ),
-                                const SizedBox(height: PortalSpacing.md),
-                                _ModelSection(
-                                  title: 'Live models',
+                                  title: 'Models',
                                   emptyText:
                                       'Làm mới để xem model từ provider.',
-                                  models: live,
-                                  providerKey: _providerKey,
-                                ),
-                                const SizedBox(height: PortalSpacing.md),
-                                _ModelSection(
-                                  title: 'Custom models',
-                                  emptyText: 'Chưa có model tùy chỉnh.',
-                                  models: custom,
+                                  models: models,
                                   providerKey: _providerKey,
                                 ),
                                 const SizedBox(height: PortalSpacing.md),
@@ -216,45 +195,155 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
   }
 
   Future<void> _addCustomModel() async {
-    final controller = TextEditingController();
-    final modelId = await showDialog<String>(
+    final connection = ref
+        .read(aiProviderControllerProvider)
+        .providers
+        .where((item) => providerKeyFor(item) == _providerKey)
+        .firstOrNull;
+    if (connection == null) return;
+
+    final draft = await showDialog<_CustomModelDraft>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Thêm model tùy chỉnh'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 200,
-          decoration: const InputDecoration(labelText: 'Model ID'),
-          onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('Thêm'),
-          ),
-        ],
+      builder: (_) => _AddCustomModelDialog(
+        connectionId: connection.id,
+        providerKey: _providerKey,
       ),
     );
-    controller.dispose();
-    if (modelId == null) return;
+    if (!mounted || draft == null) return;
 
     final added = await ref
         .read(aiProviderModelControllerProvider.notifier)
         .addCustomModel(
           _providerKey,
-          AiProviderModelDescriptor(id: modelId, name: modelId),
+          AiProviderModelDescriptor(id: draft.id, name: draft.id),
         );
     if (!added && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Model ID không hợp lệ hoặc đã tồn tại.')),
+        const SnackBar(
+          content: Text('Không thể lưu model. Vui lòng test lại rồi thử lại.'),
+        ),
       );
     }
   }
+}
+
+class _CustomModelDraft {
+  const _CustomModelDraft(this.id);
+
+  final String id;
+}
+
+class _AddCustomModelDialog extends ConsumerStatefulWidget {
+  const _AddCustomModelDialog({
+    required this.connectionId,
+    required this.providerKey,
+  });
+
+  final String connectionId;
+  final String providerKey;
+
+  @override
+  ConsumerState<_AddCustomModelDialog> createState() =>
+      _AddCustomModelDialogState();
+}
+
+class _AddCustomModelDialogState extends ConsumerState<_AddCustomModelDialog> {
+  final _controller = TextEditingController();
+  bool _testing = false;
+  bool? _testSucceeded;
+
+  String get _modelId => _controller.text.trim();
+
+  bool get _hasValidModelId => _isValidCustomModelId(_modelId);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testModel() async {
+    if (!_hasValidModelId || _testing) return;
+    setState(() {
+      _testing = true;
+      _testSucceeded = null;
+    });
+    final succeeded = await ref.read(routerAdminClientProvider).testModel(
+      connectionId: widget.connectionId,
+      providerKey: widget.providerKey,
+      modelId: _modelId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testSucceeded = succeeded;
+    });
+  }
+
+  void _submit() {
+    if (!_hasValidModelId) return;
+    Navigator.of(context).pop(_CustomModelDraft(_modelId));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: const Text('Thêm model tùy chỉnh'),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLength: 200,
+            decoration: const InputDecoration(labelText: 'Model ID'),
+            onChanged: (_) => setState(() => _testSucceeded = null),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: PortalSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: _testing || !_hasValidModelId ? null : _testModel,
+            icon: _testing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_circle_outline),
+            label: Text(_testing ? 'Đang test model' : 'Test model'),
+          ),
+          if (_testSucceeded != null) ...[
+            const SizedBox(height: PortalSpacing.sm),
+            Semantics(
+              label: 'Kết quả test model',
+              child: Text(
+                _testSucceeded!
+                    ? 'Model phản hồi thành công.'
+                    : 'Test thất bại. Sửa Model ID hoặc thử lại.',
+                style: TextStyle(
+                  color: _testSucceeded!
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _testing ? null : () => Navigator.of(context).pop(),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        onPressed: _testing || _testSucceeded != true ? null : _submit,
+        child: const Text('Thêm'),
+      ),
+    ],
+  );
 }
 
 class _ModelSection extends ConsumerWidget {
@@ -297,7 +386,6 @@ class _ModelSection extends ConsumerWidget {
                       if (model.builtIn) const Chip(label: Text('Có sẵn')),
                       if (model.refreshed)
                         const Chip(label: Text('Đã làm mới')),
-                      if (model.custom) const Chip(label: Text('Tùy chỉnh')),
                     ],
                   ),
                 ],
@@ -330,6 +418,11 @@ class _ModelSection extends ConsumerWidget {
 
 int _compareModels(ManagedProviderModel left, ManagedProviderModel right) =>
     left.name.toLowerCase().compareTo(right.name.toLowerCase());
+
+bool _isValidCustomModelId(String id) =>
+    id.isNotEmpty &&
+    id.length <= 200 &&
+    !id.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f);
 
 RouterProviderDefinition _customDefinition(AiProviderConfig config) =>
     RouterProviderDefinition(

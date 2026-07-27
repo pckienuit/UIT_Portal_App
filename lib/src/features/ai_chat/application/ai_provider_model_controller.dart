@@ -60,31 +60,35 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
   Future<bool> addCustomModel(
     String providerKey,
     AiProviderModelDescriptor model,
-  ) async {
+  ) {
     final id = model.id.trim();
-    if (_invalidId(id)) return false;
+    if (_invalidId(id)) return Future.value(false);
     final current = settingsFor(providerKey);
-    if (current.customModels.any((item) => item.id == id)) return false;
-    final updated = AiProviderModelSettings(
-      providerKey: providerKey,
-      customModels: [
-        ...current.customModels,
-        AiProviderModelDescriptor(
-          id: id,
-          name: model.name.trim().isEmpty ? id : model.name.trim(),
-        ),
-      ],
-      disabledModelIds: {...current.disabledModelIds}..remove(id),
+    if (current.customModels.any((item) => item.id == id)) {
+      return Future.value(false);
+    }
+    return _save(
+      AiProviderModelSettings(
+        providerKey: providerKey,
+        customModels: [
+          ...current.customModels,
+          AiProviderModelDescriptor(
+            id: id,
+            name: model.name.trim().isEmpty ? id : model.name.trim(),
+          ),
+        ],
+        disabledModelIds: {...current.disabledModelIds}..remove(id),
+      ),
     );
-    await _save(updated);
-    return true;
   }
 
-  Future<bool> deleteCustomModel(String providerKey, String modelId) async {
+  Future<bool> deleteCustomModel(String providerKey, String modelId) {
     final current = settingsFor(providerKey);
     final id = modelId.trim();
-    if (!current.customModels.any((model) => model.id == id)) return false;
-    await _save(
+    if (!current.customModels.any((model) => model.id == id)) {
+      return Future.value(false);
+    }
+    return _save(
       AiProviderModelSettings(
         providerKey: providerKey,
         customModels: current.customModels
@@ -93,29 +97,27 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
         disabledModelIds: {...current.disabledModelIds}..remove(id),
       ),
     );
-    return true;
   }
 
-  Future<bool> disableModel(String providerKey, String modelId) async {
+  Future<bool> disableModel(String providerKey, String modelId) {
     final id = modelId.trim();
-    if (_invalidId(id)) return false;
+    if (_invalidId(id)) return Future.value(false);
     final current = settingsFor(providerKey);
-    if (current.disabledModelIds.contains(id)) return false;
-    await _save(
+    if (current.disabledModelIds.contains(id)) return Future.value(false);
+    return _save(
       AiProviderModelSettings(
         providerKey: providerKey,
         customModels: current.customModels,
         disabledModelIds: {...current.disabledModelIds, id},
       ),
     );
-    return true;
   }
 
-  Future<bool> enableModel(String providerKey, String modelId) async {
+  Future<bool> enableModel(String providerKey, String modelId) {
     final current = settingsFor(providerKey);
     final id = modelId.trim();
-    if (!current.disabledModelIds.contains(id)) return false;
-    await _save(
+    if (!current.disabledModelIds.contains(id)) return Future.value(false);
+    return _save(
       AiProviderModelSettings(
         providerKey: providerKey,
         customModels: current.customModels,
@@ -124,7 +126,6 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
             .toSet(),
       ),
     );
-    return true;
   }
 
   Future<List<AiModelOption>> refreshModels(
@@ -135,19 +136,26 @@ class AiProviderModelController extends Notifier<AiProviderModelState> {
         .read(routerAdminClientProvider)
         .listModels(connectionId);
     state = state.copyWith(
-      discoveredModels: {...state.discoveredModels, providerKey: models},
+      discoveredModels: {
+        ...state.discoveredModels,
+        providerKey: normalizeDiscoveredModels(providerKey, models),
+      },
     );
     return models;
   }
 
-  Future<void> _save(AiProviderModelSettings settings) async {
+  Future<bool> _save(AiProviderModelSettings settings) async {
+    if (ref.read(routerRuntimeServiceProvider).state == RouterState.ready) {
+      final synced = await ref
+          .read(routerAdminClientProvider)
+          .saveModelSettings(settings);
+      if (!synced) return false;
+    }
     await _repository.save(settings);
     state = state.copyWith(
       settings: {...state.settings, settings.providerKey: settings},
     );
-    if (ref.read(routerRuntimeServiceProvider).state == RouterState.ready) {
-      await ref.read(routerAdminClientProvider).saveModelSettings(settings);
-    }
+    return true;
   }
 }
 
@@ -156,7 +164,38 @@ String providerKeyFor(AiProviderConfig connection) =>
 
 String providerKeyForIds(String presetId, String connectionId) {
   final definition = RouterCatalog.byId(presetId);
-  return definition?.id == 'custom' ? connectionId : definition?.providerKey ?? connectionId;
+  return definition?.id == 'custom'
+      ? connectionId
+      : definition?.providerKey ?? connectionId;
+}
+
+Iterable<AiProviderModelSettings> modelSettingsForConnections(
+  Iterable<AiProviderModelSettings> settings,
+  Iterable<AiProviderConfig> connections,
+) {
+  final providerKeys = connections.map(providerKeyFor).toSet();
+  return settings.where(
+    (setting) => providerKeys.contains(setting.providerKey),
+  );
+}
+
+List<AiModelOption> normalizeDiscoveredModels(
+  String providerKey,
+  Iterable<AiModelOption> models,
+) {
+  final prefix = '${providerKey.trim()}/';
+  return models
+      .map(
+        (model) => AiModelOption(
+          id: model.id.startsWith(prefix)
+              ? model.id.substring(prefix.length)
+              : model.id,
+          name: model.name,
+          owner: model.owner,
+          capabilities: model.capabilities,
+        ),
+      )
+      .toList(growable: false);
 }
 
 bool _invalidId(String id) =>
