@@ -34,7 +34,7 @@ class AiProviderSwitcherSheet extends ConsumerWidget {
           final targetProviderId = pId ?? providerId;
           await ref
               .read(aiChatControllerProvider.notifier)
-              .selectGlobalModel(targetProviderId, modelId);
+              .selectConversationModel(targetProviderId, modelId);
         },
       ),
     );

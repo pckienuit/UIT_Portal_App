@@ -86,7 +86,7 @@ void main() {
     expect(state.activeConversation, isNull);
   });
 
-  test('does not restore conversation from another provider', () async {
+  test('restores latest conversation route instead of active provider legacy model', () async {
     final container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
@@ -99,11 +99,11 @@ void main() {
 
     final repo = container.read(aiProviderRepositoryProvider);
     const config = AiProviderConfig(
-      id: 'provider-gemini-cli',
-      name: 'Gemini CLI',
+      id: 'provider-github',
+      name: 'GitHub Models',
       kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://cloudcode-pa.googleapis.com/v1internal',
-      modelId: 'gemini-2.5-flash',
+      baseUrl: 'https://models.inference.ai.azure.com',
+      modelId: 'legacy-model',
     );
     await repo.saveProvider(config);
     await repo.setActiveProviderId(config.id);
@@ -144,7 +144,7 @@ void main() {
   });
 
   test(
-    'same-connection model switch keeps active conversation instead of old model history',
+    'provider model changes do not rewrite the active conversation route',
     () async {
       final container = ProviderContainer(
         overrides: [
@@ -198,9 +198,212 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       final state = container.read(aiChatControllerProvider);
-      expect(state.activeProvider?.modelId, 'model-b');
+      expect(state.activeProvider?.modelId, 'model-a');
       expect(state.activeConversation?.id, 'conversation-a');
+      expect(state.activeConversation?.modelId, 'model-a');
+    },
+  );
+
+  test(
+    'selectConversationModel updates only active conversation and keeps provider config',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+        ],
+      );
+      addTearDown(container.dispose);
+      const providerA = AiProviderConfig(
+        id: 'provider-a',
+        name: 'Provider A',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://a.example.test/v1',
+        modelId: 'legacy-a',
+        models: [AiProviderModelDescriptor(id: 'model-a', name: 'Model A')],
+      );
+      const providerB = AiProviderConfig(
+        id: 'provider-b',
+        name: 'Provider B',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://b.example.test/v1',
+        modelId: 'legacy-b',
+        models: [AiProviderModelDescriptor(id: 'model-b', name: 'Model B')],
+      );
+      final repo = container.read(aiProviderRepositoryProvider);
+      await repo.saveProvider(providerA);
+      await repo.saveProvider(providerB);
+      await repo.setActiveProviderId(providerA.id);
+      await ChatHistoryStore(directory: tempDir).writeHistory([
+        AiConversation(
+          id: 'active',
+          title: 'Active',
+          providerId: providerA.id,
+          modelId: 'model-a',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 27),
+        ),
+        AiConversation(
+          id: 'other',
+          title: 'Other',
+          providerId: providerA.id,
+          modelId: 'model-a',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 26),
+        ),
+      ]);
+
+      container.read(aiProviderControllerProvider);
+      container.read(aiChatControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      await container
+          .read(aiChatControllerProvider.notifier)
+          .selectConversationModel(providerB.id, 'model-b');
+
+      final state = container.read(aiChatControllerProvider);
+      expect(state.activeConversation?.providerId, providerB.id);
       expect(state.activeConversation?.modelId, 'model-b');
+      expect(state.activeProvider?.id, providerB.id);
+      expect(state.activeProvider?.modelId, 'model-b');
+      expect(
+        state.conversations.singleWhere((item) => item.id == 'other').modelId,
+        'model-a',
+      );
+
+      final providerState = container.read(aiProviderControllerProvider);
+      expect(providerState.activeProviderId, providerA.id);
+      expect(
+        providerState.providers
+            .singleWhere((item) => item.id == providerA.id)
+            .modelId,
+        'legacy-a',
+      );
+      expect(
+        providerState.providers
+            .singleWhere((item) => item.id == providerB.id)
+            .modelId,
+        'legacy-b',
+      );
+
+      final persisted = await ChatHistoryStore(directory: tempDir).readHistory();
+      expect(persisted.first.providerId, providerB.id);
+      expect(persisted.first.modelId, 'model-b');
+    },
+  );
+
+  test(
+    'selectConversationModel creates a routed conversation when none is active',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+        ],
+      );
+      addTearDown(container.dispose);
+      const config = AiProviderConfig(
+        id: 'provider-b',
+        name: 'Provider B',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://b.example.test/v1',
+        modelId: 'legacy-b',
+        models: [AiProviderModelDescriptor(id: 'model-b', name: 'Model B')],
+      );
+      final repo = container.read(aiProviderRepositoryProvider);
+      await repo.saveProvider(config);
+      await repo.setActiveProviderId(config.id);
+      container.read(aiProviderControllerProvider);
+      container.read(aiChatControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      await container
+          .read(aiChatControllerProvider.notifier)
+          .selectConversationModel(config.id, 'model-b');
+
+      final state = container.read(aiChatControllerProvider);
+      expect(state.conversations, hasLength(1));
+      expect(state.activeConversation?.providerId, config.id);
+      expect(state.activeConversation?.modelId, 'model-b');
+      expect(state.activeProvider?.modelId, 'model-b');
+      expect(repo.listProviders().single.modelId, 'legacy-b');
+    },
+  );
+
+  test(
+    'restores and switches runtime route from conversation provider and model',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          chatHistoryDirectoryProvider.overrideWith((ref) => tempDir),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          authControllerProvider.overrideWith((ref) => _FakeAuthController()),
+        ],
+      );
+      addTearDown(container.dispose);
+      const providerA = AiProviderConfig(
+        id: 'provider-a',
+        name: 'Provider A',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://a.example.test/v1',
+        modelId: 'legacy-a',
+      );
+      const providerB = AiProviderConfig(
+        id: 'provider-b',
+        name: 'Provider B',
+        kind: AiBackendKind.openAiCompatible,
+        baseUrl: 'https://b.example.test/v1',
+        modelId: 'legacy-b',
+      );
+      final repo = container.read(aiProviderRepositoryProvider);
+      await repo.saveProvider(providerA);
+      await repo.saveProvider(providerB);
+      await repo.setActiveProviderId(providerA.id);
+      await ChatHistoryStore(directory: tempDir).writeHistory([
+        AiConversation(
+          id: 'conversation-a',
+          title: 'A',
+          providerId: providerA.id,
+          modelId: 'conversation-model-a',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 27),
+        ),
+        AiConversation(
+          id: 'conversation-b',
+          title: 'B',
+          providerId: providerB.id,
+          modelId: 'conversation-model-b',
+          messages: const [],
+          updatedAt: DateTime(2026, 7, 26),
+        ),
+      ]);
+
+      container.read(aiProviderControllerProvider);
+      container.read(aiChatControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(
+        container.read(aiChatControllerProvider).activeProvider?.modelId,
+        'conversation-model-a',
+      );
+
+      await container
+          .read(aiChatControllerProvider.notifier)
+          .switchConversation('conversation-b');
+
+      final state = container.read(aiChatControllerProvider);
+      expect(state.activeConversation?.id, 'conversation-b');
+      expect(state.activeProvider?.id, providerB.id);
+      expect(state.activeProvider?.modelId, 'conversation-model-b');
+      expect(
+        container.read(aiProviderControllerProvider).activeProviderId,
+        providerA.id,
+      );
     },
   );
 

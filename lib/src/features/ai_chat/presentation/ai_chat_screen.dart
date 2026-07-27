@@ -96,7 +96,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           if (providerId != null && providerId.isNotEmpty) {
             await ref
                 .read(aiChatControllerProvider.notifier)
-                .selectGlobalModel(providerId, modelId);
+                .selectConversationModel(providerId, modelId);
           }
         },
       ),
