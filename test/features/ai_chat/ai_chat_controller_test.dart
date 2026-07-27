@@ -139,7 +139,8 @@ void main() {
 
     final state = container.read(aiChatControllerProvider);
     expect(state.activeProvider?.id, config.id);
-    expect(state.activeConversation, isNull);
+    expect(state.activeProvider?.modelId, 'gpt-5.2');
+    expect(state.activeConversation?.id, 'github-conversation');
     expect(state.conversations, hasLength(1));
   });
 

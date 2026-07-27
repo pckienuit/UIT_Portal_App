@@ -91,7 +91,13 @@ class AiModelDownloadSection extends ConsumerWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   SizedBox(width: PortalSpacing.sm),
-                  Text('Đang kiểm tra tính toàn vẹn của mô hình...'),
+                  Expanded(
+                    child: Text(
+                      'Đang kiểm tra tính toàn vẹn của mô hình...',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ] else if (state.status == LocalModelStatus.ready) ...[
