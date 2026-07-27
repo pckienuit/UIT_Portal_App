@@ -553,7 +553,8 @@ void main() {
         .providers
         .single;
     expect(config.modelId, 'gpt-current');
-    expect(config.hiddenModelIds, ['gpt-next']);
+    expect(config.hiddenModelIds, isEmpty);
+    expect(prefs.getString('ai_provider_model_settings_v1'), contains('gpt-next'));
     expect(find.text('Model đã ẩn'), findsOneWidget);
   });
 

@@ -1,6 +1,8 @@
 import 'ai_chat_backend.dart';
 import 'ai_chat_models.dart';
+import 'ai_provider_model_settings.dart';
 import 'router_catalog.dart';
+import 'router_models.dart';
 
 class ManagedProviderModel {
   const ManagedProviderModel({
@@ -45,18 +47,55 @@ ManagedProviderModels resolveManagedProviderModels(
   AiProviderConfig config,
   List<AiModelOption> refreshedModels,
 ) {
-  final antigravity = config.presetId == 'antigravity';
-  final staticModels = [
-    ...config.models.map(
-      (model) => AiModelOption(id: model.id, name: model.name),
+  final definition = RouterCatalog.byId(config.presetId ?? '');
+  if (definition == null) {
+    return resolveManagedProviderModelsForDefinition(
+      RouterProviderDefinition(
+        id: config.presetId ?? config.id,
+        name: config.name,
+        category: RouterProviderCategory.custom,
+        authModes: const [],
+        models: config.models
+            .map(
+              (model) => RouterModelDefinition(
+                id: model.id,
+                name: model.name,
+                upstreamModelId: model.upstreamModelId,
+                quotaFamily: model.quotaFamily,
+              ),
+            )
+            .toList(growable: false),
+      ),
+      AiProviderModelSettings(
+        providerKey: config.presetId ?? config.id,
+        customModels: config.customModels,
+        disabledModelIds: config.hiddenModelIds.toSet(),
+      ),
+      refreshedModels,
+    );
+  }
+  return resolveManagedProviderModelsForDefinition(
+    definition,
+    AiProviderModelSettings(
+      providerKey: definition.providerKey,
+      customModels: config.customModels,
+      disabledModelIds: config.hiddenModelIds.toSet(),
     ),
-    ...?RouterCatalog.byId(
-      config.presetId ?? '',
-    )?.models.map((model) => AiModelOption(id: model.id, name: model.name)),
-  ];
+    refreshedModels,
+  );
+}
+
+ManagedProviderModels resolveManagedProviderModelsForDefinition(
+  RouterProviderDefinition definition,
+  AiProviderModelSettings settings,
+  List<AiModelOption> refreshedModels,
+) {
+  final staticModels = definition.models.map(
+    (model) => AiModelOption(id: model.id, name: model.name),
+  );
   final lockedIds = staticModels.map((model) => model.id.trim()).toSet()
     ..remove('');
-  final hiddenIds = config.hiddenModelIds.map((id) => id.trim()).toSet();
+  final hiddenIds = settings.disabledModelIds.map((id) => id.trim()).toSet();
   final managed = <String, ManagedProviderModel>{};
 
   void addManaged(
@@ -85,8 +124,8 @@ ManagedProviderModels resolveManagedProviderModels(
   for (final model in staticModels) {
     addManaged(model, builtIn: true, custom: false);
   }
-  if (!antigravity) {
-    for (final model in config.customModels) {
+  if (definition.id != 'antigravity') {
+    for (final model in settings.customModels) {
       addManaged(
         AiModelOption(id: model.id, name: model.name),
         builtIn: false,
@@ -98,7 +137,10 @@ ManagedProviderModels resolveManagedProviderModels(
   final refreshed = <String, ManagedProviderModel>{};
   for (final model in refreshedModels) {
     final id = model.id.trim();
-    if (id.isEmpty || (antigravity && !lockedIds.contains(id))) continue;
+    if (id.isEmpty ||
+        (definition.id == 'antigravity' && !lockedIds.contains(id))) {
+      continue;
+    }
     final existing = managed[id];
     if (existing != null) {
       managed[id] = ManagedProviderModel(
@@ -124,7 +166,7 @@ ManagedProviderModels resolveManagedProviderModels(
       hidden: hiddenIds.contains(id),
     );
   }
-  if (!antigravity) {
+  if (definition.id != 'antigravity') {
     for (final id in hiddenIds) {
       if (id.isEmpty || managed.containsKey(id) || refreshed.containsKey(id)) {
         continue;

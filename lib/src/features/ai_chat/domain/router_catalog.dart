@@ -113,18 +113,6 @@ class RouterCatalog {
       modelsUrl: () => isOllama ? '$baseUrl/api/tags' : definition.modelsUrl,
       authHeader: () => definition.authHeader,
       authScheme: () => definition.authScheme,
-      models: definition.models
-          .map(
-            (model) => AiProviderModelDescriptor(
-              id: model.id,
-              name: model.name,
-              upstreamModelId: model.upstreamModelId,
-              quotaFamily: model.quotaFamily,
-            ),
-          )
-          .toList(growable: false),
-      customModels: config.customModels,
-      hiddenModelIds: config.hiddenModelIds,
       staticHeaders: definition.staticHeaders,
     );
   }

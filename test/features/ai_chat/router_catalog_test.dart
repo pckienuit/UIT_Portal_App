@@ -120,10 +120,11 @@ void main() {
       expect(hydrated.authHeader, 'Authorization');
       expect(hydrated.authScheme, 'Bearer');
       expect(hydrated.staticHeaders, {'x-client-name': 'antigravity'});
-      expect(hydrated.models.map((model) => model.id), [
-        'allowed-first',
-        'allowed-second',
-      ]);
+      expect(hydrated.models, isEmpty);
+      expect(
+        RouterCatalog.byId('antigravity')!.models.map((model) => model.id),
+        ['allowed-first', 'allowed-second'],
+      );
       expect(hydrated.customModels.map((model) => model.id), ['manual-model']);
     },
   );
@@ -163,10 +164,11 @@ void main() {
       presetId: 'codex',
     );
 
-    final hydrated = RouterCatalog.hydrateConfig(config);
+    RouterCatalog.hydrateConfig(config);
 
-    expect(hydrated.models.single.upstreamModelId, 'gpt-5.6-sol');
-    expect(hydrated.models.single.quotaFamily, 'review');
+    final model = RouterCatalog.byId('codex')!.models.single;
+    expect(model.upstreamModelId, 'gpt-5.6-sol');
+    expect(model.quotaFamily, 'review');
   });
 
   test('does not mutate config without a catalog preset', () {
@@ -243,9 +245,13 @@ void main() {
 
   test('serializes nonsecret Codex account ID without token fields', () {
     const config = AiProviderConfig(
-      id: 'codex-1', name: 'Codex', kind: AiBackendKind.openAiCompatible,
-      baseUrl: 'https://chatgpt.com/backend-api', modelId: 'gpt-5.4',
-      presetId: 'codex', accountId: 'acct_123',
+      id: 'codex-1',
+      name: 'Codex',
+      kind: AiBackendKind.openAiCompatible,
+      baseUrl: 'https://chatgpt.com/backend-api',
+      modelId: 'gpt-5.4',
+      presetId: 'codex',
+      accountId: 'acct_123',
     );
     final restored = AiProviderConfig.fromJson(config.toJson());
 

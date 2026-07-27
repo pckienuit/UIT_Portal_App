@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/foundations/portal_spacing.dart';
+import '../application/ai_provider_model_controller.dart';
 import '../application/ai_provider_controller.dart';
 import '../domain/ai_chat_backend.dart';
+import '../domain/ai_chat_models.dart';
+import '../domain/ai_provider_model_settings.dart';
 import '../domain/managed_provider_models.dart';
+import '../domain/router_catalog.dart';
 
 class AiModelManagerSheet extends ConsumerStatefulWidget {
   const AiModelManagerSheet({super.key, required this.providerId});
@@ -43,10 +47,20 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
     }
 
     final config = matches.first;
-    final catalog = resolveManagedProviderModels(
-      config,
-      state.models[config.id] ?? const <AiModelOption>[],
-    );
+    final definition = RouterCatalog.byId(config.presetId ?? '');
+    final modelState = ref.watch(aiProviderModelControllerProvider);
+    final catalog = definition == null
+        ? resolveManagedProviderModels(
+            config,
+            state.models[config.id] ?? const <AiModelOption>[],
+          )
+        : resolveManagedProviderModelsForDefinition(
+            definition,
+            modelState.settings[definition.providerKey] ??
+                AiProviderModelSettings(providerKey: definition.providerKey),
+            modelState.discoveredModels[definition.providerKey] ??
+                const <AiModelOption>[],
+          );
     final query = _query.trim().toLowerCase();
     final visible =
         catalog.visible.where((model) => model.matches(query)).toList()
@@ -164,9 +178,18 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
     try {
+      final config = ref
+          .read(aiProviderControllerProvider)
+          .providers
+          .where((item) => item.id == widget.providerId)
+          .first;
+      final providerKey = RouterCatalog.byId(
+        config.presetId ?? '',
+      )?.providerKey;
+      if (providerKey == null) throw StateError('Missing provider registry');
       await ref
-          .read(aiProviderControllerProvider.notifier)
-          .refreshModels(widget.providerId);
+          .read(aiProviderModelControllerProvider.notifier)
+          .refreshModels(providerKey, config.id);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -206,9 +229,20 @@ class _AiModelManagerSheetState extends ConsumerState<AiModelManagerSheet> {
     controller.dispose();
     if (modelId == null) return;
 
+    final config = ref
+        .read(aiProviderControllerProvider)
+        .providers
+        .where((item) => item.id == widget.providerId)
+        .first;
+    final definition = RouterCatalog.byId(config.presetId ?? '');
+    if (definition == null) return;
+
     final added = await ref
-        .read(aiProviderControllerProvider.notifier)
-        .addCustomModel(widget.providerId, modelId);
+        .read(aiProviderModelControllerProvider.notifier)
+        .addCustomModel(
+          definition.providerKey,
+          AiProviderModelDescriptor(id: modelId, name: modelId),
+        );
     if (!added && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Model ID không hợp lệ hoặc đã tồn tại.')),
@@ -232,7 +266,13 @@ class _ModelSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(aiProviderControllerProvider.notifier);
+    final config = ref
+        .read(aiProviderControllerProvider)
+        .providers
+        .where((item) => item.id == providerId)
+        .first;
+    final providerKey = RouterCatalog.byId(config.presetId ?? '')?.providerKey;
+    final notifier = ref.read(aiProviderModelControllerProvider.notifier);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -266,20 +306,27 @@ class _ModelSection extends ConsumerWidget {
                   ? IconButton(
                       tooltip: 'Khôi phục model',
                       icon: const Icon(Icons.restore),
-                      onPressed: () =>
-                          notifier.restoreModel(providerId, model.id),
+                      onPressed: providerKey == null
+                          ? null
+                          : () => notifier.enableModel(providerKey, model.id),
                     )
                   : model.custom
                   ? IconButton(
                       tooltip: 'Xóa model tùy chỉnh',
                       icon: const Icon(Icons.delete_outline),
-                      onPressed: () =>
-                          notifier.removeCustomModel(providerId, model.id),
+                      onPressed: providerKey == null
+                          ? null
+                          : () => notifier.deleteCustomModel(
+                              providerKey,
+                              model.id,
+                            ),
                     )
                   : IconButton(
                       tooltip: 'Ẩn model',
                       icon: const Icon(Icons.visibility_off_outlined),
-                      onPressed: () => notifier.hideModel(providerId, model.id),
+                      onPressed: providerKey == null
+                          ? null
+                          : () => notifier.disableModel(providerKey, model.id),
                     ),
             ),
       ],
