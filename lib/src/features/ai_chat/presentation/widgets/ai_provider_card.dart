@@ -14,6 +14,7 @@ class AiProviderCard extends ConsumerWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onSelect,
+    this.onManageModels,
     required this.isActive,
     this.deleteLabel = 'Xóa',
   });
@@ -24,6 +25,7 @@ class AiProviderCard extends ConsumerWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onSelect;
+  final VoidCallback? onManageModels;
   final bool isActive;
   final String deleteLabel;
 
@@ -138,13 +140,26 @@ class AiProviderCard extends ConsumerWidget {
                   if (hasConfig)
                     PopupMenuButton<String>(
                       onSelected: (value) {
-                        if (value == 'edit') {
+                        if (value == 'models') {
+                          onManageModels?.call();
+                        } else if (value == 'edit') {
                           onEdit();
                         } else if (value == 'delete') {
                           onDelete();
                         }
                       },
                       itemBuilder: (context) => [
+                        if (onManageModels != null)
+                          const PopupMenuItem(
+                            value: 'models',
+                            child: Row(
+                              children: [
+                                Icon(Icons.style_outlined, size: 20),
+                                SizedBox(width: PortalSpacing.sm),
+                                Text('Quản lý model'),
+                              ],
+                            ),
+                          ),
                         const PopupMenuItem(
                           value: 'edit',
                           child: Row(

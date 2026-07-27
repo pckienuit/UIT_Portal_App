@@ -266,7 +266,8 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                           labelText: 'Base URL',
                           hintText: 'https://api.openai.com/v1',
                         ),
-                        enabled: widget.preset.id == 'custom' ||
+                        enabled:
+                            widget.preset.id == 'custom' ||
                             widget.preset.id == 'ollama-local' ||
                             widget.preset.requiresBaseUrl,
                         validator: (value) {
@@ -308,29 +309,35 @@ class _AiProviderEditorSheetState extends ConsumerState<AiProviderEditorSheet> {
                       SizedBox(height: PortalSpacing.md),
                       Builder(
                         builder: (context) {
+                          if (widget.preset.id != 'custom') {
+                            return const SizedBox.shrink();
+                          }
                           final customModels =
                               widget.config?.customModels ??
                               const <AiProviderModelDescriptor>[];
                           final allPresetModels = <AiModelOption>[
                             ...customModels.map(
-                              (model) => AiModelOption(
-                                id: model.id,
-                                name: model.name,
-                              ),
+                              (model) =>
+                                  AiModelOption(id: model.id, name: model.name),
                             ),
                             ...widget.preset.models.map(
-                              (model) => AiModelOption(
-                                id: model.id,
-                                name: model.name,
-                              ),
+                              (model) =>
+                                  AiModelOption(id: model.id, name: model.name),
                             ),
                           ];
                           final seen = <String>{};
-                          final uniqueModels = allPresetModels.where((m) => seen.add(m.id)).toList();
-                          if (uniqueModels.isEmpty) return const SizedBox.shrink();
+                          final uniqueModels = allPresetModels
+                              .where((m) => seen.add(m.id))
+                              .toList();
+                          if (uniqueModels.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
                           return DropdownButtonFormField<String>(
                             isExpanded: true,
-                            initialValue: uniqueModels.any((m) => m.id == _modelIdController.text.trim())
+                            initialValue:
+                                uniqueModels.any(
+                                  (m) => m.id == _modelIdController.text.trim(),
+                                )
                                 ? _modelIdController.text.trim()
                                 : (uniqueModels.first.id),
                             decoration: const InputDecoration(

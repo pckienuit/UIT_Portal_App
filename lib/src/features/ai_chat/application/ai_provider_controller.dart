@@ -168,7 +168,9 @@ class AiProviderController extends Notifier<AiProviderState> {
     }
     final isHidden = config.hiddenModelIds.contains(modelId);
     final updatedHidden = isHidden
-        ? config.hiddenModelIds.where((h) => h != modelId).toList(growable: false)
+        ? config.hiddenModelIds
+              .where((h) => h != modelId)
+              .toList(growable: false)
         : config.hiddenModelIds;
 
     final updatedCustom = config.customModels.any((m) => m.id == modelId)
@@ -189,43 +191,74 @@ class AiProviderController extends Notifier<AiProviderState> {
     return true;
   }
 
-  Future<bool> deleteCustomModel(
-    String connectionId,
-    String modelId,
-  ) async {
+  Future<bool> hideModel(String connectionId, String modelId) async {
+    final targetId = modelId.trim();
+    final index = state.providers.indexWhere((item) => item.id == connectionId);
+    if (targetId.isEmpty || index < 0) return false;
+    final config = state.providers[index];
+    if (config.hiddenModelIds.contains(targetId)) return false;
+
+    await saveProvider(
+      config.copyWith(hiddenModelIds: [...config.hiddenModelIds, targetId]),
+      replaceModelMetadata: true,
+    );
+    return true;
+  }
+
+  Future<bool> restoreModel(String connectionId, String modelId) async {
+    final targetId = modelId.trim();
+    final index = state.providers.indexWhere((item) => item.id == connectionId);
+    if (targetId.isEmpty || index < 0) return false;
+    final config = state.providers[index];
+    if (!config.hiddenModelIds.contains(targetId)) return false;
+
+    await saveProvider(
+      config.copyWith(
+        hiddenModelIds: config.hiddenModelIds
+            .where((id) => id != targetId)
+            .toList(growable: false),
+      ),
+      replaceModelMetadata: true,
+    );
+    return true;
+  }
+
+  Future<bool> removeCustomModel(String connectionId, String modelId) async {
     final targetId = modelId.trim();
     final index = state.providers.indexWhere((item) => item.id == connectionId);
     if (index < 0) return false;
     final config = state.providers[index];
-    final isCustom = config.customModels.any((m) => m.id == targetId);
+    if (!config.customModels.any((m) => m.id == targetId)) return false;
 
-    if (isCustom) {
-      final updatedCustom = config.customModels
-          .where((m) => m.id != targetId)
-          .toList(growable: false);
-      final fallbackModelId = config.models
-          .map((model) => model.id)
-          .firstWhere(
-            (id) => id != targetId && !config.hiddenModelIds.contains(id),
-            orElse: () => '',
-          );
-      await saveProvider(
-        config.copyWith(
-          customModels: updatedCustom,
-          modelId: config.modelId == targetId ? fallbackModelId : config.modelId,
-        ),
-        replaceModelMetadata: true,
-      );
-    } else {
-      if (config.hiddenModelIds.contains(targetId)) return false;
-      final updatedHidden = [...config.hiddenModelIds, targetId];
-      await saveProvider(
-        config.copyWith(hiddenModelIds: updatedHidden),
-        replaceModelMetadata: true,
-      );
-    }
-    ref.invalidate(routerModelCatalogProvider(connectionId));
+    await saveProvider(
+      config.copyWith(
+        customModels: config.customModels
+            .where((model) => model.id != targetId)
+            .toList(growable: false),
+        hiddenModelIds: config.hiddenModelIds
+            .where((id) => id != targetId)
+            .toList(growable: false),
+      ),
+      replaceModelMetadata: true,
+    );
     return true;
+  }
+
+  Future<bool> deleteCustomModel(String connectionId, String modelId) async {
+    final matches = state.providers.where((item) => item.id == connectionId);
+    if (matches.isEmpty) return false;
+    final config = matches.first;
+    return config.customModels.any((model) => model.id == modelId.trim())
+        ? removeCustomModel(connectionId, modelId)
+        : hideModel(connectionId, modelId);
+  }
+
+  Future<List<AiModelOption>> refreshModels(String connectionId) async {
+    final models = await ref
+        .read(routerAdminClientProvider)
+        .listModels(connectionId);
+    updateProviderModels(connectionId, models);
+    return models;
   }
 
   Future<void> deleteProvider(String id) async {

@@ -6,15 +6,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/ai_chat_providers.dart';
-import 'package:uit_portal_app/src/features/ai_chat/application/ai_chat_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/router_runtime_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_catalog.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/router_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/github_oauth_service.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
-import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
-import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/ai_provider_settings_screen.dart';
 import 'package:uit_portal_app/src/features/ai_chat/presentation/router_hub/router_metrics_tabs.dart';
 import 'package:uit_portal_app/src/features/home/providers/widget_preferences_provider.dart';
@@ -480,9 +477,7 @@ void main() {
     expect(find.text('Model: gpt-5.4'), findsOneWidget);
   });
 
-  testWidgets('connected Antigravity changes model through shared picker', (
-    tester,
-  ) async {
+  testWidgets('connected Antigravity opens model manager', (tester) async {
     await RouterCatalog.load('''{"providers":[
       {"id":"antigravity","name":"Antigravity","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"loopback","nativeStatus":"experimental","tokenRefresh":"refreshToken","transportKind":"geminiCli","chatUrl":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse","defaultBaseUrl":"https://cloudcode-pa.googleapis.com/v1internal","models":[{"id":"claude-sonnet-4-6","name":"Claude Sonnet 4.6 (Thinking)"}]}
     ]}''');
@@ -497,15 +492,6 @@ void main() {
         routerRuntimeServiceProvider.overrideWith(
           _StoppedRouterRuntimeService.new,
         ),
-        routerModelCatalogProvider('provider-antigravity').overrideWith(
-          (ref) async => const [
-            AiModelOption(
-              id: 'claude-sonnet-4-6',
-              name: 'Claude Sonnet 4.6 (Thinking)',
-              owner: 'antigravity',
-            ),
-          ],
-        ),
       ],
     );
     addTearDown(container.dispose);
@@ -517,18 +503,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Đổi Model'));
-    await tester.tap(find.text('Đổi Model'));
+    await tester.ensureVisible(find.text('Quản lý model'));
+    await tester.tap(find.text('Quản lý model'));
     await tester.pumpAndSettle();
-    expect(find.text('Chọn mô hình (Model)'), findsOneWidget);
-    expect(find.text('Chọn model cho Antigravity'), findsNothing);
-    await tester.tap(find.text('Claude Sonnet 4.6 (Thinking)'));
-    await tester.pumpAndSettle();
-    expect(find.text('Chọn mô hình (Model)'), findsNothing);
-    expect(tester.takeException(), isNull);
+
+    expect(find.text('Claude Sonnet 4.6 (Thinking)'), findsOneWidget);
+    expect(find.text('Thêm model'), findsNothing);
+    expect(find.byIcon(Icons.check), findsNothing);
+    expect(
+      container.read(aiProviderControllerProvider).providers.single.modelId,
+      'legacy-model',
+    );
   });
 
-  testWidgets('rejects model change while chat is generating', (tester) async {
+  testWidgets('catalog hide does not change provider modelId', (tester) async {
     await RouterCatalog.load('''{"providers":[
       {"id":"github","name":"GitHub Copilot","category":"oauth","disposition":"ready","hasOAuth":true,"mobileSupported":true,"androidAuth":"device","nativeStatus":"ready","gatewayFallback":false,"transportKind":"githubCopilot","chatUrl":"https://api.githubcopilot.com/chat/completions","models":[{"id":"gpt-next","name":"GPT Next"}]}
     ]}''');
@@ -543,12 +531,6 @@ void main() {
         routerRuntimeServiceProvider.overrideWith(
           _StoppedRouterRuntimeService.new,
         ),
-        aiChatControllerProvider.overrideWith(_GeneratingAiChatController.new),
-        routerModelCatalogProvider('provider-github').overrideWith(
-          (ref) async => const [
-            AiModelOption(id: 'gpt-next', name: 'GPT Next'),
-          ],
-        ),
       ],
     );
     addTearDown(container.dispose);
@@ -560,20 +542,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Đổi Model'));
-    await tester.tap(find.text('Đổi Model'));
+    await tester.ensureVisible(find.text('Quản lý model'));
+    await tester.tap(find.text('Quản lý model'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('GPT Next'));
+    await tester.tap(find.byTooltip('Ẩn model'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Vui lòng dừng trả lời hiện tại trước khi đổi model.'),
-      findsOneWidget,
-    );
-    expect(
-      container.read(aiProviderControllerProvider).providers.single.modelId,
-      'gpt-current',
-    );
+    final config = container
+        .read(aiProviderControllerProvider)
+        .providers
+        .single;
+    expect(config.modelId, 'gpt-current');
+    expect(config.hiddenModelIds, ['gpt-next']);
+    expect(find.text('Model đã ẩn'), findsOneWidget);
   });
 
   testWidgets('API-key deletion confirms, labels action, and bounds failure', (
@@ -622,11 +603,6 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
-}
-
-class _GeneratingAiChatController extends AiChatController {
-  @override
-  AiChatState build() => AiChatState(isGenerating: true);
 }
 
 class _StoppedRouterRuntimeService extends RouterRuntimeService {

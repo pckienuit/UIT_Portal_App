@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uit_portal_app/src/features/ai_chat/application/ai_provider_controller.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_provider_repository.dart';
+import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_backend.dart';
 import 'package:uit_portal_app/src/features/ai_chat/domain/ai_chat_models.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/router_admin_client.dart';
 import 'package:uit_portal_app/src/features/ai_chat/data/ai_backend_factory.dart';
@@ -450,6 +451,62 @@ void main() {
     expect(edited.customModels.map((model) => model.id), ['custom-model']);
     expect(edited.hiddenModelIds, ['hidden-model']);
   });
+
+  test(
+    'catalog operations preserve modelId and cache explicit refresh',
+    () async {
+      final admin = _FakeRouterAdminClient(
+        models: const [AiModelOption(id: 'refreshed', name: 'Refreshed')],
+      );
+      final container = ProviderContainer(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          secureStorageProvider.overrideWithValue(fakeSecureStorage),
+          chatHistoryDirectoryProvider.overrideWith((ref) => historyDirectory),
+          routerAdminClientProvider.overrideWithValue(admin),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(aiProviderControllerProvider.notifier);
+
+      await controller.saveProvider(
+        const AiProviderConfig(
+          id: 'catalog-provider',
+          name: 'Catalog',
+          kind: AiBackendKind.openAiCompatible,
+          baseUrl: 'https://example.test/v1',
+          modelId: 'custom-current',
+          models: [AiProviderModelDescriptor(id: 'built-in', name: 'Built in')],
+          customModels: [
+            AiProviderModelDescriptor(id: 'custom-current', name: 'Custom'),
+          ],
+        ),
+      );
+
+      expect(
+        await controller.hideModel('catalog-provider', 'built-in'),
+        isTrue,
+      );
+      expect(
+        await controller.restoreModel('catalog-provider', 'built-in'),
+        isTrue,
+      );
+      expect(
+        await controller.removeCustomModel(
+          'catalog-provider',
+          'custom-current',
+        ),
+        isTrue,
+      );
+      expect(await controller.refreshModels('catalog-provider'), hasLength(1));
+
+      final state = container.read(aiProviderControllerProvider);
+      expect(state.providers.single.modelId, 'custom-current');
+      expect(state.providers.single.customModels, isEmpty);
+      expect(state.providers.single.hiddenModelIds, isEmpty);
+      expect(state.models['catalog-provider']?.single.id, 'refreshed');
+    },
+  );
 }
 
 class _ReadyRouterRuntimeService extends RouterRuntimeService {
@@ -462,15 +519,23 @@ class _ReadyRouterRuntimeService extends RouterRuntimeService {
 }
 
 class _FakeRouterAdminClient extends Fake implements RouterAdminClient {
-  _FakeRouterAdminClient({this.setActiveResult = true, this.saveGate});
+  _FakeRouterAdminClient({
+    this.setActiveResult = true,
+    this.saveGate,
+    this.models = const [],
+  });
 
   bool setActiveResult;
   final Completer<void>? saveGate;
+  final List<AiModelOption> models;
   final Completer<void> saveStarted = Completer<void>();
   final List<String> deletedIds = [];
   final List<String> activatedIds = [];
   String? savedRuntimeToken;
   String? savedSourceToken;
+
+  @override
+  Future<List<AiModelOption>> listModels(String connectionId) async => models;
 
   @override
   Future<bool> saveProvider(

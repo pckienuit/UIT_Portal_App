@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/foundations/portal_spacing.dart';
-import '../../application/ai_chat_controller.dart';
+
 import '../../application/ai_provider_controller.dart';
 
 import '../../data/local_model_catalog.dart';
@@ -11,7 +11,7 @@ import '../../domain/ai_provider_catalog.dart';
 import '../../domain/router_catalog.dart';
 import '../../domain/router_models.dart';
 import '../ai_model_download_section.dart';
-import '../ai_model_picker_sheet.dart';
+import '../ai_model_manager_sheet.dart';
 import '../ai_provider_editor_sheet.dart';
 import '../widgets/ai_provider_card.dart';
 import 'github_oauth_sheet.dart';
@@ -192,6 +192,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
               onEdit: () => _openEditor(preset, config: config),
               onDelete: () => _deleteApiKey(notifier, config.id),
               onSelect: () => notifier.selectActiveProvider(config.id),
+              onManageModels: () => _openModelManager(config),
               deleteLabel: 'Xóa API key',
             ),
           AiProviderCard(
@@ -215,6 +216,7 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       onEdit: () => _openEditor(preset, config: config),
       onDelete: () => _deleteApiKey(notifier, config!.id),
       onSelect: () => notifier.selectActiveProvider(config!.id),
+      onManageModels: config != null ? () => _openModelManager(config) : null,
       deleteLabel: 'Xóa API key',
     );
   }
@@ -314,30 +316,8 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
               spacing: PortalSpacing.sm,
               children: [
                 TextButton(
-                  onPressed: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => AiModelPickerSheet(
-                      providerId: config.id,
-                      currentModelId: config.modelId,
-                      onModelSelected: (modelId, _) async {
-                        if (ref.read(aiChatControllerProvider).isGenerating) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Vui lòng dừng trả lời hiện tại trước khi đổi model.',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                        await notifier.saveProvider(
-                          config.copyWith(modelId: modelId),
-                        );
-                      },
-                    ),
-                  ),
-                  child: const Text('Đổi Model'),
+                  onPressed: () => _openModelManager(config),
+                  child: const Text('Quản lý model'),
                 ),
                 TextButton(
                   onPressed: removeConnection,
@@ -399,6 +379,14 @@ class _RouterProvidersTabState extends ConsumerState<RouterProvidersTab> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AiProviderEditorSheet(preset: preset, config: config),
+    );
+  }
+
+  void _openModelManager(AiProviderConfig config) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AiModelManagerSheet(providerId: config.id),
     );
   }
 
