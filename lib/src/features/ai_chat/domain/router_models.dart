@@ -189,6 +189,8 @@ class RouterProviderDefinition {
     required this.name,
     required this.category,
     required this.authModes,
+    this.alias,
+    this.passthroughModels = false,
     this.mobileSupported = true,
     this.unsupportedReason,
     this.quotaSupported = false,
@@ -209,6 +211,9 @@ class RouterProviderDefinition {
   });
 
   final String id;
+  final String? alias;
+  final bool passthroughModels;
+  String get providerKey => alias ?? id;
   final String name;
   final RouterProviderCategory category;
   final List<RouterAuthMode> authModes;
@@ -286,6 +291,8 @@ class RouterProviderDefinition {
 
     return RouterProviderDefinition(
       id: json['id'] as String,
+      alias: json['alias'] as String?,
+      passthroughModels: json['passthroughModels'] == true,
       name: json['name'] as String,
       category: category,
       authModes: authModes,

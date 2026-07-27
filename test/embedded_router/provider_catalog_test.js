@@ -69,6 +69,16 @@ test('generated catalog contains only explicitly actionable providers', () => {
   );
 });
 
+test('generated catalog preserves upstream aliases and passthrough flags', () => {
+  const byId = new Map(loadCatalog().map((provider) => [provider.id, provider]));
+
+  assert.equal(byId.get('github').alias, 'gh');
+  assert.equal(byId.get('codex').alias, 'cx');
+  assert.equal(byId.get('openai').alias, 'openai');
+  assert.equal(byId.get('openrouter').passthroughModels, true);
+  assert.equal(byId.get('github').passthroughModels, false);
+});
+
 test('generated catalog excludes candidate and removed providers', () => {
   const providers = new Map(loadCatalog().map((provider) => [provider.id, provider]));
 

@@ -28,6 +28,35 @@ void main() {
     expect(definition.staticHeaders, {'anthropic-version': '2023-06-01'});
   });
 
+  test('uses alias as provider key and falls back to provider ID', () {
+    final github = RouterProviderDefinition.fromJson({
+      'id': 'github',
+      'alias': 'gh',
+      'name': 'GitHub Copilot',
+      'category': 'oauth',
+      'mobileSupported': true,
+      'androidAuth': 'device',
+      'nativeStatus': 'ready',
+      'transportKind': 'githubCopilot',
+      'chatUrl': 'https://api.githubcopilot.com/chat/completions',
+      'models': <Object>[],
+    });
+    final openAi = RouterProviderDefinition.fromJson({
+      'id': 'openai',
+      'name': 'OpenAI',
+      'category': 'apikey',
+      'mobileSupported': true,
+      'androidAuth': 'apiKey',
+      'nativeStatus': 'ready',
+      'transportKind': 'openaiChat',
+      'chatUrl': 'https://api.openai.com/v1/chat/completions',
+      'models': <Object>[],
+    });
+
+    expect(github.providerKey, 'gh');
+    expect(openAi.providerKey, 'openai');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(

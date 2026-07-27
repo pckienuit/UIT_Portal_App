@@ -76,6 +76,8 @@ function run() {
     if (!idMatch) continue;
 
     const id = idMatch[1];
+    const alias = content.match(/\balias\s*:\s*["']([^"']+)["']/)?.[1] || null;
+    const passthroughModels = /\bpassthroughModels\s*:\s*true\b/.test(content);
     const category = catMatch ? catMatch[1] : 'custom';
     if (!SUPPORTED_CATEGORIES.has(category)) continue;
     
@@ -187,6 +189,7 @@ function run() {
 
     catalog.push({
       id,
+      alias,
       name: displayName,
       category,
       color,
@@ -210,6 +213,7 @@ function run() {
       authScheme: providerSupport.authScheme || null,
       requiredFields: providerSupport.requiredFields || [],
       staticHeaders: providerSupport.staticHeaders || {},
+      passthroughModels,
       models,
     });
   }
