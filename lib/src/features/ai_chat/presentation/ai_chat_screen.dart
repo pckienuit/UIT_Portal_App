@@ -5,6 +5,7 @@ import '../../../design_system/components/portal_surface.dart';
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../application/ai_chat_controller.dart';
 import '../application/ai_portal_context_builder.dart';
+import '../domain/ai_chat_backend.dart';
 import '../domain/ai_chat_models.dart';
 import 'ai_context_consent_sheet.dart';
 import 'ai_model_picker_sheet.dart';
@@ -20,7 +21,8 @@ class AiChatScreen extends ConsumerStatefulWidget {
 class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
-  bool _shareContextConsented = false;
+  Set<AiPortalContextSection> _sharedContextSections = {};
+  AiPortalContextSnapshot? _sharedContextSnapshot;
 
   @override
   void dispose() {
@@ -45,8 +47,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     final text = commitComposerText(_textController);
     if (text.isEmpty) return;
 
-    if (_shareContextConsented) {
-      final snapshot = const AiPortalContextBuilder().buildSnapshot(ref);
+    if (_sharedContextSections.isNotEmpty) {
+      final snapshot =
+          _sharedContextSnapshot ??
+          const AiPortalContextBuilder()
+              .buildSnapshot(ref, sections: _sharedContextSections)
+              .select(_sharedContextSections);
       ref
           .read(aiChatControllerProvider.notifier)
           .sendMessage(text, contextSnapshot: snapshot);
@@ -63,9 +69,11 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       isScrollControlled: true,
       builder: (context) {
         return AiContextConsentSheet(
-          onConsentChanged: (consented) {
+          initialSections: _sharedContextSections,
+          onSelectionChanged: (sections, snapshot) {
             setState(() {
-              _shareContextConsented = consented;
+              _sharedContextSections = sections;
+              _sharedContextSnapshot = snapshot;
             });
           },
         );
@@ -390,23 +398,24 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           Row(
             children: [
               Expanded(
-                child: CheckboxListTile(
-                  value: _shareContextConsented,
-                  title: const Text(
-                    'Chia sẻ ngữ cảnh học tập (Điểm, Lịch học, Học phí)',
-                    style: TextStyle(fontSize: 12),
+                child: TextButton.icon(
+                  onPressed: _showConsentSheet,
+                  icon: Icon(
+                    _sharedContextSections.isEmpty
+                        ? Icons.add_circle_outline
+                        : Icons.check_circle,
+                    size: 18,
                   ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (val) {
-                    if (val == true) {
-                      _showConsentSheet();
-                    } else {
-                      setState(() {
-                        _shareContextConsented = false;
-                      });
-                    }
-                  },
+                  label: Text(
+                    _sharedContextSections.isEmpty
+                        ? 'Thêm ngữ cảnh cho AI'
+                        : 'Đang chia sẻ ${_sharedContextSections.length} mục',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
               ),
             ],
