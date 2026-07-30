@@ -2,6 +2,8 @@
 
 Tài liệu này tổng hợp toàn bộ các API nội bộ của hệ thống UIT Portal (Next.js) được trích xuất trong quá trình xây dựng ứng dụng Mobile Native.
 
+> Không phải tài liệu chính thức của UIT. Chỉ dùng với tài khoản và dữ liệu của chính bạn, tuân thủ điều khoản dịch vụ của UIT Portal, tránh tải hàng loạt và không chia sẻ cookie, token, HAR hay dữ liệu sinh viên. Endpoint có thể đổi hoặc bị gỡ mà không báo trước.
+
 ## 🔑 Cơ chế Xác thực (Authentication - SSO Scraping)
 Hệ thống UIT Portal (Next.js) không cung cấp API Login trực tiếp (Username/Password) mà sử dụng luồng OIDC (OpenID Connect) redirect qua hệ thống Keycloak (Microsoft SSO) của trường (`sso.uit.edu.vn`).
 

@@ -118,6 +118,17 @@ function run() {
       if (typeof providerSupport.reason !== 'string' || !providerSupport.reason.trim()) {
         throw new Error(`Missing audit reason for ${category}/${id}`);
       }
+    }
+    if (providerSupport.disposition === 'remove') {
+      continue;
+    }
+    // Candidate entries with complete descriptors remain available to the
+    // loopback runtime for existing connections, but Flutter never exposes
+    // them in the public Android provider picker.
+    if (providerSupport.disposition === 'candidate' &&
+        (!providerSupport.androidAuth ||
+          !providerSupport.transportKind ||
+          !providerSupport.chatUrl)) {
       continue;
     }
     if (!ANDROID_AUTH.has(providerSupport.androidAuth)) {
@@ -195,8 +206,10 @@ function run() {
       color,
       icon,
       disposition: providerSupport.disposition,
-      mobileSupported: true,
-      unsupportedReason: null,
+      mobileSupported: providerSupport.disposition !== 'candidate',
+      unsupportedReason: providerSupport.disposition === 'candidate'
+        ? providerSupport.reason
+        : null,
       hasOAuth,
       quotaSupported: providerSupport.quotaAdapter != null,
       quotaAdapter: providerSupport.quotaAdapter || null,

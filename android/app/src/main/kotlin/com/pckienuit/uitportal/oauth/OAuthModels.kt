@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.oauth
+package com.pckienuit.uitportal.oauth
 
 import java.net.URI
 
@@ -49,7 +49,6 @@ private fun URI.isHttpsEndpoint(): Boolean =
 data class AuthorizationOAuthProvider(
     val id: String,
     val clientId: String,
-    val clientSecret: String?,
     val authorizeUrl: URI,
     val tokenUrl: URI,
     val scope: String,
@@ -63,7 +62,6 @@ data class AuthorizationOAuthProvider(
     init {
         require(id.isNotBlank()) { "Provider id is required" }
         require(clientId.isNotBlank()) { "OAuth client id is required" }
-        require(clientSecret == null || clientSecret.isNotBlank()) { "OAuth client secret is invalid" }
         require(scope.isNotBlank()) { "OAuth scope is required" }
         require(authorizeUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }
         require(tokenUrl.isHttpsEndpoint()) { "OAuth endpoints must use HTTPS" }

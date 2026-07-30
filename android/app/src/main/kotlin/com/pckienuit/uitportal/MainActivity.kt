@@ -1,9 +1,9 @@
-package com.personal.uit_portal_app
+package com.pckienuit.uitportal
 
 import android.content.Intent
 import android.net.Uri
-import com.personal.uit_portal_app.oauth.NativeOAuthCoordinator
-import com.personal.uit_portal_app.router.RouterRuntime
+import com.pckienuit.uitportal.oauth.NativeOAuthCoordinator
+import com.pckienuit.uitportal.router.RouterRuntime
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,7 +16,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         routerRuntime = RouterRuntime(applicationContext)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.personal.uitportal/router")
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pckienuit.uitportal/router")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "ensureStarted" -> routerRuntime.ensureStarted { status ->
@@ -27,7 +27,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.personal.uitportal/oauth")
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pckienuit.uitportal/oauth")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "openUrl" -> {
@@ -45,7 +45,7 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "com.personal.uitportal/provider_oauth",
+            "com.pckienuit.uitportal/provider_oauth",
         ).setMethodCallHandler(nativeOAuthCoordinator::handle)
     }
 

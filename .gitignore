@@ -53,3 +53,15 @@ app.*.map.json
 /android/app/libnode/
 /android/app/build/
 /router_mobile_core/
+
+# Local secrets and release signing
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+/android/key.properties
+/window_dump.xml

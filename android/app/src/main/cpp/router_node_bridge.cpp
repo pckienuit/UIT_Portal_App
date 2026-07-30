@@ -29,7 +29,7 @@ std::vector<std::string> readArguments(JNIEnv* env, jobjectArray arguments) {
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_personal_uit_1portal_1app_router_RouterRuntime_startNodeWithArguments(
+Java_com_pckienuit_uitportal_router_RouterRuntime_startNodeWithArguments(
     JNIEnv* env,
     jobject /* receiver */,
     jobjectArray arguments) {

@@ -1,6 +1,9 @@
 name: uit_portal_app
-description: "Native Flutter Android client for UIT Portal with AppAuth SSO."
+description: "Unofficial native Flutter Android client for UIT Portal."
 publish_to: 'none'
+repository: https://github.com/pckienuit/UIT_Portal_App
+issue_tracker: https://github.com/pckienuit/UIT_Portal_App/issues
+homepage: https://github.com/pckienuit/UIT_Portal_App
 
 version: 1.0.0+1
 

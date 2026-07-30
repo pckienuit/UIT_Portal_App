@@ -1,7 +1,8 @@
 {
   "oauth": {
     "antigravity": {
-      "disposition": "ready",
+      "disposition": "candidate",
+      "reason": "Disabled in public Android release: native flow requires confidential desktop OAuth credentials",
       "androidAuth": "loopback",
       "transportKind": "geminiCli",
       "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
@@ -100,7 +101,8 @@
   },
   "free": {
     "gemini-cli": {
-      "disposition": "ready",
+      "disposition": "candidate",
+      "reason": "Disabled in public Android release: native flow requires confidential desktop OAuth credentials",
       "androidAuth": "loopback",
       "transportKind": "geminiCli",
       "chatUrl": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",

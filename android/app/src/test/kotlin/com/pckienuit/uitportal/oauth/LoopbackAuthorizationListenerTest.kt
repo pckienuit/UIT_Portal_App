@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.oauth
+package com.pckienuit.uitportal.oauth
 
 import java.net.HttpURLConnection
 import java.net.InetAddress

@@ -1,7 +1,7 @@
 class OidcConfig {
   const OidcConfig({
     this.clientId = const String.fromEnvironment('UIT_OIDC_CLIENT_ID'),
-    this.redirectUrl = 'com.personal.uitportal:/oauthredirect',
+    this.redirectUrl = 'com.pckienuit.uitportal:/oauthredirect',
     this.issuer = 'https://sso.uit.edu.vn/realms/UIT',
     this.scopes = const ['openid', 'profile', 'email', 'offline_access'],
   });

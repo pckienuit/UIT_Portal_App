@@ -21,7 +21,7 @@ class GithubOAuthSheet extends ConsumerStatefulWidget {
 
 class _GithubOAuthSheetState extends ConsumerState<GithubOAuthSheet>
     with WidgetsBindingObserver {
-  static const _platform = MethodChannel('com.personal.uitportal/oauth');
+  static const _platform = MethodChannel('com.pckienuit.uitportal/oauth');
   static const _nativeOAuth = NativeOAuthClient();
 
   NativeDeviceFlow? _flow;

@@ -7,9 +7,9 @@
       "category": "oauth",
       "color": "#F59E0B",
       "icon": "rocket_launch",
-      "disposition": "ready",
-      "mobileSupported": true,
-      "unsupportedReason": null,
+      "disposition": "candidate",
+      "mobileSupported": false,
+      "unsupportedReason": "Disabled in public Android release: native flow requires confidential desktop OAuth credentials",
       "hasOAuth": true,
       "quotaSupported": true,
       "quotaAdapter": "antigravity",
@@ -320,9 +320,9 @@
       "category": "free",
       "color": "#4285F4",
       "icon": "terminal",
-      "disposition": "ready",
-      "mobileSupported": true,
-      "unsupportedReason": null,
+      "disposition": "candidate",
+      "mobileSupported": false,
+      "unsupportedReason": "Disabled in public Android release: native flow requires confidential desktop OAuth credentials",
       "hasOAuth": true,
       "quotaSupported": true,
       "quotaAdapter": "geminiCli",
@@ -399,6 +399,50 @@
       "staticHeaders": {},
       "passthroughModels": true,
       "models": []
+    },
+    {
+      "id": "anthropic",
+      "alias": "anthropic",
+      "name": "Anthropic",
+      "category": "apikey",
+      "color": "#D97757",
+      "icon": "smart_toy",
+      "disposition": "candidate",
+      "mobileSupported": false,
+      "unsupportedReason": "Hidden until auth, transport, quota, fixtures, and Android live proof pass",
+      "hasOAuth": false,
+      "quotaSupported": false,
+      "quotaAdapter": null,
+      "androidAuth": "apiKey",
+      "gatewayFallback": false,
+      "nativeStatus": "ready",
+      "nativeBlockReason": null,
+      "tokenRefresh": "none",
+      "defaultBaseUrl": "https://api.anthropic.com",
+      "transportKind": "anthropicMessages",
+      "chatUrl": "https://api.anthropic.com/v1/messages",
+      "modelsUrl": null,
+      "authHeader": "x-api-key",
+      "authScheme": null,
+      "requiredFields": [],
+      "staticHeaders": {
+        "anthropic-version": "2023-06-01"
+      },
+      "passthroughModels": false,
+      "models": [
+        {
+          "id": "claude-sonnet-4-20250514",
+          "name": "Claude Sonnet 4"
+        },
+        {
+          "id": "claude-opus-4-20250514",
+          "name": "Claude Opus 4"
+        },
+        {
+          "id": "claude-3-5-sonnet-20241022",
+          "name": "Claude 3.5 Sonnet"
+        }
+      ]
     },
     {
       "id": "cerebras",

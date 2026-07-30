@@ -25,4 +25,10 @@ void main() {
     expect(config.canStartNativeAuth, isTrue);
     expect(config.configurationProblem, isNull);
   });
+
+  test('default mobile redirect uses public Android application namespace', () {
+    const config = OidcConfig();
+
+    expect(config.redirectUrl, 'com.pckienuit.uitportal:/oauthredirect');
+  });
 }

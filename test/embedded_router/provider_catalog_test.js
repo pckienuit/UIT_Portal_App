@@ -51,17 +51,22 @@ test('generated provider catalog only contains supported LLM categories', () => 
 test('generated catalog contains only explicitly actionable providers', () => {
   const providers = loadCatalog();
   const ids = providers.map((provider) => provider.id);
+  const actionable = providers.filter((provider) => provider.mobileSupported);
 
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(
-    providers.every((provider) =>
+    actionable.every((provider) =>
       ['ready', 'customOnly'].includes(provider.disposition),
     ),
   );
-  assert.ok(providers.every((provider) => provider.mobileSupported === true));
-  assert.ok(providers.every((provider) => provider.androidAuth));
-  assert.ok(providers.every((provider) => provider.transportKind));
-  assert.ok(providers.every((provider) => provider.chatUrl));
+  assert.ok(actionable.every((provider) => provider.androidAuth));
+  assert.ok(actionable.every((provider) => provider.transportKind));
+  assert.ok(actionable.every((provider) => provider.chatUrl));
+  assert.ok(
+    providers
+      .filter((provider) => !provider.mobileSupported)
+      .every((provider) => provider.disposition === 'candidate'),
+  );
   assert.ok(
     providers.every((provider) =>
       provider.models.every((model) => !model.id.includes('embedding')),
@@ -79,7 +84,7 @@ test('generated catalog preserves upstream aliases and passthrough flags', () =>
   assert.equal(byId.get('github').passthroughModels, false);
 });
 
-test('generated catalog excludes candidate and removed providers', () => {
+test('generated catalog hides runtime-only candidates from public Android UI', () => {
   const providers = new Map(loadCatalog().map((provider) => [provider.id, provider]));
 
   assert.deepEqual(
@@ -90,51 +95,19 @@ test('generated catalog excludes candidate and removed providers', () => {
     },
     { androidAuth: 'device', nativeStatus: 'ready', tokenRefresh: 'exchange' },
   );
+  for (const id of ['antigravity', 'gemini-cli']) {
+    assert.equal(providers.get(id).disposition, 'candidate', id);
+    assert.equal(providers.get(id).mobileSupported, false, id);
+  }
   for (const id of ['claude', 'cursor', 'qwen', 'xai']) {
     assert.equal(providers.has(id), false, id);
   }
 });
 
-test('quota-enabled providers keep their own documented adapter contract', () => {
+test('public Android catalog exposes only supported quota adapters', () => {
   const byId = new Map(loadCatalog().map((provider) => [provider.id, provider]));
 
-  assert.deepEqual(
-    {
-      adapter: byId.get('antigravity').quotaAdapter,
-      modelsUrl: byId.get('antigravity').modelsUrl,
-      quotaSupported: byId.get('antigravity').quotaSupported,
-    },
-    {
-      adapter: 'antigravity',
-      modelsUrl: 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels',
-      quotaSupported: true,
-    },
-  );
-  assert.deepEqual(
-    byId.get('antigravity').models.map((model) => model.id),
-    [
-      'gemini-3-flash-agent',
-      'gemini-3.5-flash-low',
-      'gemini-3.5-flash-extra-low',
-      'gemini-pro-agent',
-      'gemini-3.1-pro-low',
-      'claude-sonnet-4-6',
-      'claude-opus-4-6-thinking',
-      'gpt-oss-120b-medium',
-      'gemini-3-flash',
-    ],
-  );
-  assert.equal(
-    byId.get('antigravity').models.some((model) => model.id.includes('image')),
-    false,
-  );
-  assert.equal(
-    byId.get('antigravity').models.some((model) =>
-      byId.get('gemini-cli').models.some((gemini) => gemini.id === model.id),
-    ),
-    false,
-  );
-  for (const id of ['codex', 'gemini-cli', 'github', 'openrouter']) {
+  for (const id of ['codex', 'github', 'openrouter']) {
     assert.equal(byId.get(id).quotaSupported, true, id);
   }
   assert.equal(byId.get('codex').quotaAdapter, 'codex');
@@ -178,7 +151,8 @@ test('Anthropic candidate locks exact Messages descriptor but remains hidden', (
   assert.deepEqual(anthropic.staticHeaders, {
     'anthropic-version': '2023-06-01',
   });
-  assert.equal(loadCatalog().some((provider) => provider.id === 'anthropic'), false);
+  const generated = loadCatalog().find((provider) => provider.id === 'anthropic');
+  assert.equal(generated?.mobileSupported, false);
 });
 
 test('generator fails closed when an upstream LLM provider is unclassified', () => {

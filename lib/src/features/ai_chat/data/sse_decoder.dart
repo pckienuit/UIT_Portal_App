@@ -10,11 +10,12 @@ class SseEvent {
   final int? retry;
 
   @override
-  String toString() => 'SseEvent(event: $event, data: $data, id: $id, retry: $retry)';
+  String toString() =>
+      'SseEvent(event: $event, data: $data, id: $id, retry: $retry)';
 }
 
-/// Bộ giải mã SSE stream độc lập. Phục vụ việc biến đổi Stream<List<int>> từ HTTP response 
-/// thành Stream<SseEvent> một cách mượt mà và an toàn trước các trường hợp:
+/// Bộ giải mã SSE stream độc lập. Phục vụ việc biến đổi `Stream<List<int>>` từ HTTP response
+/// thành `Stream<SseEvent>` một cách mượt mà và an toàn trước các trường hợp:
 /// - Event bị ngắt ở giữa các byte buffer
 /// - Nhiều events chứa trong một buffer duy nhất
 /// - UTF-8 multi-byte character bị cắt ngang ở ranh giới buffer.
@@ -23,9 +24,11 @@ class SseDecoder {
 
   Stream<SseEvent> bind(Stream<List<int>> stream) {
     String buffer = '';
-    
+
     return stream
-        .cast<List<int>>() // Cast Uint8List sang List<int> để tương thích Utf8Decoder ở runtime
+        .cast<
+          List<int>
+        >() // Cast Uint8List sang List<int> để tương thích Utf8Decoder ở runtime
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .expand((line) {

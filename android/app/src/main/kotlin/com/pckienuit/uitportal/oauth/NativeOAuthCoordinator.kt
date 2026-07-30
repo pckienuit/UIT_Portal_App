@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.oauth
+package com.pckienuit.uitportal.oauth
 
 import android.content.Intent
 import android.net.Uri
@@ -63,7 +63,6 @@ internal object OAuthAuthorizationContract {
         "code" to code,
         "redirect_uri" to redirectUri,
     ).also { fields ->
-        provider.clientSecret?.let { fields["client_secret"] = it }
         if (provider.usesPkce) fields["code_verifier"] = requireNotNull(codeVerifier)
     }
 
@@ -74,14 +73,17 @@ internal object OAuthAuthorizationContract {
         val b64 = payload.replace('-', '+').replace('_', '/')
         val pad = (4 - (b64.length % 4)) % 4
         val decoded = String(Base64.getUrlDecoder().decode(b64 + "=".repeat(pad)), StandardCharsets.UTF_8)
-        val json = JSONObject(decoded)
-        if (json.has("https://api.openai.com/auth")) {
-            val authObj = json.optJSONObject("https://api.openai.com/auth")
-            val chatgptAccId = authObj?.optString("chatgpt_account_id")
-            if (!chatgptAccId.isNullOrEmpty()) return chatgptAccId
-        }
-        json.optString("sub").trim().takeIf { it.isNotEmpty() }
+        extractJsonString(decoded, "chatgpt_account_id")
+            ?: extractJsonString(decoded, "sub")
     }.getOrNull()
+
+    private fun extractJsonString(json: String, key: String): String? =
+        Regex("\\\"${Regex.escape(key)}\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
+            .find(json)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
     private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
     private fun codeChallenge(verifier: String): String =
@@ -453,19 +455,16 @@ class NativeOAuthCoordinator {
         val clientAndUrl = try {
             val authorizationProvider = OAuthProviderRegistry.authorizationProviderOrNull(providerId)
             if (authorizationProvider != null) {
-                Triple(
-                    authorizationProvider.clientId,
-                    authorizationProvider.clientSecret,
-                    authorizationProvider.tokenUrl,
-                )
+                authorizationProvider.clientId to authorizationProvider.tokenUrl
             } else {
                 val provider = OAuthProviderRegistry.requireDeviceProvider(providerId)
-                Triple(provider.clientId, null, provider.refreshUrl ?: throw IllegalArgumentException("Provider không hỗ trợ refresh native"))
+                provider.clientId to (provider.refreshUrl
+                    ?: throw IllegalArgumentException("Provider không hỗ trợ refresh native"))
             }
         } catch (error: IllegalArgumentException) {
             return result.error("unsupported_provider", error.message, null)
         }
-        val (clientId, clientSecret, refreshUrl) = clientAndUrl
+        val (clientId, refreshUrl) = clientAndUrl
         executor.execute {
             try {
                 val fields = mutableMapOf(
@@ -473,7 +472,6 @@ class NativeOAuthCoordinator {
                     "refresh_token" to refreshToken,
                     "client_id" to clientId,
                 )
-                clientSecret?.let { fields["client_secret"] = it }
                 val payload = postForm(refreshUrl, fields)
                 result.success(
                     NativeOAuthCredential(

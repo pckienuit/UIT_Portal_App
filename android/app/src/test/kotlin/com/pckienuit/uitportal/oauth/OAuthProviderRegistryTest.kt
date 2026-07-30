@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.oauth
+package com.pckienuit.uitportal.oauth
 
 import java.net.URI
 import java.util.Base64
@@ -50,25 +50,14 @@ class OAuthProviderRegistryTest {
     }
 
     @Test
-    fun `Google providers retain separate post authorization contracts`() {
-        val gemini = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
-        val antigravity = OAuthProviderRegistry.requireAuthorizationProvider("antigravity")
-
-        assertTrue(gemini.resolvesGoogleProject)
-        assertTrue(antigravity.resolvesGoogleProject)
-        assertFalse(gemini.scope.contains("cclog"))
-        assertTrue(antigravity.scope.contains("cclog"))
-        assertTrue(antigravity.scope.contains("experimentsandconfigs"))
+    fun `Google desktop OAuth providers are not exposed by Android registry`() {
+        listOf("gemini-cli", "antigravity").forEach { providerId ->
+            assertFailsWith<IllegalArgumentException> {
+                OAuthProviderRegistry.requireAuthorizationProvider(providerId)
+            }
+        }
     }
 
-    @Test
-    fun `Gemini CLI exposes loopback authorization code flow`() {
-        val provider = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
-
-        assertEquals("https://accounts.google.com/o/oauth2/v2/auth", provider.authorizeUrl.toString())
-        assertEquals("https://oauth2.googleapis.com/token", provider.tokenUrl.toString())
-        assertEquals(true, provider.scope.contains("cloud-platform"))
-    }
 
     @Test
     fun `Codex uses upstream native OAuth scope without model request`() {
@@ -129,8 +118,16 @@ class OAuthProviderRegistryTest {
             codeVerifier = "verifier-value",
         )
 
-        assertEquals("verifier-value", fields["code_verifier"])
-        assertEquals(null, fields["client_secret"])
+        assertEquals(
+            mapOf(
+                "grant_type" to "authorization_code",
+                "client_id" to provider.clientId,
+                "code" to "authorization-code",
+                "redirect_uri" to "http://localhost:1455/auth/callback",
+                "code_verifier" to "verifier-value",
+            ),
+            fields,
+        )
         assertFalse(provider.resolvesGoogleProject)
     }
 
@@ -146,24 +143,6 @@ class OAuthProviderRegistryTest {
 
         assertEquals("acct_123", OAuthAuthorizationContract.accountIdFromIdToken(jwt))
         assertEquals(null, OAuthAuthorizationContract.accountIdFromIdToken("not-a-jwt"))
-    }
-
-    @Test
-    fun `Antigravity uses separate authorization client and required scopes`() {
-        val antigravity = OAuthProviderRegistry.requireAuthorizationProvider("antigravity")
-        val gemini = OAuthProviderRegistry.requireAuthorizationProvider("gemini-cli")
-
-        assertEquals("https://oauth2.googleapis.com/token", antigravity.tokenUrl.toString())
-        assertEquals(false, antigravity.clientId == gemini.clientId)
-        assertEquals(true, antigravity.scope.contains("cloud-platform"))
-        assertEquals(true, antigravity.scope.contains("userinfo.email"))
-        assertEquals(true, antigravity.scope.contains("userinfo.profile"))
-        assertEquals(true, antigravity.scope.contains("cclog"))
-        assertEquals(true, antigravity.scope.contains("experimentsandconfigs"))
-        assertEquals(false, gemini.scope.contains("cclog"))
-        assertEquals(false, gemini.scope.contains("experimentsandconfigs"))
-        assertEquals(antigravity, OAuthProviderRegistry.authorizationProviderOrNull("antigravity"))
-        assertEquals(null, OAuthProviderRegistry.authorizationProviderOrNull("github"))
     }
 
     @Test

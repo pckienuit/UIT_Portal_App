@@ -1256,7 +1256,9 @@ test('Ollama stalled stream returns sanitized terminal SSE error', async (t) => 
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, [mainPath, String(port), token, dataDir], {
     stdio: 'ignore',
-    env: { ...process.env, OLLAMA_STREAM_TIMEOUT_MS: '50' },
+    // Keep this above parallel CI scheduling jitter. The assertion targets a
+    // stalled response body, not connection establishment latency.
+    env: { ...process.env, OLLAMA_STREAM_TIMEOUT_MS: '200' },
   });
   t.after(() => child.kill());
   await waitUntilReady(baseUrl, token, child);

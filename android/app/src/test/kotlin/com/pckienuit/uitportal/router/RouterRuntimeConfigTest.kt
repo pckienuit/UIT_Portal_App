@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.router
+package com.pckienuit.uitportal.router
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -129,7 +129,7 @@ class NativeOAuthClient implements NativeOAuthApi {
   const NativeOAuthClient();
 
   static const _channel = MethodChannel(
-    'com.personal.uitportal/provider_oauth',
+    'com.pckienuit.uitportal/provider_oauth',
   );
 
   @override

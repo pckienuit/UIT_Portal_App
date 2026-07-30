@@ -4,7 +4,7 @@ import 'package:uit_portal_app/src/features/ai_chat/data/native_oauth_client.dar
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('com.personal.uitportal/provider_oauth');
+  const channel = MethodChannel('com.pckienuit.uitportal/provider_oauth');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 

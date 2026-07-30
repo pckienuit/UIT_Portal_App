@@ -1,4 +1,4 @@
-package com.personal.uit_portal_app.router
+package com.pckienuit.uitportal.router
 
 import android.content.Context
 import android.content.pm.PackageManager

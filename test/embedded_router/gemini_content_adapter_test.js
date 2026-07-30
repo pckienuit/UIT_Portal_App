@@ -148,20 +148,19 @@ test('runtime routes exact Gemini REST URL, key param, conversions, stream, fall
     (await request(baseUrl, token, 'POST', '/internal/providers', {
       id: 'gemini-rest-1',
       name: 'Google Gemini REST',
-      presetId: 'gemini',
+      presetId: 'custom',
       baseUrl: `http://127.0.0.1:${upstreamPort}/v1beta`,
-      modelId: 'gemini-2.5-flash',
       apiKey: secret,
       active: true,
       transportKind: 'geminiContent',
       chatUrl: `http://127.0.0.1:${upstreamPort}/v1beta/models/gemini-2.5-flash:generateContent`,
       authHeader: 'x-goog-api-key',
       authScheme: '',
-      models: [{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' }],
     })).status,
     201,
   );
   const nonStream = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'gemini-rest-1/gemini-2.5-flash',
     stream: false,
     messages: [{ role: 'user', content: 'hello' }],
   });
@@ -172,6 +171,7 @@ test('runtime routes exact Gemini REST URL, key param, conversions, stream, fall
   const nonStreamData = await nonStream.json();
   assert.equal(nonStreamData.choices[0].message.content, 'Gemini REST reply');
   const streamRes = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'gemini-rest-1/gemini-2.5-flash',
     stream: true,
     messages: [{ role: 'user', content: 'hello stream' }],
   });
@@ -182,6 +182,7 @@ test('runtime routes exact Gemini REST URL, key param, conversions, stream, fall
   assert.equal(received[0].headerKey, secret);
   mode = 'error';
   const failed = await request(baseUrl, token, 'POST', '/v1/chat/completions', {
+    model: 'gemini-rest-1/gemini-2.5-flash',
     stream: false,
     messages: [{ role: 'user', content: 'fail' }],
   });

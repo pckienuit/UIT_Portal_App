@@ -32,7 +32,7 @@ class RouterStatus {
 }
 
 class RouterRuntimeService extends Notifier<RouterStatus> {
-  static const _channel = MethodChannel('com.personal.uitportal/router');
+  static const _channel = MethodChannel('com.pckienuit.uitportal/router');
 
   @override
   RouterStatus build() {
@@ -43,11 +43,16 @@ class RouterRuntimeService extends Notifier<RouterStatus> {
     if (state.state == RouterState.ready) return state;
     state = const RouterStatus(state: RouterState.starting);
     try {
-      final res = await _channel.invokeMapMethod<String, dynamic>('ensureStarted');
+      final res = await _channel.invokeMapMethod<String, dynamic>(
+        'ensureStarted',
+      );
       if (res != null) {
         state = RouterStatus.fromMap(res);
       } else {
-        state = const RouterStatus(state: RouterState.failed, message: 'JNI returned empty result');
+        state = const RouterStatus(
+          state: RouterState.failed,
+          message: 'JNI returned empty result',
+        );
       }
     } catch (e) {
       state = RouterStatus(state: RouterState.failed, message: e.toString());
@@ -66,6 +71,7 @@ class RouterRuntimeService extends Notifier<RouterStatus> {
   }
 }
 
-final routerRuntimeServiceProvider = NotifierProvider<RouterRuntimeService, RouterStatus>(() {
-  return RouterRuntimeService();
-});
+final routerRuntimeServiceProvider =
+    NotifierProvider<RouterRuntimeService, RouterStatus>(() {
+      return RouterRuntimeService();
+    });

@@ -195,12 +195,11 @@ test('runtime routes exact Anthropic URL, headers, conversions, stream, fallback
   t.after(() => child.kill());
   await waitUntilReady(baseUrl, token, child);
   assert.equal((await coreRequest(baseUrl, token, 'POST', '/internal/providers', {
-    id: 'anthropic-1', name: 'Anthropic', presetId: 'anthropic',
-    baseUrl: 'https://must-not-be-used.example', modelId: 'claude-sonnet-4-20250514',
+    id: 'anthropic-1', name: 'Anthropic', presetId: 'custom',
+    baseUrl: 'https://must-not-be-used.example',
     apiKey: secret, active: true, transportKind: 'anthropicMessages', chatUrl,
     authHeader: 'x-api-key', authScheme: '',
     staticHeaders: { 'anthropic-version': '2023-06-01' },
-    models: [{ id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' }],
   })).status, 201);
 
   assert.equal((await coreRequest(baseUrl, token, 'PATCH', '/internal/providers/anthropic-1', {
@@ -211,18 +210,18 @@ test('runtime routes exact Anthropic URL, headers, conversions, stream, fallback
   child = spawn(process.execPath, [mainPath, String(port), token, dataDir], { stdio: 'ignore' });
   await waitUntilReady(baseUrl, token, child);
   const reloaded = await coreRequest(baseUrl, token, 'GET', '/internal/providers');
-  assert.deepEqual((await reloaded.json())[0].staticHeaders, {
+  assert.deepEqual((await reloaded.json())[0].mobileMetadata.staticHeaders, {
     'anthropic-version': '2024-01-01',
   });
   assert.equal((await coreRequest(baseUrl, token, 'PATCH', '/internal/providers/anthropic-1', {
     apiKey: secret,
   })).status, 200);
 
-  const models = await coreRequest(baseUrl, token, 'GET', '/v1/models');
-  assert.deepEqual((await models.json()).data.map((model) => model.id), [
-    'claude-sonnet-4-20250514',
-  ]);
-  const plain = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', fixture.openAiRequest);
+  const requestBody = {
+    ...fixture.openAiRequest,
+    model: 'anthropic-1/claude-sonnet-4-20250514',
+  };
+  const plain = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', requestBody);
   assert.deepEqual(await plain.json(), fixture.openAiResponse);
   assert.equal(received[0].url, '/exact/v1/messages');
   assert.equal(received[0].headers['x-api-key'], secret);
@@ -231,7 +230,7 @@ test('runtime routes exact Anthropic URL, headers, conversions, stream, fallback
 
   mode = 'stream';
   const streamed = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', {
-    ...fixture.openAiRequest, stream: true,
+    ...requestBody, stream: true,
   });
   assert.equal(streamed.status, 200);
   const streamText = await streamed.text();
@@ -239,7 +238,7 @@ test('runtime routes exact Anthropic URL, headers, conversions, stream, fallback
   assert.match(streamText, /data: \[DONE\]/);
 
   mode = 'error';
-  const failed = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', fixture.openAiRequest);
+  const failed = await coreRequest(baseUrl, token, 'POST', '/v1/chat/completions', requestBody);
   assert.equal(failed.status, 429);
   assert.deepEqual(await failed.json(), { error: 'upstream_request_failed' });
   for (const text of [
