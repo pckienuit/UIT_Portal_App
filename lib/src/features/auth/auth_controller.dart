@@ -14,10 +14,12 @@ class AuthController extends ChangeNotifier {
     FlutterAppAuth? appAuth,
     OidcConfig? config,
     SsoScraperService? scraperService,
+    DateTime Function()? now,
   }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
        _appAuth = appAuth ?? const FlutterAppAuth(),
        _config = config ?? const OidcConfig(),
-       _scraperService = scraperService ?? SsoScraperService();
+       _scraperService = scraperService ?? SsoScraperService(),
+       _now = now ?? DateTime.now;
 
   static const String _sessionMarkerKey = 'portal_session_marker';
   static const String _accessTokenKey = 'portal_access_token';
@@ -29,11 +31,14 @@ class AuthController extends ChangeNotifier {
   final FlutterAppAuth _appAuth;
   final OidcConfig _config;
   final SsoScraperService _scraperService;
+  final DateTime Function() _now;
 
   AuthStatus _status = AuthStatus.signedOut;
   bool _isBusy = false;
   String? _lastError;
   AuthSession? _session;
+  Future<void>? _expiring;
+  Future<bool>? _refreshing;
 
   AuthStatus get status => _status;
   bool get isSignedIn => _status == AuthStatus.signedIn;
@@ -49,20 +54,77 @@ class AuthController extends ChangeNotifier {
     final expiresAtValue = await _secureStorage.read(key: _expiresAtKey);
     final expiresAt = expiresAtValue == null
         ? null
-        : DateTime.tryParse(expiresAtValue);
+        : DateTime.tryParse(expiresAtValue)?.toUtc();
 
-    if (accessToken == null && refreshToken == null && idToken == null) {
+    if (accessToken == null || accessToken.isEmpty) {
+      await expireSession();
       return;
     }
 
-    _session = AuthSession(
+    final restored = AuthSession(
       accessToken: accessToken,
       refreshToken: refreshToken,
       idToken: idToken,
       expiresAt: expiresAt,
     );
+    if (_isExpired(restored)) {
+      if (!await _refreshSession(restored)) return;
+      return;
+    }
+
+    _session = restored;
     _status = AuthStatus.signedIn;
     notifyListeners();
+  }
+
+  Future<bool> ensureValidSession() async {
+    final session = _session;
+    if (session == null || !session.hasAccessToken) return false;
+    if (_isExpired(session)) return _refreshSession(session);
+    return true;
+  }
+
+  Future<bool> _refreshSession(AuthSession session) {
+    return _refreshing ??= _refreshSessionOnce(
+      session,
+    ).whenComplete(() => _refreshing = null);
+  }
+
+  Future<bool> _refreshSessionOnce(AuthSession session) async {
+    final refreshToken = session.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await expireSession();
+      return false;
+    }
+    try {
+      final result = await _appAuth.token(
+        TokenRequest(
+          _config.clientId,
+          _config.redirectUrl,
+          issuer: _config.issuer,
+          scopes: _config.scopes,
+          refreshToken: refreshToken,
+        ),
+      );
+      if (result.accessToken == null || result.accessToken!.isEmpty) {
+        await expireSession();
+        return false;
+      }
+      await _persistSession(
+        AuthSession(
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken ?? refreshToken,
+          idToken: result.idToken ?? session.idToken,
+          expiresAt: result.accessTokenExpirationDateTime,
+        ),
+      );
+      _status = AuthStatus.signedIn;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      await expireSession();
+      return false;
+    }
   }
 
   Future<void> signIn() async {
@@ -141,50 +203,61 @@ class AuthController extends ChangeNotifier {
 
   Future<void> _persistSession(AuthSession session) async {
     _session = session;
-    await _secureStorage.write(
-      key: _sessionMarkerKey,
-      value: DateTime.now().toUtc().toIso8601String(),
-    );
-    await _secureStorage.write(
-      key: _accessTokenKey,
-      value: session.accessToken,
-    );
-    await _secureStorage.write(
-      key: _refreshTokenKey,
-      value: session.refreshToken,
-    );
-    await _secureStorage.write(key: _idTokenKey, value: session.idToken);
-    await _secureStorage.write(
-      key: _expiresAtKey,
-      value: session.expiresAt?.toUtc().toIso8601String(),
-    );
+    await Future.wait([
+      _secureStorage.write(
+        key: _sessionMarkerKey,
+        value: _now().toUtc().toIso8601String(),
+      ),
+      _secureStorage.write(key: _accessTokenKey, value: session.accessToken),
+      _secureStorage.write(key: _refreshTokenKey, value: session.refreshToken),
+      _secureStorage.write(key: _idTokenKey, value: session.idToken),
+      _secureStorage.write(
+        key: _expiresAtKey,
+        value: session.expiresAt?.toUtc().toIso8601String(),
+      ),
+    ]);
+  }
+
+  Future<void> expireSession() {
+    return _expiring ??= _expireSession().whenComplete(() => _expiring = null);
+  }
+
+  Future<void> _expireSession() async {
+    await Future.wait([
+      _secureStorage.delete(key: _sessionMarkerKey),
+      _secureStorage.delete(key: _accessTokenKey),
+      _secureStorage.delete(key: _refreshTokenKey),
+      _secureStorage.delete(key: _idTokenKey),
+      _secureStorage.delete(key: _expiresAtKey),
+    ]);
+    final changed = _session != null || _status != AuthStatus.signedOut;
+    _session = null;
+    _lastError = null;
+    _status = AuthStatus.signedOut;
+    if (changed) notifyListeners();
   }
 
   Future<void> signOut() async {
     final idToken = _session?.idToken;
-    if (idToken != null && idToken.isNotEmpty) {
-      try {
-        await _appAuth.endSession(
-          EndSessionRequest(
-            idTokenHint: idToken,
-            postLogoutRedirectUrl: _config.redirectUrl,
-            issuer: _config.issuer,
-          ),
-        );
-      } catch (_) {
-        // Local logout must still complete even if remote logout fails.
-      }
+    await expireSession();
+    if (idToken == null || idToken.isEmpty) return;
+    try {
+      await _appAuth.endSession(
+        EndSessionRequest(
+          idTokenHint: idToken,
+          postLogoutRedirectUrl: _config.redirectUrl,
+          issuer: _config.issuer,
+        ),
+      );
+    } catch (_) {
+      // Local logout already completed.
     }
+  }
 
-    await _secureStorage.delete(key: _sessionMarkerKey);
-    await _secureStorage.delete(key: _accessTokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
-    await _secureStorage.delete(key: _idTokenKey);
-    await _secureStorage.delete(key: _expiresAtKey);
-    _session = null;
-    _lastError = null;
-    _status = AuthStatus.signedOut;
-    notifyListeners();
+  bool _isExpired(AuthSession session) {
+    if (session.accessToken?.startsWith('Cookie=') ?? false) return false;
+    final expiresAt = session.expiresAt;
+    return expiresAt != null && !expiresAt.isAfter(_now().toUtc());
   }
 
   static bool isPortalAuthenticatedUrl(Uri uri) {

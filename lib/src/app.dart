@@ -38,10 +38,10 @@ import 'portal_module_registry.dart';
 import 'design_system/theme/portal_theme.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authController = ref.watch(authControllerProvider);
-
-  return GoRouter(
+  final authController = ref.read(authControllerProvider);
+  final router = GoRouter(
     initialLocation: '/',
+    refreshListenable: authController,
     redirect: (context, state) {
       final isLoggingIn = state.matchedLocation == '/login';
       if (!authController.isSignedIn && !isLoggingIn) {
@@ -137,6 +137,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
 });
 
 List<RouteBase> debugRoutes({bool enabled = kDebugMode}) => enabled
@@ -148,11 +150,36 @@ List<RouteBase> debugRoutes({bool enabled = kDebugMode}) => enabled
       ]
     : const [];
 
-class UitPortalApp extends ConsumerWidget {
+class UitPortalApp extends ConsumerStatefulWidget {
   const UitPortalApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UitPortalApp> createState() => _UitPortalAppState();
+}
+
+class _UitPortalAppState extends ConsumerState<UitPortalApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(authControllerProvider).ensureValidSession();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(

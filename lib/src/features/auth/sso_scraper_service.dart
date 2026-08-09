@@ -127,7 +127,8 @@ class SsoScraperService {
       accessToken: 'Cookie=$sessionCookieStr',
       refreshToken: null,
       idToken: null,
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
+      // Cookie expiry is server-controlled and not reliably exposed here.
+      expiresAt: null,
     );
   }
 }

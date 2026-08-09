@@ -7,25 +7,30 @@ import '../portal_constants.dart';
 import 'uit_trusted_dio.dart';
 
 class PortalApiClient {
-  PortalApiClient({Dio? dio, this.accessTokenProvider, this.onSessionExpired})
-    : _dio =
-          dio ??
-          createUitTrustedDio(
-            BaseOptions(
-              baseUrl: PortalConstants.portalOrigin,
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 20),
-              sendTimeout: const Duration(seconds: 20),
-              validateStatus: (status) {
-                return status != null && status >= 200 && status < 500;
-              },
-            ),
-          ),
-      super();
+  PortalApiClient({
+    Dio? dio,
+    this.accessTokenProvider,
+    this.ensureSession,
+    this.onSessionExpired,
+  }) : _dio =
+           dio ??
+           createUitTrustedDio(
+             BaseOptions(
+               baseUrl: PortalConstants.portalOrigin,
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 20),
+               sendTimeout: const Duration(seconds: 20),
+               validateStatus: (status) {
+                 return status != null && status >= 200 && status < 500;
+               },
+             ),
+           ),
+       super();
 
   final Dio _dio;
   final FutureOr<String?> Function()? accessTokenProvider;
-  final void Function()? onSessionExpired;
+  final FutureOr<bool> Function()? ensureSession;
+  final FutureOr<void> Function()? onSessionExpired;
 
   Dio get dio => _dio;
 
@@ -34,13 +39,14 @@ class PortalApiClient {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _ensureSession(path);
     final resolvedOptions = await _withAuth(options);
     final response = await _dio.get<T>(
       path,
       queryParameters: queryParameters,
       options: resolvedOptions,
     );
-    _throwIfPortalError(response);
+    await _throwIfPortalError(response);
     return response;
   }
 
@@ -48,38 +54,29 @@ class PortalApiClient {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    // Tự động build Next-Router-State-Tree dựa trên path và queryParameters
+    await _ensureSession(path);
     String searchParamsString = '';
     String searchParamsObj = '{}';
     if (queryParameters != null && queryParameters.isNotEmpty) {
-      // Ví dụ: {"hocKy":"2","namHoc":"2025-2026"}
       final jsonParams = jsonEncode(queryParameters);
       searchParamsString = '?$jsonParams';
       searchParamsObj = jsonParams;
     }
 
-    // Tách path thành các segments
     final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-
-    // Xây dựng cây Router State từ dưới lên
-    // Bắt đầu với __PAGE__
     dynamic currentTree = [
-      "__PAGE__$searchParamsString",
+      '__PAGE__$searchParamsString',
       jsonDecode(searchParamsObj),
     ];
-
-    // Cuộn ngược các segments để bọc vào children
-    for (int i = segments.length - 1; i >= 0; i--) {
+    for (var i = segments.length - 1; i >= 0; i--) {
       currentTree = [
         segments[i],
-        {"children": currentTree},
+        {'children': currentTree},
       ];
     }
-
-    // Root Node
     final rootTree = [
-      "",
-      {"children": currentTree},
+      '',
+      {'children': currentTree},
     ];
 
     final options = Options(
@@ -95,7 +92,7 @@ class PortalApiClient {
       queryParameters: queryParameters,
       options: resolvedOptions,
     );
-    _throwIfPortalError(response);
+    await _throwIfPortalError(response);
     return response;
   }
 
@@ -105,6 +102,7 @@ class PortalApiClient {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    await _ensureSession(path);
     final resolvedOptions = await _withAuth(options);
     final response = await _dio.post<T>(
       path,
@@ -112,29 +110,24 @@ class PortalApiClient {
       queryParameters: queryParameters,
       options: resolvedOptions,
     );
-    _throwIfPortalError(response);
+    await _throwIfPortalError(response);
     return response;
   }
 
-  void _throwIfPortalError(Response<dynamic> response) {
+  Future<void> _ensureSession(String path) async {
+    if (await ensureSession?.call() ?? true) return;
+    throw PortalApiException(statusCode: 401, path: path);
+  }
+
+  Future<void> _throwIfPortalError(Response<dynamic> response) async {
     final statusCode = response.statusCode ?? 0;
-
-    // Phát hiện session hết hạn (UIT portal thường trả về trang HTML chứa form login thay vì 401)
-    bool isSessionExpired = statusCode == 401;
-    if (statusCode == 200 &&
-        response.data is String &&
-        (response.data as String).trimLeft().startsWith('<')) {
-      isSessionExpired = true;
-    }
-
-    if (isSessionExpired) {
-      onSessionExpired?.call();
+    if (_isSessionExpired(response)) {
+      await onSessionExpired?.call();
       throw PortalApiException(
         statusCode: 401,
         path: response.requestOptions.path,
       );
     }
-
     if (statusCode >= 400) {
       throw PortalApiException(
         statusCode: statusCode,
@@ -144,14 +137,30 @@ class PortalApiClient {
     }
   }
 
-  Future<Options?> _withAuth(Options? options) async {
-    final token = await accessTokenProvider?.call();
-    if (token == null || token.isEmpty) {
-      return options;
+  bool _isSessionExpired(Response<dynamic> response) {
+    final statusCode = response.statusCode ?? 0;
+    if (statusCode == 401 || statusCode == 403) return true;
+
+    final location = response.headers.value('location')?.toLowerCase() ?? '';
+    if (location.contains('/api/auth/login') ||
+        location.contains('sso.uit.edu.vn')) {
+      return true;
     }
 
-    final headers = <String, dynamic>{...?options?.headers};
+    final data = response.data;
+    if (data is! String) return false;
+    final body = data.toLowerCase();
+    return body.contains('id="kc-form-login"') ||
+        body.contains("id='kc-form-login'") ||
+        body.contains('/api/auth/login') ||
+        body.contains('sso.uit.edu.vn/realms/uit');
+  }
 
+  Future<Options?> _withAuth(Options? options) async {
+    final token = await accessTokenProvider?.call();
+    if (token == null || token.isEmpty) return options;
+
+    final headers = <String, dynamic>{...?options?.headers};
     if (token.startsWith('Cookie=')) {
       final cookie = token.replaceFirst('Cookie=', '');
       final existingCookie = headers['Cookie']?.toString() ?? '';
@@ -161,7 +170,6 @@ class PortalApiClient {
     } else {
       headers['Authorization'] = 'Bearer $token';
     }
-
     return (options ?? Options()).copyWith(headers: headers);
   }
 }

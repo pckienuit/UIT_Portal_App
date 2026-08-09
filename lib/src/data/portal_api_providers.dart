@@ -8,8 +8,7 @@ final portalApiClientProvider = Provider<PortalApiClient>((ref) {
 
   return PortalApiClient(
     accessTokenProvider: () => auth.session?.accessToken,
-    onSessionExpired: () {
-      ref.read(authControllerProvider).signOut();
-    },
+    ensureSession: auth.ensureValidSession,
+    onSessionExpired: auth.expireSession,
   );
 });
