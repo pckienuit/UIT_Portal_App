@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../design_system/components/portal_scaffold.dart';
 import '../../design_system/foundations/portal_spacing.dart';
@@ -48,6 +49,15 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: Padding(
+        key: const ValueKey('notification-fab-inset'),
+        padding: const EdgeInsets.only(bottom: 80),
+        child: FloatingActionButton(
+          tooltip: 'Thông báo',
+          onPressed: () => context.push('/module/notifications'),
+          child: const Icon(Icons.notifications_outlined),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(detailedProfileProvider);
@@ -95,7 +105,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: PortalSpacing.sm),
                 const ServiceBrowser(),
-                const SizedBox(height: PortalSpacing.xl),
+                const SizedBox(height: 96),
               ],
             ),
           ),

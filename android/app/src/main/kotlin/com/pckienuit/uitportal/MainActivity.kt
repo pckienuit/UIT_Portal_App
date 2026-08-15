@@ -1,12 +1,33 @@
 package com.pckienuit.uitportal
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import com.pckienuit.uitportal.oauth.NativeOAuthCoordinator
+import java.net.URI
+import java.net.URISyntaxException
 import com.pckienuit.uitportal.router.RouterRuntime
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+
+private val portalArticleSlug = Regex("[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
+
+internal fun isPortalArticleUrl(value: String): Boolean {
+    return try {
+        val uri = URI(value)
+        val segments = uri.path?.trimStart('/')?.split('/') ?: return false
+        uri.scheme == "https" &&
+            uri.host == "portal.uit.edu.vn" &&
+            uri.rawQuery == null &&
+            uri.rawFragment == null &&
+            segments.size == 2 &&
+            segments.first() == "bai-viet" &&
+            segments.last().matches(portalArticleSlug)
+    } catch (_: URISyntaxException) {
+        false
+    }
+}
 
 class MainActivity : FlutterActivity() {
     private lateinit var routerRuntime: RouterRuntime
@@ -40,6 +61,25 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pckienuit.uitportal/external_url")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "openPortalArticle") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val uri = call.argument<String>("url")?.let(Uri::parse)
+                if (uri == null || !isPortalArticleUrl(uri.toString())) {
+                    result.error("invalid_url", "Invalid UIT article URL", null)
+                    return@setMethodCallHandler
+                }
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    result.success(null)
+                } catch (_: ActivityNotFoundException) {
+                    result.error("no_browser", "No browser can open UIT articles", null)
                 }
             }
 

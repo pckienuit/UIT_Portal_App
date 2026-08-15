@@ -17,8 +17,6 @@ class NativeModuleScreen extends ConsumerWidget {
         child: switch (module.id) {
           'dashboard' => _PendingApiBody(module: module),
           'profile' => _PendingApiBody(module: module),
-          'services' => _PendingApiBody(module: module),
-          'notifications' => _PendingApiBody(module: module),
           _ => _PendingApiBody(module: module),
         },
       ),

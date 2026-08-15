@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uit_portal_app/src/portal_constants.dart';
 import 'package:uit_portal_app/src/portal_module_registry.dart';
 
 void main() {
@@ -9,23 +8,21 @@ void main() {
     expect(module.id, 'dashboard');
   });
 
-  test('builds portal web URLs from the official origin', () {
-    final module = PortalModuleRegistry.byId('notifications');
-
+  test('does not register retired web-only service routes', () {
     expect(
-      module.webUri.toString(),
-      '${PortalConstants.portalOrigin}/notifications',
+      PortalModuleRegistry.modules.map((module) => module.id),
+      isNot(contains('services')),
+    );
+    expect(
+      PortalModuleRegistry.modules.map((module) => module.path),
+      isNot(contains('/services')),
     );
   });
 
-  test('tracks native implementation status', () {
-    expect(
-      PortalModuleRegistry.byId('dashboard').status,
-      PortalModuleStatus.nativeImplemented,
-    );
-    expect(
-      PortalModuleRegistry.byId('profile').status,
-      PortalModuleStatus.nativeImplemented,
-    );
+  test('marks public notifications as native', () {
+    final notifications = PortalModuleRegistry.byId('notifications');
+
+    expect(notifications.status, PortalModuleStatus.nativeImplemented);
+    expect(notifications.path, '/');
   });
 }

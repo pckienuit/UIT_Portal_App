@@ -52,7 +52,6 @@ class PortalModuleRegistry {
       path: '/sinh-vien/gui-xe',
       status: PortalModuleStatus.nativeImplemented,
     ),
-
     PortalModule(
       id: 'dashboard',
       title: 'Trang chủ',
@@ -110,18 +109,11 @@ class PortalModuleRegistry {
       status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
-      id: 'services',
-      title: 'Dịch vụ',
-      description: 'Các dịch vụ trực tuyến của UIT Portal.',
-      path: '/services',
-      status: PortalModuleStatus.pendingApi,
-    ),
-    PortalModule(
       id: 'notifications',
       title: 'Thông báo',
-      description: 'Thông báo từ portal; nền cho push notification sau này.',
-      path: '/notifications',
-      status: PortalModuleStatus.pendingApi,
+      description: 'Thông báo công khai mới nhất từ UIT Portal.',
+      path: '/',
+      status: PortalModuleStatus.nativeImplemented,
     ),
     PortalModule(
       id: 'khoa-luan',

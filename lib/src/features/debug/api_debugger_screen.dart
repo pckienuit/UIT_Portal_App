@@ -16,12 +16,12 @@ class ApiDebuggerScreen extends ConsumerStatefulWidget {
 
 class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
   final TextEditingController _pathController = TextEditingController(
-    text: '/sinh-vien/tkb',
+    text: '/api/sinh-vien/tkb',
   );
   final TextEditingController _paramsController = TextEditingController(
     text: '{}',
   );
-  bool _useRscHeader = true;
+  bool _useRscHeader = false;
 
   String _result = 'Nhập thông tin và nhấn nút để test API...';
   bool _isLoading = false;
@@ -158,8 +158,26 @@ class _ApiDebuggerScreenState extends ConsumerState<ApiDebuggerScreen> {
                         '/api/sinh-vien/khao-sat-giang-day',
                         isPost: true,
                       ),
-                      _buildTestButton('/sinh-vien/hoc-phi', isRsc: true),
-                      _buildTestButton('/sinh-vien/dang-vien', isRsc: true),
+                      _buildTestButton('/api/public/announcements'),
+                      _buildTestButton(
+                        '/api/sv/tuition',
+                        isPost: true,
+                        queryParameters: {
+                          'tuition_field_list': [
+                            'id',
+                            'semester',
+                            'year_id',
+                            'tuition_amount',
+                            'remaining',
+                          ],
+                          'detail_field_list': [
+                            'id',
+                            'subject_code',
+                            'subject_name',
+                            'amount',
+                          ],
+                        },
+                      ),
                     ],
                   ),
                   const Divider(),

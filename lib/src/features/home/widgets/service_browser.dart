@@ -14,7 +14,7 @@ class ServiceBrowser extends StatefulWidget {
 }
 
 class _ServiceBrowserState extends State<ServiceBrowser> {
-  static const _excludedIds = {'dashboard', 'services', 'notifications'};
+  static const _excludedIds = {'dashboard', 'services'};
   static const _categories = <String, Set<String>>{
     'Tất cả': {},
     'Học tập': {
@@ -38,7 +38,12 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
       'thoi-hoc-bao-luu',
       'bao-hiem',
     },
-    'Tiện ích': {'parking_registration', 'lich-sinh-hoat', 'ho-tro'},
+    'Tiện ích': {
+      'parking_registration',
+      'lich-sinh-hoat',
+      'ho-tro',
+      'notifications',
+    },
   };
 
   String _query = '';
