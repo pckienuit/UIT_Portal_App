@@ -20,29 +20,21 @@ class MoodleApiClient {
                   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                   'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
                 },
-                followRedirects: true,
-                maxRedirects: 5,
+                followRedirects: false, // Manually follow 303s to capture intermediate Set-Cookie headers!
                 validateStatus: (status) => status != null && status < 500,
               ),
             ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          if (_sessionCookie != null && _sessionCookie!.isNotEmpty) {
-            options.headers[HttpHeaders.cookieHeader] = 'MoodleSession=$_sessionCookie';
+          if (_cookieJar.isNotEmpty) {
+            options.headers[HttpHeaders.cookieHeader] =
+                _cookieJar.entries.map((e) => '${e.key}=${e.value}').join('; ');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          final setCookieHeaders = response.headers[HttpHeaders.setCookieHeader];
-          if (setCookieHeaders != null) {
-            for (final header in setCookieHeaders) {
-              final match = RegExp(r'MoodleSession=([^;]+)').firstMatch(header);
-              if (match != null) {
-                _sessionCookie = match.group(1);
-              }
-            }
-          }
+          _captureCookies(response);
           return handler.next(response);
         },
       ),
@@ -51,25 +43,41 @@ class MoodleApiClient {
 
   final Dio _dio;
   final FlutterSecureStorage _storage;
+  final Map<String, String> _cookieJar = {};
 
-  String? _sessionCookie;
   String? _sesskey;
 
-  String? get sessionCookie => _sessionCookie;
+  String? get sessionCookie => _cookieJar['MoodleSession'];
   String? get sesskey => _sesskey;
-  bool get isAuthenticated => _sessionCookie != null && _sessionCookie!.isNotEmpty;
+  bool get isAuthenticated => _cookieJar.containsKey('MoodleSession') && _cookieJar['MoodleSession']!.isNotEmpty;
 
   static const _storageMoodleSessionKey = 'moodle_session_cookie';
   static const _storageMoodleSesskey = 'moodle_sesskey';
 
   Dio get dio => _dio;
 
+  void _captureCookies(Response resp) {
+    final setCookieHeaders = resp.headers[HttpHeaders.setCookieHeader];
+    if (setCookieHeaders != null) {
+      for (final header in setCookieHeaders) {
+        final cookieParts = header.split(';').first.split('=');
+        if (cookieParts.length >= 2) {
+          final k = cookieParts[0].trim();
+          final v = cookieParts.sublist(1).join('=').trim();
+          if (v != 'deleted') {
+            _cookieJar[k] = v;
+          }
+        }
+      }
+    }
+  }
+
   Future<void> restoreSession() async {
     final savedCookie = await _storage.read(key: _storageMoodleSessionKey);
     final savedSesskey = await _storage.read(key: _storageMoodleSesskey);
 
     if (savedCookie != null && savedCookie.isNotEmpty) {
-      _sessionCookie = savedCookie;
+      _cookieJar['MoodleSession'] = savedCookie;
       _sesskey = savedSesskey;
     }
   }
@@ -87,19 +95,31 @@ class MoodleApiClient {
         return false;
       }
 
-      // 2. Submit URL-encoded form data (Moodle requires application/x-www-form-urlencoded)
-      final postResp = await _dio.post<String>(
+      // 2. Submit URL-encoded form data (Moodle returns 303 See Other)
+      var postResp = await _dio.post<String>(
         '/login/index.php',
         data: {
+          'anchor': '',
+          'logintoken': logintoken,
           'username': username.trim(),
           'password': password.trim(),
-          'logintoken': logintoken,
-          'anchor': '',
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
         ),
       );
+
+      // 3. Follow redirect loop up to 5 times (manually preserving MoodleSession cookie)
+      var redirectCount = 0;
+      while ((postResp.statusCode == 302 || postResp.statusCode == 303 || postResp.statusCode == 301) &&
+          redirectCount < 5) {
+        redirectCount++;
+        var nextLoc = postResp.headers.value('location') ?? '/';
+        if (nextLoc.startsWith('https://courses.uit.edu.vn')) {
+          nextLoc = nextLoc.replaceFirst('https://courses.uit.edu.vn', '');
+        }
+        postResp = await _dio.get<String>(nextLoc);
+      }
 
       final postHtml = postResp.data ?? '';
 
@@ -108,7 +128,7 @@ class MoodleApiClient {
         return false;
       }
 
-      // 3. Extract sesskey from post response or from /my/
+      // 4. Extract sesskey from post response
       final sesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(postHtml);
       if (sesskeyMatch != null) {
         _sesskey = sesskeyMatch.group(1);
@@ -119,11 +139,12 @@ class MoodleApiClient {
         _sesskey = mySesskeyMatch?.group(1);
       }
 
-      // 4. Check if we have a valid session cookie
-      if (_sessionCookie != null && _sessionCookie!.isNotEmpty) {
+      // 5. Check if we have a valid session cookie
+      final sessionCookieVal = _cookieJar['MoodleSession'];
+      if (sessionCookieVal != null && sessionCookieVal.isNotEmpty) {
         await _storage.write(
           key: _storageMoodleSessionKey,
-          value: _sessionCookie!,
+          value: sessionCookieVal,
         );
         if (_sesskey != null) {
           await _storage.write(
@@ -141,7 +162,7 @@ class MoodleApiClient {
   }
 
   Future<void> logout() async {
-    _sessionCookie = null;
+    _cookieJar.clear();
     _sesskey = null;
     await _storage.delete(key: _storageMoodleSessionKey);
     await _storage.delete(key: _storageMoodleSesskey);
