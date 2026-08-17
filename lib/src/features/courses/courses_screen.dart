@@ -111,6 +111,9 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: false,
+          tabAlignment: TabAlignment.fill,
+          labelPadding: EdgeInsets.zero,
           tabs: [
             Tab(
               child: deadlinesAsync.maybeWhen(
@@ -118,7 +121,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
                   final count = all.where((d) => d.status == DeadlineStatus.upcoming).length;
                   return _TabWithBadge(label: 'Chưa tới hạn', count: count, color: Colors.teal);
                 },
-                orElse: () => const Text('Chưa tới hạn'),
+                orElse: () => const Text('Chưa tới hạn', style: TextStyle(fontSize: 12)),
               ),
             ),
             Tab(
@@ -127,7 +130,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
                   final count = all.where((d) => d.status == DeadlineStatus.overdue).length;
                   return _TabWithBadge(label: 'Đã quá hạn', count: count, color: Colors.red);
                 },
-                orElse: () => const Text('Đã quá hạn'),
+                orElse: () => const Text('Đã quá hạn', style: TextStyle(fontSize: 12)),
               ),
             ),
             Tab(
@@ -136,7 +139,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
                   final count = all.where((d) => d.status == DeadlineStatus.completed).length;
                   return _TabWithBadge(label: 'Đã hoàn thành', count: count, color: Colors.green);
                 },
-                orElse: () => const Text('Đã hoàn thành'),
+                orElse: () => const Text('Đã hoàn thành', style: TextStyle(fontSize: 12)),
               ),
             ),
           ],
@@ -366,21 +369,28 @@ class _TabWithBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         if (count > 0) ...[
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '$count',
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
