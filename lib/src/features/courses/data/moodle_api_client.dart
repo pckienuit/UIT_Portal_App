@@ -21,6 +21,7 @@ class MoodleApiClient {
                   'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
                 },
                 followRedirects: true,
+                maxRedirects: 5,
                 validateStatus: (status) => status != null && status < 500,
               ),
             ) {
@@ -86,17 +87,15 @@ class MoodleApiClient {
         return false;
       }
 
-      // 2. Submit form
-      final formData = FormData.fromMap({
-        'username': username.trim(),
-        'password': password,
-        'logintoken': logintoken,
-        'anchor': '',
-      });
-
+      // 2. Submit URL-encoded form data (Moodle requires application/x-www-form-urlencoded)
       final postResp = await _dio.post<String>(
         '/login/index.php',
-        data: formData,
+        data: {
+          'username': username.trim(),
+          'password': password.trim(),
+          'logintoken': logintoken,
+          'anchor': '',
+        },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
         ),
@@ -104,18 +103,23 @@ class MoodleApiClient {
 
       final postHtml = postResp.data ?? '';
 
-      // 3. Extract sesskey
+      // Check if error is present in response
+      if (postHtml.contains('Đăng nhập sai') || postHtml.contains('loginerrors')) {
+        return false;
+      }
+
+      // 3. Extract sesskey from post response or from /my/
       final sesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(postHtml);
       if (sesskeyMatch != null) {
         _sesskey = sesskeyMatch.group(1);
       } else {
-        // Try fetching /my/
         final myResp = await _dio.get<String>('/my/');
         final myHtml = myResp.data ?? '';
         final mySesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(myHtml);
         _sesskey = mySesskeyMatch?.group(1);
       }
 
+      // 4. Check if we have a valid session cookie
       if (_sessionCookie != null && _sessionCookie!.isNotEmpty) {
         await _storage.write(
           key: _storageMoodleSessionKey,
