@@ -17,86 +17,54 @@ class CoursesScreen extends ConsumerStatefulWidget {
 
 class _CoursesScreenState extends ConsumerState<CoursesScreen> {
   String _searchQuery = '';
+  final _usernameController = TextEditingController(text: '23520804');
+  final _passwordController = TextEditingController(text: '18092005');
+  bool _isInlineLoggingIn = false;
+  String? _inlineError;
 
-  void _showMoodleLoginDialog() {
-    final usernameController = TextEditingController(text: '23520804');
-    final passwordController = TextEditingController();
-    var isLoggingIn = false;
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.school_rounded, color: Colors.indigo),
-              SizedBox(width: 8),
-              Text('Đăng nhập Moodle'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Nhập tài khoản courses.uit.edu.vn để đồng bộ môn học và slide bài giảng:'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'MSSV',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mật khẩu Moodle',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isLoggingIn ? null : () => Navigator.of(ctx).pop(),
-              child: const Text('Đóng'),
-            ),
-            FilledButton(
-              onPressed: isLoggingIn
-                  ? null
-                  : () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      final nav = Navigator.of(ctx);
-                      setDialogState(() => isLoggingIn = true);
-                      final client = ref.read(moodleApiClientProvider);
-                      final success = await client.login(
-                        usernameController.text,
-                        passwordController.text,
-                      );
-                      if (!mounted) return;
-                      nav.pop();
-                      if (success) {
-                        ref.invalidate(moodleCoursesFutureProvider);
-                        ref.invalidate(moodleDeadlinesFutureProvider);
-                        messenger.showSnackBar(
-                          const SnackBar(content: Text('Đăng nhập Moodle thành công!')),
-                        );
-                      } else {
-                        messenger.showSnackBar(
-                          const SnackBar(content: Text('Đăng nhập Moodle thất bại. Vui lòng kiểm tra lại mật khẩu.')),
-                        );
-                      }
-                    },
-              child: isLoggingIn
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Đăng nhập'),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _performMoodleLogin() async {
+    setState(() {
+      _isInlineLoggingIn = true;
+      _inlineError = null;
+    });
+
+    try {
+      final client = ref.read(moodleApiClientProvider);
+      final success = await client.login(
+        _usernameController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ref.invalidate(moodleCoursesFutureProvider);
+        ref.invalidate(moodleDeadlinesFutureProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đồng bộ Moodle thành công!')),
+        );
+      } else {
+        setState(() {
+          _inlineError = 'Đăng nhập Moodle không thành công. Vui lòng kiểm tra lại mật khẩu.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _inlineError = 'Lỗi kết nối: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isInlineLoggingIn = false);
+      }
+    }
   }
 
   @override
@@ -110,11 +78,6 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
         title: const Text('Moodle Courses & Tài liệu'),
         actions: [
           IconButton(
-            tooltip: 'Đăng nhập lại Moodle',
-            icon: const Icon(Icons.key_rounded),
-            onPressed: _showMoodleLoginDialog,
-          ),
-          IconButton(
             tooltip: 'Làm mới danh sách môn học',
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(moodleCoursesFutureProvider),
@@ -125,30 +88,79 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
         data: (courses) {
           if (courses.isEmpty) {
             return Center(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(PortalSpacing.lg),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.school_outlined, size: 64, color: scheme.onSurfaceVariant),
-                    const SizedBox(height: PortalSpacing.md),
-                    Text(
-                      'Chưa có môn học Moodle',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.5)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(PortalSpacing.lg),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.school_rounded, size: 56, color: scheme.primary),
+                        const SizedBox(height: PortalSpacing.sm),
+                        Text(
+                          'Đăng nhập Moodle Courses',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: PortalSpacing.xs),
+                        Text(
+                          'Kết nối courses.uit.edu.vn để tải slide bài giảng, xem hạn nộp bài tập và tài liệu học tập.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: PortalSpacing.md),
+                        if (_inlineError != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: scheme.errorContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _inlineError!,
+                              style: TextStyle(color: scheme.onErrorContainer, fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: PortalSpacing.sm),
+                        ],
+                        TextField(
+                          controller: _usernameController,
+                          decoration: const InputDecoration(
+                            labelText: 'MSSV',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: PortalSpacing.sm),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Mật khẩu Moodle',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: PortalSpacing.md),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton.icon(
+                            onPressed: _isInlineLoggingIn ? null : _performMoodleLogin,
+                            icon: _isInlineLoggingIn
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.sync_rounded),
+                            label: Text(_isInlineLoggingIn ? 'Đang đồng bộ...' : 'Đồng bộ Moodle ngay'),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: PortalSpacing.xs),
-                    Text(
-                      'Phiên đăng nhập Moodle có thể chưa được kích hoạt.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: PortalSpacing.lg),
-                    FilledButton.icon(
-                      onPressed: _showMoodleLoginDialog,
-                      icon: const Icon(Icons.login_rounded),
-                      label: const Text('Đăng nhập Moodle'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             );

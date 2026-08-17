@@ -41,22 +41,28 @@ class HomeScreen extends ConsumerWidget {
     final activeWidgets = ref.watch(widgetPreferencesProvider);
     final unreadPersonal = ref.watch(personalNotificationProvider).where((n) => !n.isRead).length;
 
-    // Lắng nghe dữ liệu để tự động kích hoạt thông báo cá nhân khi có cập nhật
+    // Lắng nghe dữ liệu để tự động kích hoạt thông báo cá nhân an toàn sau frame build
     ref.listen(scheduleFutureProvider, (previous, next) {
       next.whenData((schedule) {
-        ref.read(personalNotificationProvider.notifier).syncScheduleAlerts(schedule);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncScheduleAlerts(schedule);
+        });
       });
     });
 
     ref.listen(gradesFutureProvider, (previous, next) {
       next.whenData((grades) {
-        ref.read(personalNotificationProvider.notifier).syncGradesAlerts(grades);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncGradesAlerts(grades);
+        });
       });
     });
 
     ref.listen(tuitionListProvider, (previous, next) {
       next.whenData((tuition) {
-        ref.read(personalNotificationProvider.notifier).syncTuitionAlerts(tuition);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncTuitionAlerts(tuition);
+        });
       });
     });
 
@@ -92,6 +98,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(tuitionListProvider);
           ref.invalidate(gradesFutureProvider);
           ref.invalidate(moodleDeadlinesFutureProvider);
+          ref.invalidate(moodleCoursesFutureProvider);
           final results = await Future.wait([
             ref.read(detailedProfileProvider.future),
             ref.read(scheduleFutureProvider.future),

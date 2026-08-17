@@ -73,13 +73,15 @@ class MoodleApiClient {
   }
 
   Future<void> restoreSession() async {
-    final savedCookie = await _storage.read(key: _storageMoodleSessionKey);
-    final savedSesskey = await _storage.read(key: _storageMoodleSesskey);
+    try {
+      final savedCookie = await _storage.read(key: _storageMoodleSessionKey);
+      final savedSesskey = await _storage.read(key: _storageMoodleSesskey);
 
-    if (savedCookie != null && savedCookie.isNotEmpty) {
-      _cookieJar['MoodleSession'] = savedCookie;
-      _sesskey = savedSesskey;
-    }
+      if (savedCookie != null && savedCookie.isNotEmpty) {
+        _cookieJar['MoodleSession'] = savedCookie;
+        _sesskey = savedSesskey;
+      }
+    } catch (_) {}
   }
 
   Future<bool> login(String username, String password) async {
@@ -142,16 +144,18 @@ class MoodleApiClient {
       // 5. Check if we have a valid session cookie
       final sessionCookieVal = _cookieJar['MoodleSession'];
       if (sessionCookieVal != null && sessionCookieVal.isNotEmpty) {
-        await _storage.write(
-          key: _storageMoodleSessionKey,
-          value: sessionCookieVal,
-        );
-        if (_sesskey != null) {
+        try {
           await _storage.write(
-            key: _storageMoodleSesskey,
-            value: _sesskey!,
+            key: _storageMoodleSessionKey,
+            value: sessionCookieVal,
           );
-        }
+          if (_sesskey != null) {
+            await _storage.write(
+              key: _storageMoodleSesskey,
+              value: _sesskey!,
+            );
+          }
+        } catch (_) {}
         return true;
       }
 
@@ -164,7 +168,9 @@ class MoodleApiClient {
   Future<void> logout() async {
     _cookieJar.clear();
     _sesskey = null;
-    await _storage.delete(key: _storageMoodleSessionKey);
-    await _storage.delete(key: _storageMoodleSesskey);
+    try {
+      await _storage.delete(key: _storageMoodleSessionKey);
+      await _storage.delete(key: _storageMoodleSesskey);
+    } catch (_) {}
   }
 }
