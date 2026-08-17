@@ -44,7 +44,6 @@ class MoodleApiClient {
       ),
     );
 
-    // Bypass Android TrustManager cert verification issues on school intermediate CA
     final adapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
@@ -112,6 +111,17 @@ class MoodleApiClient {
       if (savedCookie != null && savedCookie.isNotEmpty) {
         _cookieJar['MoodleSession'] = savedCookie;
         _sesskey = savedSesskey;
+      }
+
+      // Kiểm tra lại tính hợp lệ của sesskey, nếu chưa có sesskey thì fetch nhanh từ trang /my/
+      if (isAuthenticated && (_sesskey == null || _sesskey!.isEmpty)) {
+        final myResp = await _dio.get<String>('/my/');
+        final myHtml = myResp.data ?? '';
+        final mySesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(myHtml);
+        if (mySesskeyMatch != null) {
+          _sesskey = mySesskeyMatch.group(1);
+          await _storage.write(key: _storageMoodleSesskey, value: _sesskey!);
+        }
       }
     } catch (_) {}
   }

@@ -182,17 +182,22 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Authenticate Portal (Primary)
-      final session = await _scraperService.scrapeLogin(
+      // 1. Authenticate Portal (Primary) & Moodle (Secondary) in parallel
+      final portalFuture = _scraperService.scrapeLogin(
         username,
         password,
         _config,
       );
+      final moodleFuture = _moodleApiClient.login(username, password).catchError((_) => false);
+
+      final results = await Future.wait([
+        portalFuture,
+        moodleFuture,
+      ]);
+
+      final session = results[0] as AuthSession;
       await _persistSession(session);
       _status = AuthStatus.signedIn;
-
-      // 2. Authenticate Moodle in parallel background (Best-effort / Secondary)
-      unawaited(_moodleApiClient.login(username, password).catchError((_) => false));
     } on SsoScraperException catch (error) {
       _lastError = error.message;
     } catch (_) {
