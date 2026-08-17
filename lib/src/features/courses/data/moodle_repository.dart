@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'moodle_api_client.dart';
 import '../models/moodle_models.dart';
 
@@ -9,8 +10,14 @@ class MoodleRepository {
 
   /// Lấy danh sách toàn bộ các hạn nộp bài tập (Deadlines) từ Moodle
   Future<List<MoodleDeadline>> getAllDeadlines({int limit = 50}) async {
+    // 1. Đảm bảo phiên Moodle đã được khôi phục hoặc đăng nhập
+    if (!apiClient.isAuthenticated || apiClient.sesskey == null || apiClient.sesskey!.isEmpty) {
+      await apiClient.restoreSession();
+    }
+
     final sesskey = apiClient.sesskey;
     if (sesskey == null || sesskey.isEmpty) {
+      debugPrint('[MoodleRepository] No sesskey available, returning empty list');
       return [];
     }
 
@@ -63,7 +70,9 @@ class MoodleRepository {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[MoodleRepository] Error fetching calendar events: $e');
+    }
 
     allDeadlines.addAll(allEventsMap.values);
 
@@ -78,7 +87,9 @@ class MoodleRepository {
           allDeadlines.add(comp);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[MoodleRepository] Error scanning completed assignments: $e');
+    }
 
     return allDeadlines;
   }
