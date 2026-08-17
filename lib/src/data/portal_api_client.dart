@@ -114,6 +114,24 @@ class PortalApiClient {
     return response;
   }
 
+  Future<Response<T>> delete<T>(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    await _ensureSession(path);
+    final resolvedOptions = await _withAuth(options);
+    final response = await _dio.delete<T>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: resolvedOptions,
+    );
+    await _throwIfPortalError(response);
+    return response;
+  }
+
   Future<void> _ensureSession(String path) async {
     if (await ensureSession?.call() ?? true) return;
     throw PortalApiException(statusCode: 401, path: path);

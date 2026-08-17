@@ -1,28 +1,61 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-
 import '../../../design_system/foundations/portal_spacing.dart';
+import '../../../utils/qr_image_saver.dart';
 
-class PaymentQrSheet extends StatelessWidget {
-  const PaymentQrSheet({super.key, required this.qrCode});
+class PaymentQrSheet extends StatefulWidget {
+  const PaymentQrSheet({super.key, required this.qrCode, this.title = 'Thanh toán học phí'});
 
   final String qrCode;
+  final String title;
 
-  static Future<void> show(BuildContext context, String qrCode) {
+  static Future<void> show(BuildContext context, String qrCode, {String title = 'Thanh toán học phí'}) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => PaymentQrSheet(qrCode: qrCode),
+      builder: (context) => PaymentQrSheet(qrCode: qrCode, title: title),
     );
+  }
+
+  @override
+  State<PaymentQrSheet> createState() => _PaymentQrSheetState();
+}
+
+class _PaymentQrSheetState extends State<PaymentQrSheet> {
+  bool _isSaving = false;
+
+  Future<void> _saveQr(BuildContext context) async {
+    setState(() => _isSaving = true);
+    try {
+      final path = await QrImageSaver.saveQrCode(widget.qrCode, prefix: 'QR_Payment');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã lưu ảnh QR vào: $path'),
+            backgroundColor: Colors.green[700],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi lưu ảnh: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bytes = _decode(qrCode);
+    final bytes = _decode(widget.qrCode);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         PortalSpacing.lg,
@@ -48,7 +81,7 @@ class PaymentQrSheet extends StatelessWidget {
           ),
           const SizedBox(height: PortalSpacing.sm),
           Text(
-            'Thanh toán học phí',
+            widget.title,
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -83,9 +116,9 @@ class PaymentQrSheet extends StatelessWidget {
                 ),
               ),
             )
-          else
+          else ...[
             Semantics(
-              label: 'Mã QR thanh toán học phí',
+              label: 'Mã QR thanh toán',
               image: true,
               child: Image.memory(
                 bytes,
@@ -99,6 +132,15 @@ class PaymentQrSheet extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: PortalSpacing.md),
+            OutlinedButton.icon(
+              onPressed: _isSaving ? null : () => _saveQr(context),
+              icon: _isSaving
+                  ? const SizedBox.square(dimension: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.download_rounded, size: 18),
+              label: Text(_isSaving ? 'Đang lưu...' : 'Lưu ảnh QR vào máy'),
+            ),
+          ],
           const SizedBox(height: PortalSpacing.md),
           Text(
             'Mở ứng dụng ngân hàng và quét mã để thanh toán.',

@@ -157,7 +157,26 @@ Native status: planned
 Notes: Bắt buộc dùng POST thay vì GET.
 ```
 
-## 6. Các API 404 (Không có JSON Endpoint, cần dùng RSC Fallback)
+## 7. Đăng Ký Gửi Xe
+
+```text
+Module: Gửi xe
+Screen: ParkingRegistrationScreen
+Endpoint: /api/sinh-vien/gui-xe
+Methods: 
+  - GET: Lấy danh sách lịch sử đăng ký gửi xe
+  - POST: Gửi đơn đăng ký gửi xe mới
+Auth source: server session cookie
+Request shape (POST):
+  JSON Body:
+  - license_plate_number (string): Biển số xe (vd: "59X3-12345")
+  - vehicle_type (string): Loại xe ("motorcycle", "bicycle", "electric_bicycle")
+  - number_of_months (int): Số tháng gửi (1 đến 12)
+Response shape:
+  JSON Object (hoặc ParkingRecord)
+Native status: implemented
+```
+
 
 - **Hồ sơ sinh viên**: `/api/sinh-vien/ho-so` -> 404 Not Found.
 - **Học phí**: `/api/sinh-vien/hoc-phi` -> 404 Not Found.

@@ -72,6 +72,7 @@ class PortalEndpointCatalog {
       path: '/api/sinh-vien/the-sinh-vien',
     ),
     PortalEndpoint(method: PortalHttpMethod.get, path: '/api/sinh-vien/gui-xe'),
+    PortalEndpoint(method: PortalHttpMethod.post, path: '/api/sinh-vien/gui-xe'),
     PortalEndpoint(
       method: PortalHttpMethod.get,
       path: '/api/sinh-vien/khoa-luan',
