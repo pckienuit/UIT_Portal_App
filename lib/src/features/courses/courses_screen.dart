@@ -21,6 +21,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
   final _passwordController = TextEditingController(text: '18092005');
   bool _isInlineLoggingIn = false;
   String? _inlineError;
+  bool _obscureMoodlePassword = false; // default visible for debugging
 
   @override
   void dispose() {
@@ -143,11 +144,23 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
                         const SizedBox(height: PortalSpacing.sm),
                         TextField(
                           controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
+                          obscureText: _obscureMoodlePassword,
+                          decoration: InputDecoration(
                             labelText: 'Mật khẩu Moodle',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                             isDense: true,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureMoodlePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureMoodlePassword = !_obscureMoodlePassword;
+                                });
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: PortalSpacing.md),
