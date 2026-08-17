@@ -71,7 +71,6 @@ class MoodleRepository {
     try {
       final completedFromCourses = await _fetchCompletedAssignmentsFromRecentCourses(sesskey);
       for (final comp in completedFromCourses) {
-        // Nếu đã có trong map thì cập nhật isCompleted, nếu chưa thì thêm mới
         final existingIdx = allDeadlines.indexWhere((d) => d.name == comp.name && d.courseCode == comp.courseCode);
         if (existingIdx >= 0) {
           allDeadlines[existingIdx] = allDeadlines[existingIdx].copyWith(isCompleted: true);
@@ -94,7 +93,7 @@ class MoodleRepository {
         {
           'index': 0,
           'methodname': 'core_course_get_enrolled_courses_by_timeline_classification',
-          'args': {'offset': 0, 'limit': 8, 'classification': 'all', 'sort': 'fullname'}
+          'args': {'offset': 0, 'limit': 15, 'classification': 'all', 'sort': 'fullname'}
         }
       ];
 
@@ -109,7 +108,7 @@ class MoodleRepository {
       final data = first['data'] as Map<String, dynamic>?;
       final courses = data?['courses'] as List<dynamic>? ?? [];
 
-      for (final c in courses.take(6)) {
+      for (final c in courses.take(8)) {
         final cid = c['id'];
         final cName = (c['fullname'] ?? '') as String;
         final cCode = (c['shortname'] ?? '') as String;
@@ -117,26 +116,33 @@ class MoodleRepository {
         final cResp = await apiClient.dio.get<String>('/course/view.php?id=$cid');
         final html = cResp.data ?? '';
 
-        final assignRegex = RegExp(r'<li[^>]+class="[^"]*modtype_assign[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>', dotAll: true);
-        final matches = assignRegex.allMatches(html);
+        final liRegex = RegExp(r'<li[^>]+class="[^"]*modtype_assign[^"]*"[^>]*>(.*?)<\/li>', dotAll: true);
+        final matches = liRegex.allMatches(html);
 
-        for (final m in matches.take(4)) {
-          final assignUrl = m.group(1);
-          final rawInner = m.group(2) ?? '';
-          final cleanTitle = rawInner.replaceAll(RegExp(r'<[^>]*>'), '').replaceAll(RegExp(r'\s+Bài tập$'), '').trim();
+        for (final m in matches.take(5)) {
+          final liInner = m.group(1) ?? '';
+          
+          final linkMatch = RegExp(r'<a[^>]+href="([^"]*mod\/assign\/view\.php[^"]*)"').firstMatch(liInner);
+          final assignUrl = linkMatch?.group(1);
+
+          final titleMatch = RegExp(r'<span[^>]+class="instancename"[^>]*>(.*?)<\/span>', dotAll: true).firstMatch(liInner);
+          final rawTitle = titleMatch?.group(1)?.replaceAll(RegExp(r'<[^>]*>'), '').trim() ?? '';
+          final cleanTitle = rawTitle.replaceAll(RegExp(r'\s+Bài tập$'), '').trim();
 
           if (assignUrl != null && assignUrl.isNotEmpty && cleanTitle.isNotEmpty) {
             try {
               final aResp = await apiClient.dio.get<String>(assignUrl);
               final aHtml = aResp.data ?? '';
 
-              if (aHtml.contains('Đã nộp để chấm điểm') || aHtml.contains('Submitted for grading')) {
+              if (aHtml.contains('Đã nộp để chấm điểm') ||
+                  aHtml.contains('Submitted for grading') ||
+                  aHtml.contains('submissionstatussubmitted')) {
                 completedList.add(MoodleDeadline(
                   id: assignUrl.hashCode,
                   name: cleanTitle,
                   courseName: cName,
                   courseCode: cCode,
-                  deadlineTime: DateTime.now().subtract(const Duration(days: 7)),
+                  deadlineTime: DateTime.now().subtract(const Duration(days: 14)),
                   isOverdue: false,
                   actionUrl: assignUrl,
                   actionName: 'Xem bài nộp',
