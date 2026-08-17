@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../design_system/foundations/portal_spacing.dart';
 import '../models/moodle_models.dart';
@@ -11,7 +12,7 @@ class HomeMoodleDeadlinesCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deadlinesAsync = ref.watch(moodleDeadlinesFutureProvider);
+    final deadlinesAsync = ref.watch(moodleAllDeadlinesFutureProvider);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -25,22 +26,16 @@ class HomeMoodleDeadlinesCard extends ConsumerWidget {
         padding: const EdgeInsets.all(PortalSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.alarm_rounded, color: Colors.orange, size: 20),
-                ),
-                const SizedBox(width: 8),
+                Icon(Icons.alarm_rounded, color: scheme.primary, size: 20),
+                const SizedBox(width: PortalSpacing.xs),
                 Expanded(
                   child: Text(
                     'Hạn nộp bài tập (Moodle)',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,
@@ -48,51 +43,62 @@ class HomeMoodleDeadlinesCard extends ConsumerWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => context.push('/module/moodle_courses'),
+                  onPressed: () {
+                    context.push('/module/moodle_courses');
+                  },
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Xem tất cả'),
+                  child: const Text('Xem tất cả', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
             const SizedBox(height: PortalSpacing.sm),
             deadlinesAsync.when(
-              data: (deadlines) {
-                if (deadlines.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded, color: Colors.green[600], size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Không có bài tập nào sắp tới hạn.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+              data: (allDeadlines) {
+                // Chỉ lấy tối đa 3 deadline gần nhất CHƯA TỚI HẠN
+                final upcoming = allDeadlines
+                    .where((d) => d.status == DeadlineStatus.upcoming)
+                    .toList()
+                  ..sort((a, b) => a.deadlineTime.compareTo(b.deadlineTime));
+
+                if (upcoming.isEmpty) {
+                  return Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 18),
+                      const SizedBox(width: PortalSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          'Không có bài tập nào sắp tới hạn.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   );
                 }
 
+                final top3 = upcoming.take(3).toList();
+
                 return Column(
-                  children: deadlines.take(3).map((item) {
-                    return _DeadlineItemRow(item: item);
-                  }).toList(),
+                  children: [
+                    for (int i = 0; i < top3.length; i++) ...[
+                      if (i > 0) const Divider(height: 12),
+                      _DeadlineMiniTile(deadline: top3[i]),
+                    ],
+                  ],
                 );
               },
-              loading: () => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Đang đồng bộ hạn nộp bài tập...',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: PortalSpacing.xs),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
               ),
@@ -110,69 +116,98 @@ class HomeMoodleDeadlinesCard extends ConsumerWidget {
   }
 }
 
-class _DeadlineItemRow extends StatelessWidget {
-  const _DeadlineItemRow({required this.item});
+class _DeadlineMiniTile extends StatelessWidget {
+  const _DeadlineMiniTile({required this.deadline});
 
-  final MoodleDeadline item;
+  final MoodleDeadline deadline;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final dateFormat = DateFormat('HH:mm - dd/MM/yyyy');
+    final timeStr = dateFormat.format(deadline.deadlineTime);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.assignment_outlined,
-            size: 16,
-            color: scheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  item.courseName,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              item.formattedTime?.replaceAll(RegExp(r'<[^>]*>'), '').trim() ?? 'Sắp hạn',
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+    // Tính số ngày/giờ còn lại
+    final diff = deadline.deadlineTime.difference(DateTime.now());
+    String remainingStr;
+    Color badgeColor;
+    if (diff.inDays > 0) {
+      remainingStr = 'Còn ${diff.inDays} ngày';
+      badgeColor = Colors.teal;
+    } else if (diff.inHours > 0) {
+      remainingStr = 'Còn ${diff.inHours} giờ';
+      badgeColor = Colors.orange;
+    } else {
+      remainingStr = 'Sắp hết hạn!';
+      badgeColor = Colors.red;
+    }
+
+    return InkWell(
+      onTap: () {
+        context.push('/module/moodle_courses');
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
               ),
-              maxLines: 1,
+              child: Text(
+                remainingStr,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: badgeColor,
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: PortalSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    deadline.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        deadline.courseCode.isNotEmpty ? deadline.courseCode : deadline.courseName,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        timeStr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -97,7 +97,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(scheduleFutureProvider);
           ref.invalidate(tuitionListProvider);
           ref.invalidate(gradesFutureProvider);
-          ref.invalidate(moodleDeadlinesFutureProvider);
+          ref.invalidate(moodleAllDeadlinesFutureProvider);
           ref.invalidate(moodleCoursesFutureProvider);
           final results = await Future.wait([
             ref.read(detailedProfileProvider.future),

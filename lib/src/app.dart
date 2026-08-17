@@ -35,7 +35,6 @@ import 'features/main/main_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/ai_chat/presentation/ai_chat_screen.dart';
 import 'features/courses/courses_screen.dart';
-import 'features/courses/course_detail_screen.dart';
 import 'portal_module_registry.dart';
 import 'design_system/theme/portal_theme.dart';
 
@@ -97,14 +96,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/grades', redirect: (_, _) => '/module/grades'),
       GoRoute(path: '/tuition', redirect: (_, _) => '/module/hoc-phi'),
-      GoRoute(
-        path: '/moodle/course/:courseId',
-        builder: (context, state) {
-          final courseId = int.tryParse(state.pathParameters['courseId'] ?? '') ?? 0;
-          final courseName = state.uri.queryParameters['name'] ?? 'Chi tiết môn học';
-          return CourseDetailScreen(courseId: courseId, courseName: courseName);
-        },
-      ),
       ...debugRoutes(),
       GoRoute(
         path: '/module/:moduleId',

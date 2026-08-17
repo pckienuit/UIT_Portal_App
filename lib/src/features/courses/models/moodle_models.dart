@@ -1,122 +1,79 @@
-class MoodleCourse {
-  const MoodleCourse({
-    required this.id,
-    required this.fullname,
-    required this.shortname,
-    this.idnumber,
-    this.summary,
-    this.viewUrl,
-    this.courseImage,
-    this.progress,
-    this.hasCompleted = false,
-  });
-
-  final int id;
-  final String fullname;
-  final String shortname;
-  final String? idnumber;
-  final String? summary;
-  final String? viewUrl;
-  final String? courseImage;
-  final int? progress;
-  final bool hasCompleted;
-
-  factory MoodleCourse.fromJson(Map<String, dynamic> json) {
-    return MoodleCourse(
-      id: json['id'] as int? ?? 0,
-      fullname: json['fullname']?.toString() ?? '',
-      shortname: json['shortname']?.toString() ?? '',
-      idnumber: json['idnumber']?.toString(),
-      summary: json['summary']?.toString(),
-      viewUrl: json['viewurl']?.toString(),
-      courseImage: json['courseimage']?.toString(),
-      progress: json['progress'] as int?,
-      hasCompleted: json['hascompleted'] == true,
-    );
-  }
-}
-
 class MoodleDeadline {
   const MoodleDeadline({
     required this.id,
     required this.name,
     required this.courseName,
-    required this.courseId,
-    this.description,
-    this.activityName,
-    this.url,
-    this.timesort,
-    this.formattedTime,
-    this.actionName,
+    required this.courseCode,
+    required this.deadlineTime,
+    required this.isOverdue,
     this.actionUrl,
+    this.actionName,
+    this.isCompleted = false,
   });
-
-  final int id;
-  final String name;
-  final String courseName;
-  final int courseId;
-  final String? description;
-  final String? activityName;
-  final String? url;
-  final int? timesort;
-  final String? formattedTime;
-  final String? actionName;
-  final String? actionUrl;
 
   factory MoodleDeadline.fromJson(Map<String, dynamic> json) {
     final course = json['course'] as Map<String, dynamic>?;
     final action = json['action'] as Map<String, dynamic>?;
 
+    final name = (json['activityname'] ?? json['name'] ?? '') as String;
+    final cleanName = name
+        .replaceAll(RegExp(r'\s+tới hạn$', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+is due$', caseSensitive: false), '')
+        .trim();
+
+    final timesort = json['timesort'] as int? ?? json['timestart'] as int? ?? 0;
+    final deadlineTime = DateTime.fromMillisecondsSinceEpoch(timesort * 1000);
+
+    final now = DateTime.now();
+    final overdueBool = json['overdue'] as bool? ?? deadlineTime.isBefore(now);
+
+    // Moodle logic: nếu action.actionable == false và action.name != 'Thêm bài nộp' hoặc actionUrl dẫn tới view đã nộp
+    // hoặc eventtype/action cho thấy đã nộp
+    final actionName = action?['name'] as String?;
+    final actionUrl = action?['url'] as String? ?? json['url'] as String?;
+    
+    // Nếu sinh viên đã hoàn thành hoặc không còn actionable
+    final isCompleted = action != null &&
+        action['actionable'] == false &&
+        (actionName?.contains('Đã nộp') == true ||
+            actionName?.contains('Xem bài nộp') == true ||
+            actionName?.contains('Xem tổng quan') == true);
+
     return MoodleDeadline(
       id: json['id'] as int? ?? 0,
-      name: json['name']?.toString() ?? '',
-      courseName: course?['fullname']?.toString() ?? json['course_name']?.toString() ?? '',
-      courseId: course?['id'] as int? ?? json['course_id'] as int? ?? 0,
-      description: json['description']?.toString(),
-      activityName: json['activityname']?.toString(),
-      url: json['url']?.toString(),
-      timesort: json['timesort'] as int?,
-      formattedTime: json['formattedtime']?.toString(),
-      actionName: action?['name']?.toString(),
-      actionUrl: action?['url']?.toString(),
+      name: cleanName.isNotEmpty ? cleanName : name,
+      courseName: (course?['fullname'] ?? '') as String,
+      courseCode: (course?['shortname'] ?? '') as String,
+      deadlineTime: deadlineTime,
+      isOverdue: overdueBool,
+      actionUrl: actionUrl,
+      actionName: actionName,
+      isCompleted: isCompleted,
     );
   }
-}
 
-class MoodleActivity {
-  const MoodleActivity({
-    required this.id,
-    required this.name,
-    required this.type, // forum, folder, resource, assign, url, quiz
-    this.url,
-    this.contentInfo,
-  });
-
-  final String id;
+  final int id;
   final String name;
-  final String type;
-  final String? url;
-  final String? contentInfo;
+  final String courseName;
+  final String courseCode;
+  final DateTime deadlineTime;
+  final bool isOverdue;
+  final String? actionUrl;
+  final String? actionName;
+  final bool isCompleted;
 
-  factory MoodleActivity.fromHtml(String id, String name, String type, String? url, {String? contentInfo}) {
-    return MoodleActivity(
-      id: id,
-      name: name,
-      type: type,
-      url: url,
-      contentInfo: contentInfo,
-    );
+  /// Trạng thái phân loại: upcoming (chưa tới hạn), overdue (đã quá hạn), completed (đã hoàn thành)
+  DeadlineStatus get status {
+    if (isCompleted) return DeadlineStatus.completed;
+    if (deadlineTime.isBefore(DateTime.now()) || isOverdue) {
+      return DeadlineStatus.overdue;
+    }
+    return DeadlineStatus.upcoming;
   }
 }
 
-class MoodleCourseDetail {
-  const MoodleCourseDetail({
-    required this.courseId,
-    required this.courseName,
-    required this.activities,
-  });
-
-  final int courseId;
-  final String courseName;
-  final List<MoodleActivity> activities;
+enum DeadlineStatus {
+  upcoming,
+  overdue,
+  completed,
 }

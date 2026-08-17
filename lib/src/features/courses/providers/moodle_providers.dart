@@ -10,30 +10,16 @@ final moodleApiClientProvider = Provider<MoodleApiClient>((ref) {
 });
 
 final moodleRepositoryProvider = Provider<MoodleRepository>((ref) {
-  final client = ref.watch(moodleApiClientProvider);
-  return MoodleRepository(apiClient: client);
+  final apiClient = ref.watch(moodleApiClientProvider);
+  return MoodleRepository(apiClient: apiClient);
 });
 
-/// Danh sách khóa học Moodle
-final moodleCoursesFutureProvider = FutureProvider.autoDispose<List<MoodleCourse>>((ref) async {
-  final client = ref.watch(moodleApiClientProvider);
-  await client.restoreSession();
+final moodleAllDeadlinesFutureProvider =
+    FutureProvider<List<MoodleDeadline>>((ref) async {
   final repo = ref.watch(moodleRepositoryProvider);
-  return repo.getEnrolledCourses();
+  return repo.getAllDeadlines();
 });
 
-/// Danh sách hạn nộp bài tập (Deadlines)
-final moodleDeadlinesFutureProvider = FutureProvider.autoDispose<List<MoodleDeadline>>((ref) async {
-  final client = ref.watch(moodleApiClientProvider);
-  await client.restoreSession();
-  final repo = ref.watch(moodleRepositoryProvider);
-  return repo.getUpcomingDeadlines();
-});
-
-/// Chi tiết môn học
-final moodleCourseDetailFutureProvider = FutureProvider.autoDispose.family<MoodleCourseDetail, ({int courseId, String courseName})>((ref, arg) async {
-  final client = ref.watch(moodleApiClientProvider);
-  await client.restoreSession();
-  final repo = ref.watch(moodleRepositoryProvider);
-  return repo.getCourseDetail(arg.courseId, arg.courseName);
-});
+// Alias for backward compatibility
+final moodleDeadlinesFutureProvider = moodleAllDeadlinesFutureProvider;
+final moodleCoursesFutureProvider = moodleAllDeadlinesFutureProvider;

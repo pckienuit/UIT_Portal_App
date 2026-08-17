@@ -75,8 +75,8 @@ class PortalModuleRegistry {
     ),
     PortalModule(
       id: 'moodle_courses',
-      title: 'Moodle Courses & Tài liệu',
-      description: 'Khóa học, slide bài giảng và hạn nộp bài trên courses.uit.edu.vn.',
+      title: 'Hạn nộp bài tập Moodle',
+      description: 'Theo dõi hạn nộp bài tập, lab và nhắc deadline trên courses.uit.edu.vn.',
       path: '/sinh-vien/moodle-courses',
       status: PortalModuleStatus.nativeImplemented,
     ),

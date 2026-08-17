@@ -6,26 +6,42 @@ import 'package:uit_portal_app/src/features/courses/models/moodle_models.dart';
 import 'package:uit_portal_app/src/features/courses/providers/moodle_providers.dart';
 
 void main() {
-  testWidgets('CoursesScreen renders enrolled courses list', (tester) async {
-    final mockCourses = [
-      const MoodleCourse(
-        id: 11965,
-        fullname: 'Cấu trúc dữ liệu và giải thuật - IT003.O214',
-        shortname: 'IT003.O214',
-        progress: 80,
+  testWidgets('CoursesScreen renders 3 tabs for deadlines', (tester) async {
+    final mockDeadlines = [
+      MoodleDeadline(
+        id: 1,
+        name: 'Bài tập Lab 1',
+        courseName: 'Cấu trúc dữ liệu',
+        courseCode: 'IT003',
+        deadlineTime: DateTime.now().add(const Duration(days: 2)),
+        isOverdue: false,
+        actionUrl: 'https://courses.uit.edu.vn/mod/assign/view.php?id=1',
       ),
-      const MoodleCourse(
-        id: 14155,
-        fullname: 'Cơ sở dữ liệu - IT004.P118',
-        shortname: 'IT004.P118',
-        progress: 50,
+      MoodleDeadline(
+        id: 2,
+        name: 'Bài tập Lab 2',
+        courseName: 'Cơ sở dữ liệu',
+        courseCode: 'IT004',
+        deadlineTime: DateTime.now().subtract(const Duration(days: 5)),
+        isOverdue: true,
+        actionUrl: 'https://courses.uit.edu.vn/mod/assign/view.php?id=2',
+      ),
+      MoodleDeadline(
+        id: 3,
+        name: 'Báo cáo giữa kỳ',
+        courseName: 'Hệ điều hành',
+        courseCode: 'IT007',
+        deadlineTime: DateTime.now().subtract(const Duration(days: 10)),
+        isOverdue: true,
+        isCompleted: true,
+        actionUrl: 'https://courses.uit.edu.vn/mod/assign/view.php?id=3',
       ),
     ];
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          moodleCoursesFutureProvider.overrideWith((ref) async => mockCourses),
+          moodleAllDeadlinesFutureProvider.overrideWith((ref) => Future.value(mockDeadlines)),
         ],
         child: const MaterialApp(
           home: CoursesScreen(),
@@ -35,9 +51,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Moodle Courses & Tài liệu'), findsOneWidget);
-    expect(find.text('Cấu trúc dữ liệu và giải thuật - IT003.O214'), findsOneWidget);
-    expect(find.text('Cơ sở dữ liệu - IT004.P118'), findsOneWidget);
-    expect(find.text('80%'), findsOneWidget);
+    expect(find.text('Chưa tới hạn'), findsOneWidget);
+    expect(find.text('Đã quá hạn'), findsOneWidget);
+    expect(find.text('Đã hoàn thành'), findsOneWidget);
+    expect(find.text('Bài tập Lab 1'), findsOneWidget);
   });
 }

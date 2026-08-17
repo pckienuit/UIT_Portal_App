@@ -8,26 +8,20 @@ import 'package:uit_portal_app/src/features/courses/widgets/home_moodle_deadline
 void main() {
   testWidgets('HomeMoodleDeadlinesCard renders upcoming deadlines', (tester) async {
     final mockDeadlines = [
-      const MoodleDeadline(
+      MoodleDeadline(
         id: 1,
-        name: 'Bài tập Chương 1',
+        name: 'Bài tập Lab 1',
         courseName: 'Cấu trúc dữ liệu',
-        courseId: 11965,
-        formattedTime: '20 tháng 3, 23:59',
-      ),
-      const MoodleDeadline(
-        id: 2,
-        name: 'Lab 2 Mạch số',
-        courseName: 'Nhập môn mạch số',
-        courseId: 11966,
-        formattedTime: '24 tháng 3, 23:59',
+        courseCode: 'IT003',
+        deadlineTime: DateTime.now().add(const Duration(days: 2)),
+        isOverdue: false,
       ),
     ];
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          moodleDeadlinesFutureProvider.overrideWith((ref) async => mockDeadlines),
+          moodleAllDeadlinesFutureProvider.overrideWith((ref) => Future.value(mockDeadlines)),
         ],
         child: const MaterialApp(
           home: Scaffold(
@@ -40,8 +34,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hạn nộp bài tập (Moodle)'), findsOneWidget);
-    expect(find.text('Bài tập Chương 1'), findsOneWidget);
-    expect(find.text('Cấu trúc dữ liệu'), findsOneWidget);
-    expect(find.text('Lab 2 Mạch số'), findsOneWidget);
+    expect(find.text('Bài tập Lab 1'), findsOneWidget);
+    expect(find.text('Xem tất cả'), findsOneWidget);
   });
 }
