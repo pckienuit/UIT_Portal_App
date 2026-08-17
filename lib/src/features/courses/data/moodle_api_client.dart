@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class MoodleApiClient {
@@ -8,22 +9,7 @@ class MoodleApiClient {
     Dio? dio,
     FlutterSecureStorage? storage,
   })  : _storage = storage ?? const FlutterSecureStorage(),
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: 'https://courses.uit.edu.vn',
-                connectTimeout: const Duration(seconds: 20),
-                receiveTimeout: const Duration(seconds: 25),
-                headers: {
-                  'User-Agent':
-                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                  'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-                },
-                followRedirects: false,
-                validateStatus: (status) => status != null && status < 500,
-              ),
-            ) {
+        _dio = dio ?? _createDefaultDio() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -39,6 +25,38 @@ class MoodleApiClient {
         },
       ),
     );
+  }
+
+  static Dio _createDefaultDio() {
+    final d = Dio(
+      BaseOptions(
+        baseUrl: 'https://courses.uit.edu.vn',
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 25),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        followRedirects: false,
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+
+    // Bypass Android TrustManager cert verification issues on school intermediate CA
+    final adapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+          return host.contains('courses.uit.edu.vn') || host.contains('uit.edu.vn');
+        };
+        return client;
+      },
+    );
+    d.httpClientAdapter = adapter;
+
+    return d;
   }
 
   final Dio _dio;
@@ -68,7 +86,6 @@ class MoodleApiClient {
   }
 
   void _parseAndStoreCookieString(String rawHeader) {
-    // Regex matches Name=Value before optional attributes
     final matches = RegExp(r'([a-zA-Z0-9_-]+)=([^;,\s]+)').allMatches(rawHeader);
     for (final m in matches) {
       final name = m.group(1);
