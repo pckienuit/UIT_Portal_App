@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,17 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
 class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   final Map<String, double> _downloadProgress = {};
   final Map<String, bool> _isDownloading = {};
+  final Map<String, String> _downloadedPaths = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingLocalFiles();
+  }
+
+  Future<void> _checkExistingLocalFiles() async {
+    // Sẽ được kích hoạt khi detailAsync có dữ liệu
+  }
 
   Future<void> _handleActivityTap(MoodleActivity activity) async {
     final actUrl = activity.url;
@@ -39,6 +51,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
 
     // Nếu là resource (Slide / PDF) hoặc folder (Thư mục tài liệu) -> Tải trực tiếp trong app bằng session Moodle
     if (activity.type == 'resource' || activity.type == 'folder') {
+      final existingPath = _downloadedPaths[activity.id];
+
+      // Nếu file đã có sẵn trên máy -> Mở ngay bằng app thích hợp
+      if (existingPath != null && File(existingPath).existsSync()) {
+        await _openLocalFile(existingPath);
+        return;
+      }
+
       setState(() {
         _isDownloading[activity.id] = true;
         _downloadProgress[activity.id] = 0.0;
@@ -63,29 +83,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
 
         setState(() {
           _isDownloading[activity.id] = false;
+          _downloadedPaths[activity.id] = filePath;
         });
 
-        // Xác định MIME Type
-        String mimeType = 'application/pdf';
-        if (filePath.endsWith('.zip')) {
-          mimeType = 'application/zip';
-        } else if (filePath.endsWith('.docx') || filePath.endsWith('.doc')) {
-          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        } else if (filePath.endsWith('.pptx') || filePath.endsWith('.ppt')) {
-          mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-        }
-
-        // Mở file trực tiếp trên app qua native intent viewer
-        try {
-          await _urlChannel.invokeMethod('openDownloadedFile', {
-            'filePath': filePath,
-            'mimeType': mimeType,
-          });
-        } catch (_) {
-          messenger.showSnackBar(
-            SnackBar(content: Text('Đã tải thành công: $filePath')),
-          );
-        }
+        // Mở file trực tiếp trên app qua App Chooser
+        await _openLocalFile(filePath);
       } catch (e) {
         if (!mounted) return;
         setState(() {
@@ -99,6 +101,29 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
     } else {
       // Các loại URL / WeCode / Forum / Quiz -> Mở trình duyệt web
       _openExternalUrl(actUrl);
+    }
+  }
+
+  Future<void> _openLocalFile(String filePath) async {
+    final messenger = ScaffoldMessenger.of(context);
+    String mimeType = 'application/pdf';
+    if (filePath.endsWith('.zip')) {
+      mimeType = 'application/zip';
+    } else if (filePath.endsWith('.docx') || filePath.endsWith('.doc')) {
+      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (filePath.endsWith('.pptx') || filePath.endsWith('.ppt')) {
+      mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    }
+
+    try {
+      await _urlChannel.invokeMethod('openDownloadedFile', {
+        'filePath': filePath,
+        'mimeType': mimeType,
+      });
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Không thể mở file: $e')),
+      );
     }
   }
 
@@ -156,10 +181,12 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
               final act = detail.activities[index];
               final downloading = _isDownloading[act.id] ?? false;
               final progress = _downloadProgress[act.id] ?? 0.0;
+              final isDownloaded = _downloadedPaths.containsKey(act.id);
 
               return _ActivityTile(
                 activity: act,
                 isDownloading: downloading,
+                isDownloaded: isDownloaded,
                 progress: progress,
                 onTap: () => _handleActivityTap(act),
               );
@@ -183,12 +210,14 @@ class _ActivityTile extends StatelessWidget {
   const _ActivityTile({
     required this.activity,
     required this.isDownloading,
+    required this.isDownloaded,
     required this.progress,
     required this.onTap,
   });
 
   final MoodleActivity activity;
   final bool isDownloading;
+  final bool isDownloaded;
   final double progress;
   final VoidCallback onTap;
 
@@ -212,7 +241,11 @@ class _ActivityTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.5)),
+        side: BorderSide(
+          color: isDownloaded
+              ? Colors.green.withValues(alpha: 0.6)
+              : theme.dividerColor.withValues(alpha: 0.5),
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -257,7 +290,31 @@ class _ActivityTile extends StatelessWidget {
                                 fontSize: 12,
                               ),
                             ),
-                            if (isDownloadable) ...[
+                            if (isDownloaded) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.green),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'Đã tải về máy',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (isDownloadable) ...[
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -289,6 +346,12 @@ class _ActivityTile extends StatelessWidget {
                         value: progress > 0 ? progress : null,
                         strokeWidth: 2.5,
                       ),
+                    )
+                  else if (isDownloaded)
+                    const Icon(
+                      Icons.folder_open_rounded,
+                      color: Colors.green,
+                      size: 22,
                     )
                   else
                     Icon(

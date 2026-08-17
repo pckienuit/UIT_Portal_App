@@ -128,10 +128,14 @@ class MainActivity : FlutterActivity() {
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            startActivity(intent)
+                            // Dùng Intent.createChooser để Android luôn hiển thị hộp thoại chọn ứng dụng (App Chooser)
+                            val chooserIntent = Intent.createChooser(intent, "Mở bằng ứng dụng").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(chooserIntent)
                             result.success(true)
                         } catch (e: ActivityNotFoundException) {
-                            result.error("no_viewer", "No viewer app found for $mimeType", null)
+                            result.error("no_viewer", "Không tìm thấy ứng dụng phù hợp để đọc file ($mimeType)", null)
                         } catch (e: Exception) {
                             result.error("open_error", e.message, null)
                         }
