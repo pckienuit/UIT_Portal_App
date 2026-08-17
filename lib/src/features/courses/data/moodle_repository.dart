@@ -1,4 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
 import 'moodle_api_client.dart';
 import '../models/moodle_models.dart';
 
@@ -42,9 +47,7 @@ class MoodleRepository {
             }
           }
         }
-      } catch (_) {
-        // Fallback to HTML scraping
-      }
+      } catch (_) {}
     }
 
     // Fallback: Scraping HTML từ trang /my/
@@ -117,9 +120,7 @@ class MoodleRepository {
           return events.map((e) => MoodleDeadline.fromJson(e as Map<String, dynamic>)).toList();
         }
       }
-    } catch (_) {
-      // Fallback
-    }
+    } catch (_) {}
 
     return [];
   }
@@ -169,5 +170,95 @@ class MoodleRepository {
       courseName: courseName,
       activities: activities,
     );
+  }
+
+  /// Tải trực tiếp tài liệu / slide / file Moodle về máy
+  Future<String> downloadActivityFile(MoodleActivity activity, {void Function(int count, int total)? onProgress}) async {
+    final activityUrl = activity.url;
+    if (activityUrl == null || activityUrl.isEmpty) {
+      throw Exception('Hoạt động này không có đường dẫn tải về.');
+    }
+
+    final docDir = await getApplicationDocumentsDirectory();
+    final moodleDir = Directory(p.join(docDir.path, 'MoodleDownloads'));
+    if (!await moodleDir.exists()) {
+      await moodleDir.create(recursive: true);
+    }
+
+    // Trường hợp 1: mod/folder -> tải ZIP trọn bộ qua download_folder.php
+    if (activity.type == 'folder') {
+      final folderIdMatch = RegExp(r'id=(\d+)').firstMatch(activityUrl);
+      final folderId = folderIdMatch?.group(1);
+      if (folderId != null) {
+        final safeName = activity.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        final targetPath = p.join(moodleDir.path, '${safeName}_$folderId.zip');
+
+        await apiClient.dio.download(
+          'https://courses.uit.edu.vn/mod/folder/download_folder.php?id=$folderId',
+          targetPath,
+          onReceiveProgress: onProgress,
+          options: Options(
+            headers: {
+              'Referer': activityUrl,
+            },
+          ),
+        );
+        return targetPath;
+      }
+    }
+
+    // Trường hợp 2: mod/resource -> tải file trực tiếp (PDF/Word/ZIP)
+    if (activity.type == 'resource') {
+      // Gọi GET view.php để lấy direct download URL (303 location hoặc pluginfile link)
+      final viewResp = await apiClient.dio.get<String>(
+        activityUrl,
+        options: Options(
+          followRedirects: false,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+
+      String? downloadUrl = viewResp.headers.value('location');
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        // Tìm thẻ pluginfile trong html bằng regex
+        final html = viewResp.data ?? '';
+        final match = RegExp(r'href="([^"]*pluginfile\.php[^"]*)"').firstMatch(html);
+        downloadUrl = match?.group(1);
+      }
+
+      if (downloadUrl == null || downloadUrl.isEmpty) {
+        downloadUrl = activityUrl;
+      }
+
+      // Xác định extension file
+      String extension = '.pdf';
+      final uriPath = Uri.tryParse(downloadUrl)?.path.toLowerCase() ?? '';
+      if (uriPath.endsWith('.pdf')) {
+        extension = '.pdf';
+      } else if (uriPath.endsWith('.docx') || uriPath.endsWith('.doc')) {
+        extension = '.docx';
+      } else if (uriPath.endsWith('.zip')) {
+        extension = '.zip';
+      } else if (uriPath.endsWith('.pptx') || uriPath.endsWith('.ppt')) {
+        extension = '.pptx';
+      }
+
+      final safeName = activity.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final targetPath = p.join(moodleDir.path, '$safeName$extension');
+
+      await apiClient.dio.download(
+        downloadUrl,
+        targetPath,
+        onReceiveProgress: onProgress,
+        options: Options(
+          headers: {
+            'Referer': activityUrl,
+          },
+        ),
+      );
+      return targetPath;
+    }
+
+    throw Exception('Loại hoạt động này chưa hỗ trợ tải file trực tiếp.');
   }
 }
