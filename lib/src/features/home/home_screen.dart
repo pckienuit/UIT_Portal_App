@@ -9,6 +9,8 @@ import '../profile/profile_providers.dart';
 import '../schedule/schedule_providers.dart';
 import '../tuition/tuition_providers.dart';
 import '../grades/grades_providers.dart';
+import '../courses/widgets/home_moodle_deadlines_card.dart';
+import '../courses/providers/moodle_providers.dart';
 import '../notifications/providers/personal_notification_providers.dart';
 import 'providers/widget_preferences_provider.dart';
 import 'widgets/home_header.dart';
@@ -89,6 +91,7 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(scheduleFutureProvider);
           ref.invalidate(tuitionListProvider);
           ref.invalidate(gradesFutureProvider);
+          ref.invalidate(moodleDeadlinesFutureProvider);
           final results = await Future.wait([
             ref.read(detailedProfileProvider.future),
             ref.read(scheduleFutureProvider.future),
@@ -126,6 +129,7 @@ class HomeScreen extends ConsumerWidget {
                         const TuitionSnapshot(),
                       if (activeWidgets.contains('grades'))
                         const GradesSnapshot(),
+                      const HomeMoodleDeadlinesCard(),
                     ],
                   ),
                   const SizedBox(height: PortalSpacing.lg),
