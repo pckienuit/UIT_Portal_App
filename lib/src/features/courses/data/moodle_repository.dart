@@ -179,8 +179,18 @@ class MoodleRepository {
       throw Exception('Hoạt động này không có đường dẫn tải về.');
     }
 
-    final docDir = await getApplicationDocumentsDirectory();
-    final moodleDir = Directory(p.join(docDir.path, 'MoodleDownloads'));
+    // Dùng getExternalStorageDirectory hoặc getTemporaryDirectory/getApplicationDocumentsDirectory
+    // Trên Android, getExternalStorageDirectory tương ứng với /storage/emulated/0/Android/data/... (external-path)
+    // hoặc getApplicationDocumentsDirectory tương ứng với /data/user/0/.../app_flutter (files-path / root-path)
+    Directory dir;
+    try {
+      final extDir = await getExternalStorageDirectory();
+      dir = extDir ?? await getApplicationDocumentsDirectory();
+    } catch (_) {
+      dir = await getApplicationDocumentsDirectory();
+    }
+
+    final moodleDir = Directory(p.join(dir.path, 'MoodleDownloads'));
     if (!await moodleDir.exists()) {
       await moodleDir.create(recursive: true);
     }
@@ -209,7 +219,6 @@ class MoodleRepository {
 
     // Trường hợp 2: mod/resource -> tải file trực tiếp (PDF/Word/ZIP)
     if (activity.type == 'resource') {
-      // Gọi GET view.php để lấy direct download URL (303 location hoặc pluginfile link)
       final viewResp = await apiClient.dio.get<String>(
         activityUrl,
         options: Options(
@@ -220,7 +229,6 @@ class MoodleRepository {
 
       String? downloadUrl = viewResp.headers.value('location');
       if (downloadUrl == null || downloadUrl.isEmpty) {
-        // Tìm thẻ pluginfile trong html bằng regex
         final html = viewResp.data ?? '';
         final match = RegExp(r'href="([^"]*pluginfile\.php[^"]*)"').firstMatch(html);
         downloadUrl = match?.group(1);
@@ -230,7 +238,6 @@ class MoodleRepository {
         downloadUrl = activityUrl;
       }
 
-      // Xác định extension file
       String extension = '.pdf';
       final uriPath = Uri.tryParse(downloadUrl)?.path.toLowerCase() ?? '';
       if (uriPath.endsWith('.pdf')) {
