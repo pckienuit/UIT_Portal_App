@@ -142,7 +142,7 @@ class MoodleRepository {
 
       final titleMatch = RegExp(r'<span[^>]+class="instancename"[^>]*>(.*?)<\/span>', dotAll: true).firstMatch(innerHtml);
       final rawName = titleMatch?.group(1)?.replaceAll(RegExp(r'<[^>]*>'), '').trim() ?? '';
-      final name = rawName.replaceAll(RegExp(r'\s+(Diễn đàn|Thư mục|URL|Tệp|Bài tập|Trắc nghiệm)$'), '').trim();
+      final name = rawName.replaceAll(RegExp(r'\s+(Diễn đàn|Thư mục|URL|Tệp|Bài tập|Trắc nghiệm|H5P)$'), '').trim();
 
       final linkMatch = RegExp(r'<a[^>]+href="([^"]+)"').firstMatch(innerHtml);
       final url = linkMatch?.group(1);
@@ -158,6 +158,8 @@ class MoodleRepository {
         type = 'url';
       } else if (classAttr.contains('modtype_quiz')) {
         type = 'quiz';
+      } else if (classAttr.contains('modtype_h5pactivity') || classAttr.contains('h5p')) {
+        type = 'h5p';
       }
 
       if (name.isNotEmpty) {
@@ -179,9 +181,6 @@ class MoodleRepository {
       throw Exception('Hoạt động này không có đường dẫn tải về.');
     }
 
-    // Dùng getExternalStorageDirectory hoặc getTemporaryDirectory/getApplicationDocumentsDirectory
-    // Trên Android, getExternalStorageDirectory tương ứng với /storage/emulated/0/Android/data/... (external-path)
-    // hoặc getApplicationDocumentsDirectory tương ứng với /data/user/0/.../app_flutter (files-path / root-path)
     Directory dir;
     try {
       final extDir = await getExternalStorageDirectory();
@@ -235,6 +234,11 @@ class MoodleRepository {
       }
 
       if (downloadUrl == null || downloadUrl.isEmpty) {
+        // Kiểm tra xem response có phải là trang HTML hay không
+        final contentType = viewResp.headers.value('content-type') ?? '';
+        if (contentType.contains('text/html')) {
+          throw Exception('Hoạt động này là nội dung web tương tác, không phải file tài liệu tĩnh.');
+        }
         downloadUrl = activityUrl;
       }
 
@@ -266,6 +270,6 @@ class MoodleRepository {
       return targetPath;
     }
 
-    throw Exception('Loại hoạt động này chưa hỗ trợ tải file trực tiếp.');
+    throw Exception('Hoạt động này không hỗ trợ tải file trực tiếp.');
   }
 }

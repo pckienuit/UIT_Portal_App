@@ -30,16 +30,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   final Map<String, bool> _isDownloading = {};
   final Map<String, String> _downloadedPaths = {};
 
-  @override
-  void initState() {
-    super.initState();
-    _checkExistingLocalFiles();
-  }
-
-  Future<void> _checkExistingLocalFiles() async {
-    // Sẽ được kích hoạt khi detailAsync có dữ liệu
-  }
-
   Future<void> _handleActivityTap(MoodleActivity activity) async {
     final actUrl = activity.url;
     if (actUrl == null || actUrl.isEmpty) {
@@ -99,7 +89,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         _openExternalUrl(actUrl);
       }
     } else {
-      // Các loại URL / WeCode / Forum / Quiz -> Mở trình duyệt web
+      // Các loại H5P / URL / WeCode / Forum / Quiz -> Mở trình duyệt web
       _openExternalUrl(actUrl);
     }
   }
@@ -232,6 +222,7 @@ class _ActivityTile extends StatelessWidget {
       'assign' => (Icons.assignment_turned_in_rounded, Colors.purple[600]!, 'Bài tập nộp'),
       'url' => (Icons.link_rounded, Colors.teal[600]!, 'Liên kết ngoài'),
       'quiz' => (Icons.quiz_rounded, Colors.orange[700]!, 'Bài trắc nghiệm'),
+      'h5p' => (Icons.play_circle_filled_rounded, Colors.indigo[600]!, 'Bài học tương tác (H5P/Video)'),
       _ => (Icons.picture_as_pdf_rounded, Colors.red[600]!, 'Slide / File tài liệu'),
     };
 
