@@ -93,6 +93,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/grades', redirect: (_, _) => '/module/grades'),
+      GoRoute(path: '/tuition', redirect: (_, _) => '/module/hoc-phi'),
       ...debugRoutes(),
       GoRoute(
         path: '/module/:moduleId',

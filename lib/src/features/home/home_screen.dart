@@ -9,6 +9,7 @@ import '../profile/profile_providers.dart';
 import '../schedule/schedule_providers.dart';
 import '../tuition/tuition_providers.dart';
 import '../grades/grades_providers.dart';
+import '../notifications/providers/personal_notification_providers.dart';
 import 'providers/widget_preferences_provider.dart';
 import 'widgets/home_header.dart';
 import 'widgets/home_widgets.dart';
@@ -36,6 +37,26 @@ class HomeScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final activeWidgets = ref.watch(widgetPreferencesProvider);
+    final unreadPersonal = ref.watch(personalNotificationProvider).where((n) => !n.isRead).length;
+
+    // Lắng nghe dữ liệu để tự động kích hoạt thông báo cá nhân khi có cập nhật
+    ref.listen(scheduleFutureProvider, (previous, next) {
+      next.whenData((schedule) {
+        ref.read(personalNotificationProvider.notifier).syncScheduleAlerts(schedule);
+      });
+    });
+
+    ref.listen(gradesFutureProvider, (previous, next) {
+      next.whenData((grades) {
+        ref.read(personalNotificationProvider.notifier).syncGradesAlerts(grades);
+      });
+    });
+
+    ref.listen(tuitionListProvider, (previous, next) {
+      next.whenData((tuition) {
+        ref.read(personalNotificationProvider.notifier).syncTuitionAlerts(tuition);
+      });
+    });
 
     return PortalScaffold(
       appBar: AppBar(
@@ -52,10 +73,14 @@ class HomeScreen extends ConsumerWidget {
       floatingActionButton: Padding(
         key: const ValueKey('notification-fab-inset'),
         padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          tooltip: 'Thông báo',
-          onPressed: () => context.push('/module/notifications'),
-          child: const Icon(Icons.notifications_outlined),
+        child: Badge(
+          isLabelVisible: unreadPersonal > 0,
+          label: Text('$unreadPersonal'),
+          child: FloatingActionButton(
+            tooltip: 'Thông báo',
+            onPressed: () => context.push('/module/notifications'),
+            child: const Icon(Icons.notifications_outlined),
+          ),
         ),
       ),
       body: RefreshIndicator(
@@ -64,12 +89,21 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(scheduleFutureProvider);
           ref.invalidate(tuitionListProvider);
           ref.invalidate(gradesFutureProvider);
-          await Future.wait([
+          final results = await Future.wait([
             ref.read(detailedProfileProvider.future),
             ref.read(scheduleFutureProvider.future),
             ref.read(tuitionListProvider.future),
             ref.read(gradesFutureProvider.future),
           ]);
+
+          final schedule = results[1] as dynamic;
+          final tuition = results[2] as dynamic;
+          final grades = results[3] as dynamic;
+
+          final notifNotifier = ref.read(personalNotificationProvider.notifier);
+          await notifNotifier.syncScheduleAlerts(schedule);
+          await notifNotifier.syncTuitionAlerts(tuition);
+          await notifNotifier.syncGradesAlerts(grades);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
