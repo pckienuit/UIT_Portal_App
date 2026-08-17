@@ -10,7 +10,7 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 const _kWidgetPreferencesKey = 'widget_preferences';
 
 class WidgetPreferencesNotifier extends Notifier<List<String>> {
-  static const defaultWidgets = ['schedule', 'tuition', 'grades'];
+  static const defaultWidgets = ['schedule', 'tuition', 'grades', 'moodle_deadlines'];
 
   @override
   List<String> build() {

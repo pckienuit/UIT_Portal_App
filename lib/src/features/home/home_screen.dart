@@ -129,7 +129,8 @@ class HomeScreen extends ConsumerWidget {
                         const TuitionSnapshot(),
                       if (activeWidgets.contains('grades'))
                         const GradesSnapshot(),
-                      const HomeMoodleDeadlinesCard(),
+                      if (activeWidgets.contains('moodle_deadlines'))
+                        const HomeMoodleDeadlinesCard(),
                     ],
                   ),
                   const SizedBox(height: PortalSpacing.lg),
@@ -215,6 +216,14 @@ class _WidgetCustomizationSheet extends ConsumerWidget {
                 activeColor: colorScheme.primary,
                 onChanged: (val) =>
                     notifier.toggleWidget('grades', val ?? false),
+              ),
+              CheckboxListTile(
+                title: const Text('Hạn nộp bài tập (Moodle)'),
+                subtitle: const Text('Theo dõi bài tập sắp tới hạn'),
+                value: activeWidgets.contains('moodle_deadlines'),
+                activeColor: colorScheme.primary,
+                onChanged: (val) =>
+                    notifier.toggleWidget('moodle_deadlines', val ?? false),
               ),
               const SizedBox(height: 16),
             ],
