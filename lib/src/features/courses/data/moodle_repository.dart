@@ -16,13 +16,13 @@ class MoodleRepository {
 
     final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_calendar_get_action_events_by_timesort';
     
-    // Lấy các bài tập từ quá khứ đến tương lai
+    // Lấy các bài tập từ mốc thời gian trước đây đến tương lai
     final payload = [
       {
         'index': 0,
         'methodname': 'core_calendar_get_action_events_by_timesort',
         'args': {
-          'timesortfrom': 1700000000, // lấy sự kiện từ học kỳ gần đây
+          'timesortfrom': 0, // 0 để lấy toàn bộ sự kiện lịch
           'limitnum': limit,
         },
       }
