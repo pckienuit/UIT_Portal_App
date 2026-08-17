@@ -40,9 +40,7 @@ android {
                 arguments += "-DANDROID_STL=c++_shared"
             }
         }
-        ndk {
-            abiFilters += setOf("arm64-v8a", "x86_64")
-        }
+        // ndk abiFilters handled by flutter CLI / splits
     }
 
     sourceSets {
