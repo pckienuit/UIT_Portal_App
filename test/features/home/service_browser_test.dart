@@ -9,10 +9,10 @@ void main() {
   testWidgets('searches services by title and description', (tester) async {
     await tester.pumpWidget(_browserApp());
 
-    await tester.enterText(find.byType(SearchBar), 'ngoại ngữ');
+    await tester.enterText(find.byType(SearchBar), 'khảo sát');
     await tester.pump();
 
-    expect(find.text('Xác nhận chứng chỉ'), findsOneWidget);
+    expect(find.text('Khảo sát'), findsOneWidget);
     expect(find.text('Học phí'), findsNothing);
   });
 
@@ -56,8 +56,6 @@ void main() {
     await tester.pump();
 
     expect(find.text('Học phí'), findsOneWidget);
-    expect(find.text('Gia hạn học phí'), findsOneWidget);
-    expect(find.text('Học bổng'), findsOneWidget);
     expect(find.text('Bảng điểm'), findsNothing);
   });
 
@@ -80,11 +78,11 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Giấy xác nhận'));
+    await tester.tap(find.text('Đăng ký gửi xe'));
     await tester.pump();
 
     expect(selectedModule, isNotNull);
-    expect(selectedModule!.id, equals('confirmation_paper'));
+    expect(selectedModule!.id, equals('parking_registration'));
   });
 
   testWidgets('navigates to /module/:id when callback is not provided', (
@@ -116,10 +114,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Giấy xác nhận'));
+    await tester.tap(find.text('Đăng ký gửi xe'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Module Page: confirmation_paper'), findsOneWidget);
+    expect(find.text('Module Page: parking_registration'), findsOneWidget);
   });
 }
 

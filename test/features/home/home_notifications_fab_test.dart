@@ -25,7 +25,7 @@ void main() {
         GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
         GoRoute(
           path: '/module/notifications',
-          builder: (_, _) => const Scaffold(body: Text('Thông báo')),
+          builder: (_, _) => const Scaffold(body: Text('Màn hình thông báo')),
         ),
       ],
     );
@@ -50,7 +50,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     final fab = tester.widget<FloatingActionButton>(
       find.byType(FloatingActionButton),
@@ -62,9 +62,9 @@ void main() {
     expect(inset.padding, const EdgeInsets.only(bottom: 80));
 
     await tester.tap(find.byTooltip('Thông báo'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.text('Thông báo'), findsOneWidget);
+    expect(find.text('Màn hình thông báo'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

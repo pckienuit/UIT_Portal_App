@@ -14,35 +14,54 @@ class ServiceBrowser extends StatefulWidget {
 }
 
 class _ServiceBrowserState extends State<ServiceBrowser> {
-  static const _excludedIds = {'dashboard', 'services'};
+  // Ẩn/loại bỏ các dịch vụ ít dùng hoặc đã có tab/nút riêng theo yêu cầu:
+  // - profile: Thông tin cá nhân (đã có tab Cá nhân ở Navbar)
+  // - notifications: Thông báo (đã có floating button/header action)
+  // - confirmation_paper: Giấy xác nhận
+  // - certificate_validation: Xác nhận chứng chỉ
+  // - exam_postponement: Hoãn thi & Thi lại
+  // - revaluation: Phúc khảo điểm
+  // - ho-tro: Hỗ trợ SV
+  // - student_card: Thẻ SV
+  // - thoi-hoc-bao-luu: Bảo lưu
+  // - gia-han-hoc-phi: Gia hạn học phí
+  // - transcript_request: Xin bảng điểm
+  // - khoa-luan: Khóa luận
+  // - tot-nghiep: Tốt nghiệp
+  // - hoc-bong: Học bổng
+  static const _excludedIds = {
+    'dashboard',
+    'services',
+    'profile',
+    'notifications',
+    'confirmation_paper',
+    'certificate_validation',
+    'exam_postponement',
+    'revaluation',
+    'ho-tro',
+    'student_card',
+    'thoi-hoc-bao-luu',
+    'gia-han-hoc-phi',
+    'transcript_request',
+    'khoa-luan',
+    'tot-nghiep',
+    'hoc-bong',
+  };
+
   static const _categories = <String, Set<String>>{
     'Tất cả': {},
     'Học tập': {
       'tkb',
       'grades',
       'training_point',
-      'transcript_request',
       'lich-thi',
-      'exam_postponement',
-      'revaluation',
-      'khoa-luan',
-      'tot-nghiep',
       'khao-sat-giang-day',
-      'certificate_validation',
     },
-    'Tài chính': {'hoc-phi', 'gia-han-hoc-phi', 'hoc-bong'},
-    'Hồ sơ': {
-      'profile',
-      'student_card',
-      'confirmation_paper',
-      'thoi-hoc-bao-luu',
-      'bao-hiem',
-    },
+    'Tài chính': {'hoc-phi'},
+    'Hồ sơ': {'bao-hiem'},
     'Tiện ích': {
       'parking_registration',
       'lich-sinh-hoat',
-      'ho-tro',
-      'notifications',
     },
   };
 
@@ -51,6 +70,7 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final query = _normalizeVietnamese(_query.trim());
     final categoryIds = _categories[_category]!;
     final modules = PortalModuleRegistry.modules.where((module) {
@@ -100,7 +120,7 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
               ],
             ),
           )
-        else
+        else ...[
           ...modules.map(
             (module) => ServiceTile(
               key: ValueKey(module.id),
@@ -115,6 +135,20 @@ class _ServiceBrowserState extends State<ServiceBrowser> {
               },
             ),
           ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'Các dịch vụ trên ứng dụng có thể không đầy đủ so với cổng thông tin web portal.uit.edu.vn.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ],
     );
   }
