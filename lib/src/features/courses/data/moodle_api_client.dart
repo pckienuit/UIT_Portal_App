@@ -12,8 +12,8 @@ class MoodleApiClient {
             Dio(
               BaseOptions(
                 baseUrl: 'https://courses.uit.edu.vn',
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 20),
+                connectTimeout: const Duration(seconds: 20),
+                receiveTimeout: const Duration(seconds: 25),
                 headers: {
                   'User-Agent':
                       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -46,9 +46,11 @@ class MoodleApiClient {
   final Map<String, String> _cookieJar = {};
 
   String? _sesskey;
+  String? _lastErrorDetails;
 
   String? get sessionCookie => _cookieJar['MoodleSession'];
   String? get sesskey => _sesskey;
+  String? get lastErrorDetails => _lastErrorDetails;
   bool get isAuthenticated => _cookieJar.containsKey('MoodleSession') && _cookieJar['MoodleSession']!.isNotEmpty;
 
   static const _storageMoodleSessionKey = 'moodle_session_cookie';
@@ -57,7 +59,6 @@ class MoodleApiClient {
   Dio get dio => _dio;
 
   void _captureCookies(Response resp) {
-    // 1. Get raw set-cookie list from response headers
     final setCookieList = resp.headers[HttpHeaders.setCookieHeader] ?? resp.headers['set-cookie'];
     if (setCookieList != null) {
       for (final rawCookie in setCookieList) {
@@ -66,17 +67,21 @@ class MoodleApiClient {
     }
   }
 
-  void _parseAndStoreCookieString(String cookieStr) {
-    // A single header entry might contain multiple comma-separated cookies (except in expires dates)
-    final parts = cookieStr.split(';');
-    if (parts.isNotEmpty) {
-      final firstPair = parts.first.trim();
-      final eqIdx = firstPair.indexOf('=');
-      if (eqIdx > 0) {
-        final key = firstPair.substring(0, eqIdx).trim();
-        final value = firstPair.substring(eqIdx + 1).trim();
-        if (value.isNotEmpty && value != 'deleted') {
-          _cookieJar[key] = value;
+  void _parseAndStoreCookieString(String rawHeader) {
+    // Regex matches Name=Value before optional attributes
+    final matches = RegExp(r'([a-zA-Z0-9_-]+)=([^;,\s]+)').allMatches(rawHeader);
+    for (final m in matches) {
+      final name = m.group(1);
+      final value = m.group(2);
+      if (name != null && value != null) {
+        final lower = name.toLowerCase();
+        if (lower != 'path' &&
+            lower != 'domain' &&
+            lower != 'expires' &&
+            lower != 'max-age' &&
+            lower != 'samesite' &&
+            value != 'deleted') {
+          _cookieJar[name] = value;
         }
       }
     }
@@ -95,6 +100,7 @@ class MoodleApiClient {
   }
 
   Future<bool> login(String username, String password) async {
+    _lastErrorDetails = null;
     try {
       _cookieJar.clear();
       _sesskey = null;
@@ -107,6 +113,7 @@ class MoodleApiClient {
       final logintoken = logintokenMatch?.group(1);
 
       if (logintoken == null || logintoken.isEmpty) {
+        _lastErrorDetails = 'Không lấy được logintoken từ Moodle';
         return false;
       }
 
@@ -151,6 +158,7 @@ class MoodleApiClient {
 
       // Check if error is present in response
       if (postHtml.contains('Đăng nhập sai') || postHtml.contains('loginerrors')) {
+        _lastErrorDetails = 'Tài khoản hoặc mật khẩu Moodle không chính xác';
         return false;
       }
 
@@ -183,8 +191,10 @@ class MoodleApiClient {
         return true;
       }
 
+      _lastErrorDetails = 'Không nhận được cookie phiên MoodleSession';
       return false;
-    } catch (_) {
+    } catch (e) {
+      _lastErrorDetails = 'Lỗi kết nối: $e';
       return false;
     }
   }

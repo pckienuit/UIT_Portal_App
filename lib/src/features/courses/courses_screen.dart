@@ -21,7 +21,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
   final _passwordController = TextEditingController(text: '18092005');
   bool _isInlineLoggingIn = false;
   String? _inlineError;
-  bool _obscureMoodlePassword = false; // default visible for debugging
+  bool _obscureMoodlePassword = false;
 
   @override
   void dispose() {
@@ -39,7 +39,6 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
     try {
       final client = ref.read(moodleApiClientProvider);
       
-      // Step 1: Login to Moodle server
       final success = await client.login(
         _usernameController.text.trim(),
         _passwordController.text.trim(),
@@ -48,7 +47,6 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       if (!mounted) return;
 
       if (success) {
-        // Invalidate providers to trigger fresh fetch
         ref.invalidate(moodleCoursesFutureProvider);
         ref.invalidate(moodleDeadlinesFutureProvider);
         
@@ -57,7 +55,7 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
         );
       } else {
         setState(() {
-          _inlineError = 'Đăng nhập Moodle không thành công. Server từ chối phiên xác thực.';
+          _inlineError = client.lastErrorDetails ?? 'Đăng nhập Moodle không thành công. Server từ chối phiên xác thực.';
         });
       }
     } catch (e) {
