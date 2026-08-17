@@ -20,7 +20,7 @@ class MoodleApiClient {
                   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                   'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
                 },
-                followRedirects: false, // Manually follow 303s to capture intermediate Set-Cookie headers!
+                followRedirects: false,
                 validateStatus: (status) => status != null && status < 500,
               ),
             ) {
@@ -57,16 +57,26 @@ class MoodleApiClient {
   Dio get dio => _dio;
 
   void _captureCookies(Response resp) {
-    final setCookieHeaders = resp.headers[HttpHeaders.setCookieHeader];
-    if (setCookieHeaders != null) {
-      for (final header in setCookieHeaders) {
-        final cookieParts = header.split(';').first.split('=');
-        if (cookieParts.length >= 2) {
-          final k = cookieParts[0].trim();
-          final v = cookieParts.sublist(1).join('=').trim();
-          if (v != 'deleted') {
-            _cookieJar[k] = v;
-          }
+    // 1. Get raw set-cookie list from response headers
+    final setCookieList = resp.headers[HttpHeaders.setCookieHeader] ?? resp.headers['set-cookie'];
+    if (setCookieList != null) {
+      for (final rawCookie in setCookieList) {
+        _parseAndStoreCookieString(rawCookie);
+      }
+    }
+  }
+
+  void _parseAndStoreCookieString(String cookieStr) {
+    // A single header entry might contain multiple comma-separated cookies (except in expires dates)
+    final parts = cookieStr.split(';');
+    if (parts.isNotEmpty) {
+      final firstPair = parts.first.trim();
+      final eqIdx = firstPair.indexOf('=');
+      if (eqIdx > 0) {
+        final key = firstPair.substring(0, eqIdx).trim();
+        final value = firstPair.substring(eqIdx + 1).trim();
+        if (value.isNotEmpty && value != 'deleted') {
+          _cookieJar[key] = value;
         }
       }
     }
@@ -111,6 +121,10 @@ class MoodleApiClient {
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
+          headers: {
+            'Origin': 'https://courses.uit.edu.vn',
+            'Referer': 'https://courses.uit.edu.vn/login/index.php',
+          },
         ),
       );
 
@@ -123,7 +137,14 @@ class MoodleApiClient {
         if (nextLoc.startsWith('https://courses.uit.edu.vn')) {
           nextLoc = nextLoc.replaceFirst('https://courses.uit.edu.vn', '');
         }
-        postResp = await _dio.get<String>(nextLoc);
+        postResp = await _dio.get<String>(
+          nextLoc,
+          options: Options(
+            headers: {
+              'Referer': 'https://courses.uit.edu.vn/login/index.php',
+            },
+          ),
+        );
       }
 
       final postHtml = postResp.data ?? '';
