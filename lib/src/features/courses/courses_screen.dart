@@ -111,10 +111,34 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Chưa tới hạn'),
-            Tab(text: 'Đã quá hạn'),
-            Tab(text: 'Đã hoàn thành'),
+          tabs: [
+            Tab(
+              child: deadlinesAsync.maybeWhen(
+                data: (all) {
+                  final count = all.where((d) => d.status == DeadlineStatus.upcoming).length;
+                  return _TabWithBadge(label: 'Chưa tới hạn', count: count, color: Colors.teal);
+                },
+                orElse: () => const Text('Chưa tới hạn'),
+              ),
+            ),
+            Tab(
+              child: deadlinesAsync.maybeWhen(
+                data: (all) {
+                  final count = all.where((d) => d.status == DeadlineStatus.overdue).length;
+                  return _TabWithBadge(label: 'Đã quá hạn', count: count, color: Colors.red);
+                },
+                orElse: () => const Text('Đã quá hạn'),
+              ),
+            ),
+            Tab(
+              child: deadlinesAsync.maybeWhen(
+                data: (all) {
+                  final count = all.where((d) => d.status == DeadlineStatus.completed).length;
+                  return _TabWithBadge(label: 'Đã hoàn thành', count: count, color: Colors.green);
+                },
+                orElse: () => const Text('Đã hoàn thành'),
+              ),
+            ),
           ],
         ),
       ),
@@ -140,29 +164,77 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
               .toList()
             ..sort((a, b) => b.deadlineTime.compareTo(a.deadlineTime));
 
-          return TabBarView(
-            controller: _tabController,
+          return Column(
             children: [
-              _DeadlineListView(
-                deadlines: upcoming,
-                emptyTitle: 'Tuyệt vời!',
-                emptyMessage: 'Không có bài tập nào sắp tới hạn.',
-                emptyIcon: Icons.task_alt_rounded,
-                onOpenUrl: _openExternalUrl,
+              // Thống kê tổng quan nhanh (Overview Metrics Strip)
+              Container(
+                margin: const EdgeInsets.fromLTRB(
+                  PortalSpacing.md,
+                  PortalSpacing.sm,
+                  PortalSpacing.md,
+                  PortalSpacing.xs,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: PortalSpacing.md,
+                  vertical: PortalSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _MetricItem(
+                      label: 'Sắp tới hạn',
+                      count: upcoming.length,
+                      color: Colors.teal,
+                      icon: Icons.schedule_rounded,
+                    ),
+                    Container(height: 24, width: 1, color: theme.dividerColor),
+                    _MetricItem(
+                      label: 'Quá hạn',
+                      count: overdue.length,
+                      color: Colors.red,
+                      icon: Icons.error_outline_rounded,
+                    ),
+                    Container(height: 24, width: 1, color: theme.dividerColor),
+                    _MetricItem(
+                      label: 'Đã nộp',
+                      count: completed.length,
+                      color: Colors.green,
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                  ],
+                ),
               ),
-              _DeadlineListView(
-                deadlines: overdue,
-                emptyTitle: 'Không có bài tập quá hạn',
-                emptyMessage: 'Bạn không có bài tập nào bị trễ hạn.',
-                emptyIcon: Icons.sentiment_satisfied_alt_rounded,
-                onOpenUrl: _openExternalUrl,
-              ),
-              _DeadlineListView(
-                deadlines: completed,
-                emptyTitle: 'Chưa có bài tập hoàn thành',
-                emptyMessage: 'Các bài tập đã nộp sẽ hiển thị tại đây.',
-                emptyIcon: Icons.assignment_turned_in_outlined,
-                onOpenUrl: _openExternalUrl,
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _DeadlineListView(
+                      deadlines: upcoming,
+                      emptyTitle: 'Tuyệt vời!',
+                      emptyMessage: 'Không có bài tập nào sắp tới hạn.',
+                      emptyIcon: Icons.task_alt_rounded,
+                      onOpenUrl: _openExternalUrl,
+                    ),
+                    _DeadlineListView(
+                      deadlines: overdue,
+                      emptyTitle: 'Không có bài tập quá hạn',
+                      emptyMessage: 'Bạn không có bài tập nào bị trễ hạn.',
+                      emptyIcon: Icons.sentiment_satisfied_alt_rounded,
+                      onOpenUrl: _openExternalUrl,
+                    ),
+                    _DeadlineListView(
+                      deadlines: completed,
+                      emptyTitle: 'Chưa có bài tập hoàn thành',
+                      emptyMessage: 'Các bài tập đã nộp sẽ hiển thị tại đây.',
+                      emptyIcon: Icons.assignment_turned_in_outlined,
+                      onOpenUrl: _openExternalUrl,
+                    ),
+                  ],
+                ),
               ),
             ],
           );
@@ -280,6 +352,78 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
   }
 }
 
+class _TabWithBadge extends StatelessWidget {
+  const _TabWithBadge({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        if (count > 0) ...[
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetricItem extends StatelessWidget {
+  const _MetricItem({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+        ),
+        Text(
+          '$count',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+        ),
+      ],
+    );
+  }
+}
+
 class _DeadlineListView extends StatelessWidget {
   const _DeadlineListView({
     required this.deadlines,
@@ -378,7 +522,7 @@ class _DeadlineFullCard extends StatelessWidget {
         ),
       DeadlineStatus.completed => (
           Colors.green,
-          'Đã hoàn thành',
+          'Đã nộp bài',
           Icons.check_circle_outline_rounded,
         ),
     };
@@ -387,7 +531,11 @@ class _DeadlineFullCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.5)),
+        side: BorderSide(
+          color: deadline.isCompleted
+              ? Colors.green.withValues(alpha: 0.5)
+              : theme.dividerColor.withValues(alpha: 0.5),
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),

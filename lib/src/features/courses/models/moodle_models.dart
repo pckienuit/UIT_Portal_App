@@ -27,12 +27,9 @@ class MoodleDeadline {
     final now = DateTime.now();
     final overdueBool = json['overdue'] as bool? ?? deadlineTime.isBefore(now);
 
-    // Moodle logic: nếu action.actionable == false và action.name != 'Thêm bài nộp' hoặc actionUrl dẫn tới view đã nộp
-    // hoặc eventtype/action cho thấy đã nộp
     final actionName = action?['name'] as String?;
     final actionUrl = action?['url'] as String? ?? json['url'] as String?;
-    
-    // Nếu sinh viên đã hoàn thành hoặc không còn actionable
+
     final isCompleted = action != null &&
         action['actionable'] == false &&
         (actionName?.contains('Đã nộp') == true ||
@@ -61,6 +58,30 @@ class MoodleDeadline {
   final String? actionUrl;
   final String? actionName;
   final bool isCompleted;
+
+  MoodleDeadline copyWith({
+    int? id,
+    String? name,
+    String? courseName,
+    String? courseCode,
+    DateTime? deadlineTime,
+    bool? isOverdue,
+    String? actionUrl,
+    String? actionName,
+    bool? isCompleted,
+  }) {
+    return MoodleDeadline(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      courseName: courseName ?? this.courseName,
+      courseCode: courseCode ?? this.courseCode,
+      deadlineTime: deadlineTime ?? this.deadlineTime,
+      isOverdue: isOverdue ?? this.isOverdue,
+      actionUrl: actionUrl ?? this.actionUrl,
+      actionName: actionName ?? this.actionName,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
 
   /// Trạng thái phân loại: upcoming (chưa tới hạn), overdue (đã quá hạn), completed (đã hoàn thành)
   DeadlineStatus get status {
