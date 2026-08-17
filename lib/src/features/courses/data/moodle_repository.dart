@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'moodle_api_client.dart';
 import '../models/moodle_models.dart';
 
@@ -9,34 +10,77 @@ class MoodleRepository {
   /// Lấy danh sách khóa học đang theo học
   Future<List<MoodleCourse>> getEnrolledCourses() async {
     final sesskey = apiClient.sesskey;
-    if (sesskey == null || sesskey.isEmpty) {
+    if (sesskey != null && sesskey.isNotEmpty) {
+      final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_course_get_enrolled_courses_by_timeline_classification';
+      final payload = [
+        {
+          'index': 0,
+          'methodname': 'core_course_get_enrolled_courses_by_timeline_classification',
+          'args': {
+            'offset': 0,
+            'limit': 50,
+            'classification': 'all',
+            'sort': 'fullname',
+          },
+        }
+      ];
+
+      try {
+        final resp = await apiClient.dio.post<dynamic>(url, data: payload);
+        if (resp.statusCode == 200) {
+          dynamic rawData = resp.data;
+          if (rawData is String) {
+            rawData = jsonDecode(rawData);
+          }
+          if (rawData is List && rawData.isNotEmpty) {
+            final first = rawData.first as Map<String, dynamic>;
+            final data = first['data'] as Map<String, dynamic>?;
+            final courses = data?['courses'] as List<dynamic>? ?? [];
+
+            if (courses.isNotEmpty) {
+              return courses.map((c) => MoodleCourse.fromJson(c as Map<String, dynamic>)).toList();
+            }
+          }
+        }
+      } catch (_) {
+        // Fallback to HTML scraping
+      }
+    }
+
+    // Fallback: Scraping HTML từ trang /my/
+    try {
+      final myResp = await apiClient.dio.get<String>('/my/');
+      final html = myResp.data ?? '';
+
+      final courseCardsRegex = RegExp(r'<a[^>]+href="https:\/\/courses\.uit\.edu\.vn\/course\/view\.php\?id=(\d+)"[^>]*>(.*?)<\/a>', dotAll: true);
+      final matches = courseCardsRegex.allMatches(html);
+
+      final scrapedList = <MoodleCourse>[];
+      final seenIds = <int>{};
+
+      for (final match in matches) {
+        final idStr = match.group(1);
+        final inner = match.group(2) ?? '';
+        final id = int.tryParse(idStr ?? '') ?? 0;
+
+        if (id > 0 && !seenIds.contains(id)) {
+          seenIds.add(id);
+          final cleanName = inner.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+          if (cleanName.isNotEmpty && !cleanName.contains('Chuyển tới nội dung')) {
+            scrapedList.add(MoodleCourse(
+              id: id,
+              fullname: cleanName,
+              shortname: cleanName,
+              viewUrl: 'https://courses.uit.edu.vn/course/view.php?id=$id',
+            ));
+          }
+        }
+      }
+
+      return scrapedList;
+    } catch (_) {
       return [];
     }
-
-    final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_course_get_enrolled_courses_by_timeline_classification';
-    final payload = [
-      {
-        'index': 0,
-        'methodname': 'core_course_get_enrolled_courses_by_timeline_classification',
-        'args': {
-          'offset': 0,
-          'limit': 50,
-          'classification': 'all',
-          'sort': 'fullname',
-        },
-      }
-    ];
-
-    final resp = await apiClient.dio.post<dynamic>(url, data: payload);
-    if (resp.statusCode == 200 && resp.data is List && (resp.data as List).isNotEmpty) {
-      final first = (resp.data as List).first as Map<String, dynamic>;
-      final data = first['data'] as Map<String, dynamic>?;
-      final courses = data?['courses'] as List<dynamic>? ?? [];
-
-      return courses.map((c) => MoodleCourse.fromJson(c as Map<String, dynamic>)).toList();
-    }
-
-    return [];
   }
 
   /// Lấy danh sách sự kiện / Hạn nộp bài tập (Deadlines)
@@ -58,19 +102,29 @@ class MoodleRepository {
       }
     ];
 
-    final resp = await apiClient.dio.post<dynamic>(url, data: payload);
-    if (resp.statusCode == 200 && resp.data is List && (resp.data as List).isNotEmpty) {
-      final first = (resp.data as List).first as Map<String, dynamic>;
-      final data = first['data'] as Map<String, dynamic>?;
-      final events = data?['events'] as List<dynamic>? ?? [];
+    try {
+      final resp = await apiClient.dio.post<dynamic>(url, data: payload);
+      if (resp.statusCode == 200) {
+        dynamic rawData = resp.data;
+        if (rawData is String) {
+          rawData = jsonDecode(rawData);
+        }
+        if (rawData is List && rawData.isNotEmpty) {
+          final first = rawData.first as Map<String, dynamic>;
+          final data = first['data'] as Map<String, dynamic>?;
+          final events = data?['events'] as List<dynamic>? ?? [];
 
-      return events.map((e) => MoodleDeadline.fromJson(e as Map<String, dynamic>)).toList();
+          return events.map((e) => MoodleDeadline.fromJson(e as Map<String, dynamic>)).toList();
+        }
+      }
+    } catch (_) {
+      // Fallback
     }
 
     return [];
   }
 
-  /// Lấy chi tiết tài liệu, slide và hoạt động của một khóa học (dùng Regex parse gọn nhẹ không cần HTML parser)
+  /// Lấy chi tiết tài liệu, slide và hoạt động của một khóa học
   Future<MoodleCourseDetail> getCourseDetail(int courseId, String courseName) async {
     final resp = await apiClient.dio.get<String>('/course/view.php?id=$courseId');
     final html = resp.data ?? '';

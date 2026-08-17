@@ -2,10 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/moodle_api_client.dart';
 import '../data/moodle_repository.dart';
 import '../models/moodle_models.dart';
+import '../../auth/auth_providers.dart';
 
 final moodleApiClientProvider = Provider<MoodleApiClient>((ref) {
-  final client = MoodleApiClient();
-  return client;
+  final authController = ref.watch(authControllerProvider);
+  return authController.moodleApiClient;
 });
 
 final moodleRepositoryProvider = Provider<MoodleRepository>((ref) {

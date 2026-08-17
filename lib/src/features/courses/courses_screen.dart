@@ -18,6 +18,87 @@ class CoursesScreen extends ConsumerStatefulWidget {
 class _CoursesScreenState extends ConsumerState<CoursesScreen> {
   String _searchQuery = '';
 
+  void _showMoodleLoginDialog() {
+    final usernameController = TextEditingController(text: '23520804');
+    final passwordController = TextEditingController();
+    var isLoggingIn = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.school_rounded, color: Colors.indigo),
+              SizedBox(width: 8),
+              Text('Đăng nhập Moodle'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Nhập tài khoản courses.uit.edu.vn để đồng bộ môn học và slide bài giảng:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'MSSV',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Mật khẩu Moodle',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoggingIn ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Đóng'),
+            ),
+            FilledButton(
+              onPressed: isLoggingIn
+                  ? null
+                  : () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(ctx);
+                      setDialogState(() => isLoggingIn = true);
+                      final client = ref.read(moodleApiClientProvider);
+                      final success = await client.login(
+                        usernameController.text,
+                        passwordController.text,
+                      );
+                      if (!mounted) return;
+                      nav.pop();
+                      if (success) {
+                        ref.invalidate(moodleCoursesFutureProvider);
+                        ref.invalidate(moodleDeadlinesFutureProvider);
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Đăng nhập Moodle thành công!')),
+                        );
+                      } else {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Đăng nhập Moodle thất bại. Vui lòng kiểm tra lại mật khẩu.')),
+                        );
+                      }
+                    },
+              child: isLoggingIn
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Đăng nhập'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final coursesAsync = ref.watch(moodleCoursesFutureProvider);
@@ -29,6 +110,11 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
         title: const Text('Moodle Courses & Tài liệu'),
         actions: [
           IconButton(
+            tooltip: 'Đăng nhập lại Moodle',
+            icon: const Icon(Icons.key_rounded),
+            onPressed: _showMoodleLoginDialog,
+          ),
+          IconButton(
             tooltip: 'Làm mới danh sách môn học',
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(moodleCoursesFutureProvider),
@@ -38,9 +124,33 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen> {
       body: coursesAsync.when(
         data: (courses) {
           if (courses.isEmpty) {
-            return const PortalAsyncState.empty(
-              title: 'Chưa có môn học Moodle',
-              message: 'Vui lòng kiểm tra lại tài khoản hoặc làm mới danh sách.',
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(PortalSpacing.lg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.school_outlined, size: 64, color: scheme.onSurfaceVariant),
+                    const SizedBox(height: PortalSpacing.md),
+                    Text(
+                      'Chưa có môn học Moodle',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: PortalSpacing.xs),
+                    Text(
+                      'Phiên đăng nhập Moodle có thể chưa được kích hoạt.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: PortalSpacing.lg),
+                    FilledButton.icon(
+                      onPressed: _showMoodleLoginDialog,
+                      icon: const Icon(Icons.login_rounded),
+                      label: const Text('Đăng nhập Moodle'),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
 
