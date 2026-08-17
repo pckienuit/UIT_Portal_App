@@ -82,8 +82,10 @@ class CourseDetailScreen extends ConsumerWidget {
     );
   }
 
-  static void _openExternalUrl(String url) {
-    _urlChannel.invokeMethod('openPortalArticle', {'url': url});
+  static Future<void> _openExternalUrl(String url) async {
+    try {
+      await _urlChannel.invokeMethod('openWebBrowser', {'url': url});
+    } catch (_) {}
   }
 }
 

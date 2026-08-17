@@ -74,20 +74,37 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pckienuit.uitportal/external_url")
             .setMethodCallHandler { call, result ->
-                if (call.method != "openPortalArticle") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-                val uri = call.argument<String>("url")?.let(Uri::parse)
-                if (uri == null || !isPortalArticleUrl(uri.toString())) {
-                    result.error("invalid_url", "Invalid UIT article URL", null)
-                    return@setMethodCallHandler
-                }
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, uri))
-                    result.success(null)
-                } catch (_: ActivityNotFoundException) {
-                    result.error("no_browser", "No browser can open UIT articles", null)
+                when (call.method) {
+                    "openPortalArticle" -> {
+                        val uri = call.argument<String>("url")?.let(Uri::parse)
+                        if (uri == null || !isPortalArticleUrl(uri.toString())) {
+                            result.error("invalid_url", "Invalid UIT article URL", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            result.success(null)
+                        } catch (_: ActivityNotFoundException) {
+                            result.error("no_browser", "No browser can open UIT articles", null)
+                        }
+                    }
+                    "openWebBrowser" -> {
+                        val urlStr = call.argument<String>("url")
+                        val uri = urlStr?.let(Uri::parse)
+                        if (uri == null) {
+                            result.error("invalid_url", "Missing or invalid URL", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (_: ActivityNotFoundException) {
+                            result.error("no_browser", "No browser found to open URL", null)
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
             }
 
@@ -135,7 +152,6 @@ class MainActivity : FlutterActivity() {
 
             resolver.openOutputStream(uri)?.use { stream ->
                 stream.write(bytes)
-                stream.flush()
             }
 
             contentValues.clear()
@@ -149,7 +165,6 @@ class MainActivity : FlutterActivity() {
             val file = File(appDir, filename)
             FileOutputStream(file).use { stream ->
                 stream.write(bytes)
-                stream.flush()
             }
 
             // Trigger media scanner for legacy Android
