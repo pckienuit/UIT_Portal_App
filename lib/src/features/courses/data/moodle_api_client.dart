@@ -86,6 +86,9 @@ class MoodleApiClient {
 
   Future<bool> login(String username, String password) async {
     try {
+      _cookieJar.clear();
+      _sesskey = null;
+
       // 1. Fetch login page to extract logintoken
       final loginPageResp = await _dio.get<String>('/login/index.php');
       final html = loginPageResp.data ?? '';
