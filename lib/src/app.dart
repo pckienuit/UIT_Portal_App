@@ -34,6 +34,7 @@ import 'features/teaching_survey/teaching_survey_screen.dart';
 import 'features/main/main_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/ai_chat/presentation/ai_chat_screen.dart';
+import 'features/courses/courses_screen.dart';
 import 'portal_module_registry.dart';
 import 'design_system/theme/portal_theme.dart';
 
@@ -105,6 +106,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             'profile' => const ProfileScreen(),
             'grades' => const GradesScreen(),
             'tkb' => const ScheduleScreen(),
+            'moodle_courses' => const CoursesScreen(),
             'confirmation_paper' => const ConfirmationPaperScreen(),
             'certificate_validation' => const CertificateValidationScreen(),
             'student_card' => const StudentCardScreen(),

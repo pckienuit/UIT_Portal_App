@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import com.pckienuit.uitportal.oauth.NativeOAuthCoordinator
 import java.net.URI
 import java.net.URISyntaxException
@@ -74,20 +75,72 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pckienuit.uitportal/external_url")
             .setMethodCallHandler { call, result ->
-                if (call.method != "openPortalArticle") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-                val uri = call.argument<String>("url")?.let(Uri::parse)
-                if (uri == null || !isPortalArticleUrl(uri.toString())) {
-                    result.error("invalid_url", "Invalid UIT article URL", null)
-                    return@setMethodCallHandler
-                }
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, uri))
-                    result.success(null)
-                } catch (_: ActivityNotFoundException) {
-                    result.error("no_browser", "No browser can open UIT articles", null)
+                when (call.method) {
+                    "openPortalArticle" -> {
+                        val uri = call.argument<String>("url")?.let(Uri::parse)
+                        if (uri == null || !isPortalArticleUrl(uri.toString())) {
+                            result.error("invalid_url", "Invalid UIT article URL", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            result.success(null)
+                        } catch (_: ActivityNotFoundException) {
+                            result.error("no_browser", "No browser can open UIT articles", null)
+                        }
+                    }
+                    "openWebBrowser" -> {
+                        val urlStr = call.argument<String>("url")
+                        val uri = urlStr?.let(Uri::parse)
+                        if (uri == null) {
+                            result.error("invalid_url", "Missing or invalid URL", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (_: ActivityNotFoundException) {
+                            result.error("no_browser", "No browser found to open URL", null)
+                        }
+                    }
+                    "openDownloadedFile" -> {
+                        val filePath = call.argument<String>("filePath")
+                        val mimeType = call.argument<String>("mimeType") ?: "*/*"
+                        if (filePath == null) {
+                            result.error("invalid_path", "File path cannot be null", null)
+                            return@setMethodCallHandler
+                        }
+                        val file = File(filePath)
+                        if (!file.exists()) {
+                            result.error("file_not_found", "File does not exist at $filePath", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val contentUri: Uri = FileProvider.getUriForFile(
+                                applicationContext,
+                                "${applicationContext.packageName}.fileprovider",
+                                file
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(contentUri, mimeType)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            // Dùng Intent.createChooser để Android luôn hiển thị hộp thoại chọn ứng dụng (App Chooser)
+                            val chooserIntent = Intent.createChooser(intent, "Mở bằng ứng dụng").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(chooserIntent)
+                            result.success(true)
+                        } catch (e: ActivityNotFoundException) {
+                            result.error("no_viewer", "Không tìm thấy ứng dụng phù hợp để đọc file ($mimeType)", null)
+                        } catch (e: Exception) {
+                            result.error("open_error", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
             }
 
@@ -135,7 +188,6 @@ class MainActivity : FlutterActivity() {
 
             resolver.openOutputStream(uri)?.use { stream ->
                 stream.write(bytes)
-                stream.flush()
             }
 
             contentValues.clear()
@@ -149,7 +201,6 @@ class MainActivity : FlutterActivity() {
             val file = File(appDir, filename)
             FileOutputStream(file).use { stream ->
                 stream.write(bytes)
-                stream.flush()
             }
 
             // Trigger media scanner for legacy Android

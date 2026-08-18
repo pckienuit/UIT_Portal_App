@@ -9,6 +9,8 @@ import '../profile/profile_providers.dart';
 import '../schedule/schedule_providers.dart';
 import '../tuition/tuition_providers.dart';
 import '../grades/grades_providers.dart';
+import '../courses/widgets/home_moodle_deadlines_card.dart';
+import '../courses/providers/moodle_providers.dart';
 import '../notifications/providers/personal_notification_providers.dart';
 import 'providers/widget_preferences_provider.dart';
 import 'widgets/home_header.dart';
@@ -39,22 +41,28 @@ class HomeScreen extends ConsumerWidget {
     final activeWidgets = ref.watch(widgetPreferencesProvider);
     final unreadPersonal = ref.watch(personalNotificationProvider).where((n) => !n.isRead).length;
 
-    // Lắng nghe dữ liệu để tự động kích hoạt thông báo cá nhân khi có cập nhật
+    // Lắng nghe dữ liệu để tự động kích hoạt thông báo cá nhân an toàn sau frame build
     ref.listen(scheduleFutureProvider, (previous, next) {
       next.whenData((schedule) {
-        ref.read(personalNotificationProvider.notifier).syncScheduleAlerts(schedule);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncScheduleAlerts(schedule);
+        });
       });
     });
 
     ref.listen(gradesFutureProvider, (previous, next) {
       next.whenData((grades) {
-        ref.read(personalNotificationProvider.notifier).syncGradesAlerts(grades);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncGradesAlerts(grades);
+        });
       });
     });
 
     ref.listen(tuitionListProvider, (previous, next) {
       next.whenData((tuition) {
-        ref.read(personalNotificationProvider.notifier).syncTuitionAlerts(tuition);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(personalNotificationProvider.notifier).syncTuitionAlerts(tuition);
+        });
       });
     });
 
@@ -89,6 +97,8 @@ class HomeScreen extends ConsumerWidget {
           ref.invalidate(scheduleFutureProvider);
           ref.invalidate(tuitionListProvider);
           ref.invalidate(gradesFutureProvider);
+          ref.invalidate(moodleAllDeadlinesFutureProvider);
+          ref.invalidate(moodleCoursesFutureProvider);
           final results = await Future.wait([
             ref.read(detailedProfileProvider.future),
             ref.read(scheduleFutureProvider.future),
@@ -126,6 +136,8 @@ class HomeScreen extends ConsumerWidget {
                         const TuitionSnapshot(),
                       if (activeWidgets.contains('grades'))
                         const GradesSnapshot(),
+                      if (activeWidgets.contains('moodle_deadlines'))
+                        const HomeMoodleDeadlinesCard(),
                     ],
                   ),
                   const SizedBox(height: PortalSpacing.lg),
@@ -211,6 +223,14 @@ class _WidgetCustomizationSheet extends ConsumerWidget {
                 activeColor: colorScheme.primary,
                 onChanged: (val) =>
                     notifier.toggleWidget('grades', val ?? false),
+              ),
+              CheckboxListTile(
+                title: const Text('Hạn nộp bài tập (Moodle)'),
+                subtitle: const Text('Theo dõi bài tập sắp tới hạn'),
+                value: activeWidgets.contains('moodle_deadlines'),
+                activeColor: colorScheme.primary,
+                onChanged: (val) =>
+                    notifier.toggleWidget('moodle_deadlines', val ?? false),
               ),
               const SizedBox(height: 16),
             ],

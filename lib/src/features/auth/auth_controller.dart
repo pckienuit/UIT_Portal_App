@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../portal_constants.dart';
+import '../courses/data/moodle_api_client.dart';
 import 'oidc_config.dart';
 import 'sso_scraper_service.dart';
 
@@ -14,11 +16,13 @@ class AuthController extends ChangeNotifier {
     FlutterAppAuth? appAuth,
     OidcConfig? config,
     SsoScraperService? scraperService,
+    MoodleApiClient? moodleApiClient,
     DateTime Function()? now,
   }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
        _appAuth = appAuth ?? const FlutterAppAuth(),
        _config = config ?? const OidcConfig(),
        _scraperService = scraperService ?? SsoScraperService(),
+       _moodleApiClient = moodleApiClient ?? MoodleApiClient(),
        _now = now ?? DateTime.now;
 
   static const String _sessionMarkerKey = 'portal_session_marker';
@@ -31,6 +35,7 @@ class AuthController extends ChangeNotifier {
   final FlutterAppAuth _appAuth;
   final OidcConfig _config;
   final SsoScraperService _scraperService;
+  final MoodleApiClient _moodleApiClient;
   final DateTime Function() _now;
 
   AuthStatus _status = AuthStatus.signedOut;
@@ -46,6 +51,7 @@ class AuthController extends ChangeNotifier {
   String? get lastError => _lastError;
   AuthSession? get session => _session;
   OidcConfig get config => _config;
+  MoodleApiClient get moodleApiClient => _moodleApiClient;
 
   Future<void> restoreSession() async {
     final accessToken = await _secureStorage.read(key: _accessTokenKey);
@@ -74,6 +80,7 @@ class AuthController extends ChangeNotifier {
 
     _session = restored;
     _status = AuthStatus.signedIn;
+    await _moodleApiClient.restoreSession();
     notifyListeners();
   }
 
@@ -175,11 +182,20 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final session = await _scraperService.scrapeLogin(
+      // 1. Authenticate Portal (Primary) & Moodle (Secondary) in parallel
+      final portalFuture = _scraperService.scrapeLogin(
         username,
         password,
         _config,
       );
+      final moodleFuture = _moodleApiClient.login(username, password).catchError((_) => false);
+
+      final results = await Future.wait([
+        portalFuture,
+        moodleFuture,
+      ]);
+
+      final session = results[0] as AuthSession;
       await _persistSession(session);
       _status = AuthStatus.signedIn;
     } on SsoScraperException catch (error) {
@@ -229,6 +245,7 @@ class AuthController extends ChangeNotifier {
       _secureStorage.delete(key: _refreshTokenKey),
       _secureStorage.delete(key: _idTokenKey),
       _secureStorage.delete(key: _expiresAtKey),
+      _moodleApiClient.logout(),
     ]);
     final changed = _session != null || _status != AuthStatus.signedOut;
     _session = null;
