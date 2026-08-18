@@ -18,13 +18,43 @@ String getWeekStartDate(DateTime date) {
   return '$year-$month-$day';
 }
 
+/// Helper xác định học kỳ, năm học và yearId từ ngày bắt đầu tuần (startDate)
+({int hocKy, int namHoc, int yearId}) getSemesterForDate(DateTime date) {
+  final month = date.month;
+  final year = date.year;
+
+  int hocKy;
+  int namHoc;
+
+  if (month >= 9) {
+    hocKy = 1;
+    namHoc = year;
+  } else if (month == 1) {
+    hocKy = 1;
+    namHoc = year - 1;
+  } else if (month >= 2 && month <= 6) {
+    hocKy = 2;
+    namHoc = year - 1;
+  } else {
+    // Tháng 7 và 8: Học kỳ Hè (HK3)
+    hocKy = 3;
+    namHoc = year - 1;
+  }
+
+  final yearId = (namHoc >= 2008) ? (namHoc - 2008) : 17;
+  return (hocKy: hocKy, namHoc: namHoc, yearId: yearId);
+}
+
 /// Provider lấy TKB theo tuần cụ thể (startDate dạng YYYY-MM-DD)
 final scheduleByWeekProvider = FutureProvider.family.autoDispose<ScheduleResponse, String>((ref, startDate) {
   final repository = ref.watch(scheduleRepositoryProvider);
+  final date = DateTime.tryParse(startDate) ?? DateTime.now();
+  final info = getSemesterForDate(date);
+
   return repository.fetchSchedule(
-    hocKy: 2,
-    namHoc: 2025,
-    yearId: 17,
+    hocKy: info.hocKy,
+    namHoc: info.namHoc,
+    yearId: info.yearId,
     startDate: startDate,
   );
 });
