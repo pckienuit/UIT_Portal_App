@@ -10,12 +10,11 @@ class MoodleRepository {
 
   /// Lấy danh sách toàn bộ các hạn nộp bài tập (Deadlines) từ cả Moodle chính và Fallback Moodle cũ
   Future<List<MoodleDeadline>> getAllDeadlines({int limit = 50}) async {
-    if (!apiClient.isAuthenticated) {
-      await apiClient.restoreSession();
-    }
+    // Luôn đảm bảo đã restore hoặc đăng nhập cả 2 server
+    await apiClient.restoreSession();
 
-    if (!apiClient.isAuthenticated) {
-      debugPrint('[MoodleRepository] Attempting silent login fallback to both Moodle instances.');
+    if (!apiClient.isAuthenticated || apiClient.oldSesskey == null || apiClient.oldSesskey!.isEmpty) {
+      debugPrint('[MoodleRepository] Missing oldSesskey. Performing dual login.');
       await apiClient.login('23520804', '18092005');
     }
 
@@ -52,7 +51,9 @@ class MoodleRepository {
             }
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MoodleRepository] Error fetching primary Moodle: $e');
+      }
     }
 
     // 2. Quét Fallback từ Moodle cũ (coursesold.uit.edu.vn)
@@ -85,7 +86,9 @@ class MoodleRepository {
             }
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MoodleRepository] Error fetching coursesold: $e');
+      }
     }
 
     allDeadlines.addAll(allEventsMap.values);
@@ -102,7 +105,9 @@ class MoodleRepository {
             allDeadlines.add(comp);
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MoodleRepository] Error scanning old courses: $e');
+      }
     }
 
     return allDeadlines;
