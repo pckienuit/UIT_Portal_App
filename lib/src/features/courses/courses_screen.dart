@@ -167,77 +167,29 @@ class _CoursesScreenState extends ConsumerState<CoursesScreen>
               .toList()
             ..sort((a, b) => b.deadlineTime.compareTo(a.deadlineTime));
 
-          return Column(
+          return TabBarView(
+            controller: _tabController,
             children: [
-              // Thống kê tổng quan nhanh (Overview Metrics Strip)
-              Container(
-                margin: const EdgeInsets.fromLTRB(
-                  PortalSpacing.md,
-                  PortalSpacing.sm,
-                  PortalSpacing.md,
-                  PortalSpacing.xs,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PortalSpacing.md,
-                  vertical: PortalSpacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _MetricItem(
-                      label: 'Sắp tới hạn',
-                      count: upcoming.length,
-                      color: Colors.teal,
-                      icon: Icons.schedule_rounded,
-                    ),
-                    Container(height: 24, width: 1, color: theme.dividerColor),
-                    _MetricItem(
-                      label: 'Quá hạn',
-                      count: overdue.length,
-                      color: Colors.red,
-                      icon: Icons.error_outline_rounded,
-                    ),
-                    Container(height: 24, width: 1, color: theme.dividerColor),
-                    _MetricItem(
-                      label: 'Đã nộp',
-                      count: completed.length,
-                      color: Colors.green,
-                      icon: Icons.check_circle_outline_rounded,
-                    ),
-                  ],
-                ),
+              _DeadlineListView(
+                deadlines: upcoming,
+                emptyTitle: 'Tuyệt vời!',
+                emptyMessage: 'Không có bài tập nào sắp tới hạn.',
+                emptyIcon: Icons.task_alt_rounded,
+                onOpenUrl: _openExternalUrl,
               ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _DeadlineListView(
-                      deadlines: upcoming,
-                      emptyTitle: 'Tuyệt vời!',
-                      emptyMessage: 'Không có bài tập nào sắp tới hạn.',
-                      emptyIcon: Icons.task_alt_rounded,
-                      onOpenUrl: _openExternalUrl,
-                    ),
-                    _DeadlineListView(
-                      deadlines: overdue,
-                      emptyTitle: 'Không có bài tập quá hạn',
-                      emptyMessage: 'Bạn không có bài tập nào bị trễ hạn.',
-                      emptyIcon: Icons.sentiment_satisfied_alt_rounded,
-                      onOpenUrl: _openExternalUrl,
-                    ),
-                    _DeadlineListView(
-                      deadlines: completed,
-                      emptyTitle: 'Chưa có bài tập hoàn thành',
-                      emptyMessage: 'Các bài tập đã nộp sẽ hiển thị tại đây.',
-                      emptyIcon: Icons.assignment_turned_in_outlined,
-                      onOpenUrl: _openExternalUrl,
-                    ),
-                  ],
-                ),
+              _DeadlineListView(
+                deadlines: overdue,
+                emptyTitle: 'Không có bài tập quá hạn',
+                emptyMessage: 'Bạn không có bài tập nào bị trễ hạn.',
+                emptyIcon: Icons.sentiment_satisfied_alt_rounded,
+                onOpenUrl: _openExternalUrl,
+              ),
+              _DeadlineListView(
+                deadlines: completed,
+                emptyTitle: 'Chưa có bài tập hoàn thành',
+                emptyMessage: 'Các bài tập đã nộp sẽ hiển thị tại đây.',
+                emptyIcon: Icons.assignment_turned_in_outlined,
+                onOpenUrl: _openExternalUrl,
               ),
             ],
           );
@@ -397,38 +349,6 @@ class _TabWithBadge extends StatelessWidget {
             ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _MetricItem extends StatelessWidget {
-  const _MetricItem({
-    required this.label,
-    required this.count,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final int count;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Text(
-          '$label: ',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-        ),
-        Text(
-          '$count',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
-        ),
       ],
     );
   }
