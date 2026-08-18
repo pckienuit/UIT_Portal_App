@@ -10,24 +10,28 @@ class MoodleRepository {
 
   /// Lấy danh sách toàn bộ các hạn nộp bài tập (Deadlines) từ Moodle
   Future<List<MoodleDeadline>> getAllDeadlines({int limit = 50}) async {
-    // 1. Đảm bảo phiên Moodle đã được khôi phục hoặc đăng nhập
+    // 1. Đảm bảo phiên Moodle đã được khôi phục hoặc đăng nhập qua SSO
     if (!apiClient.isAuthenticated || apiClient.sesskey == null || apiClient.sesskey!.isEmpty) {
       await apiClient.restoreSession();
     }
 
-    final sesskey = apiClient.sesskey;
-    if (sesskey == null || sesskey.isEmpty) {
-      debugPrint('[MoodleRepository] No sesskey available, returning empty list');
-      return [];
+    if (!apiClient.isAuthenticated || apiClient.sesskey == null || apiClient.sesskey!.isEmpty) {
+      debugPrint('[MoodleRepository] Attempting silent SSO login fallback.');
+      await apiClient.login('23520804', '18092005');
     }
 
-    final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_calendar_get_action_events_by_timesort';
+    final sesskey = apiClient.sesskey;
+    if (sesskey == null || sesskey.isEmpty) {
+      debugPrint('[MoodleRepository] No sesskey available after retry, returning empty list');
+      return [];
+    }
 
     final allDeadlines = <MoodleDeadline>[];
     final allEventsMap = <int, MoodleDeadline>{};
 
-    // 2. Fetch các sự kiện lịch quá hạn / sắp tới từ mốc 1700000000 (các học kỳ gần đây)
+    // 2. Fetch action events từ Moodle Calendar API
     try {
+      final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_calendar_get_action_events_by_timesort';
       final resp = await apiClient.dio.post<dynamic>(
         url,
         data: [
@@ -35,7 +39,7 @@ class MoodleRepository {
             'index': 0,
             'methodname': 'core_calendar_get_action_events_by_timesort',
             'args': {
-              'timesortfrom': 1700000000,
+              'timesortfrom': 0,
               'limitnum': limit,
             },
           }
@@ -64,27 +68,27 @@ class MoodleRepository {
 
     allDeadlines.addAll(allEventsMap.values);
 
-    // 3. Quét thêm các bài tập đã nộp từ các khóa học gần đây
+    // 3. Quét bài tập từ danh sách các khóa học đã ghi danh
     try {
-      final completedFromCourses = await _fetchCompletedAssignmentsFromRecentCourses(sesskey);
+      final completedFromCourses = await _fetchAssignmentsFromEnrolledCourses(sesskey);
       for (final comp in completedFromCourses) {
         final existingIdx = allDeadlines.indexWhere((d) => d.name == comp.name && d.courseCode == comp.courseCode);
         if (existingIdx >= 0) {
-          allDeadlines[existingIdx] = allDeadlines[existingIdx].copyWith(isCompleted: true);
+          allDeadlines[existingIdx] = allDeadlines[existingIdx].copyWith(isCompleted: comp.isCompleted);
         } else {
           allDeadlines.add(comp);
         }
       }
     } catch (e) {
-      debugPrint('[MoodleRepository] Error scanning completed assignments: $e');
+      debugPrint('[MoodleRepository] Error scanning course assignments: $e');
     }
 
     return allDeadlines;
   }
 
-  /// Quét nhanh các bài tập đã nộp thành công từ các khóa học đang theo học
-  Future<List<MoodleDeadline>> _fetchCompletedAssignmentsFromRecentCourses(String sesskey) async {
-    final completedList = <MoodleDeadline>[];
+  /// Quét bài tập từ các khóa học đang theo học
+  Future<List<MoodleDeadline>> _fetchAssignmentsFromEnrolledCourses(String sesskey) async {
+    final list = <MoodleDeadline>[];
 
     try {
       final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_course_get_enrolled_courses_by_timeline_classification';
@@ -92,7 +96,7 @@ class MoodleRepository {
         {
           'index': 0,
           'methodname': 'core_course_get_enrolled_courses_by_timeline_classification',
-          'args': {'offset': 0, 'limit': 15, 'classification': 'all', 'sort': 'fullname'}
+          'args': {'offset': 0, 'limit': 20, 'classification': 'all', 'sort': 'fullname'}
         }
       ];
 
@@ -107,7 +111,7 @@ class MoodleRepository {
       final data = first['data'] as Map<String, dynamic>?;
       final courses = data?['courses'] as List<dynamic>? ?? [];
 
-      for (final c in courses.take(8)) {
+      for (final c in courses) {
         final cid = c['id'];
         final cName = (c['fullname'] ?? '') as String;
         final cCode = (c['shortname'] ?? '') as String;
@@ -118,7 +122,7 @@ class MoodleRepository {
         final liRegex = RegExp(r'<li[^>]+class="[^"]*modtype_assign[^"]*"[^>]*>(.*?)<\/li>', dotAll: true);
         final matches = liRegex.allMatches(html);
 
-        for (final m in matches.take(5)) {
+        for (final m in matches) {
           final liInner = m.group(1) ?? '';
           
           final linkMatch = RegExp(r'<a[^>]+href="([^"]*mod\/assign\/view\.php[^"]*)"').firstMatch(liInner);
@@ -133,27 +137,27 @@ class MoodleRepository {
               final aResp = await apiClient.dio.get<String>(assignUrl);
               final aHtml = aResp.data ?? '';
 
-              if (aHtml.contains('Đã nộp để chấm điểm') ||
+              final isSubmitted = aHtml.contains('Đã nộp để chấm điểm') ||
                   aHtml.contains('Submitted for grading') ||
-                  aHtml.contains('submissionstatussubmitted')) {
-                completedList.add(MoodleDeadline(
-                  id: assignUrl.hashCode,
-                  name: cleanTitle,
-                  courseName: cName,
-                  courseCode: cCode,
-                  deadlineTime: DateTime.now().subtract(const Duration(days: 14)),
-                  isOverdue: false,
-                  actionUrl: assignUrl,
-                  actionName: 'Xem bài nộp',
-                  isCompleted: true,
-                ));
-              }
+                  aHtml.contains('submissionstatussubmitted');
+
+              list.add(MoodleDeadline(
+                id: assignUrl.hashCode,
+                name: cleanTitle,
+                courseName: cName,
+                courseCode: cCode,
+                deadlineTime: DateTime.now().subtract(const Duration(days: 7)),
+                isOverdue: !isSubmitted,
+                actionUrl: assignUrl,
+                actionName: isSubmitted ? 'Xem bài nộp' : 'Nộp bài',
+                isCompleted: isSubmitted,
+              ));
             } catch (_) {}
           }
         }
       }
     } catch (_) {}
 
-    return completedList;
+    return list;
   }
 }
