@@ -23,21 +23,58 @@ void main() {
     expect(find.textContaining('Exception'), findsNothing);
   });
 
-  testWidgets('orders exams by date and renders API fields', (tester) async {
+  testWidgets('opens only the latest semester by default and reveals older semester', (
+    tester,
+  ) async {
     await tester.pumpWidget(_appWith(_response()));
     await tester.pumpAndSettle();
 
     expect(
-      tester
-          .getTopLeft(
-            find.text('Kiến trúc máy tính và hệ thống nhúng nâng cao'),
-          )
-          .dy,
-      lessThan(tester.getTopLeft(find.text('Nhập môn lập trình')).dy),
+      find.text('Kiến trúc máy tính và hệ thống nhúng nâng cao'),
+      findsOneWidget,
     );
     expect(find.textContaining('2026-07-20'), findsOneWidget);
     expect(find.textContaining('B4.10'), findsOneWidget);
     expect(find.textContaining('07:30 đến 09:00'), findsOneWidget);
+    expect(find.text('Nhập môn lập trình'), findsNothing);
+
+    await tester.tap(find.text('Học kỳ 1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nhập môn lập trình'), findsOneWidget);
+  });
+
+  testWidgets('orders exams within a semester by date descending', (tester) async {
+    const sameSemesterResponse = ExamScheduleResponse(
+      items: [
+        ExamItem(
+          id: '1',
+          maMonHoc: 'IT001',
+          tenMonHoc: 'Môn thi sớm',
+          maLop: 'IT001.Q21',
+          ngayThi: '2026-07-10',
+          namHoc: 2026,
+          hocKy: 2,
+        ),
+        ExamItem(
+          id: '2',
+          maMonHoc: 'IT002',
+          tenMonHoc: 'Môn thi muộn',
+          maLop: 'IT002.Q21',
+          ngayThi: '2026-07-25',
+          namHoc: 2026,
+          hocKy: 2,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_appWith(sameSemesterResponse));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.text('Môn thi muộn')).dy,
+      lessThan(tester.getTopLeft(find.text('Môn thi sớm')).dy),
+    );
   });
 
   testWidgets('renders long exam details on a narrow dark viewport', (
@@ -72,8 +109,10 @@ ExamScheduleResponse _response() => const ExamScheduleResponse(
       maMonHoc: 'IT001',
       tenMonHoc: 'Nhập môn lập trình',
       maLop: 'IT001.Q21',
-      ngayThi: '2026-07-10',
+      ngayThi: '2026-01-10',
       kyThi: 'midterm',
+      namHoc: 2026,
+      hocKy: 1,
     ),
     ExamItem(
       id: 'new',
