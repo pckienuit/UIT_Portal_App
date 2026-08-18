@@ -21,52 +21,40 @@ class MoodleRepository {
       return [];
     }
 
-    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final pastSec = nowSec - (180 * 86400);
-
-    final url =
-        '/lib/ajax/service.php?sesskey=$sesskey&info=core_calendar_get_action_events_by_timesort';
-
-    final payload = [
-      {
-        'index': 0,
-        'methodname': 'core_calendar_get_action_events_by_timesort',
-        'args': {
-          'timesortfrom': nowSec,
-          'limitnum': limit,
-        },
-      },
-      {
-        'index': 1,
-        'methodname': 'core_calendar_get_action_events_by_timesort',
-        'args': {
-          'timesortfrom': pastSec,
-          'limitnum': limit,
-        },
-      }
-    ];
+    final url = '/lib/ajax/service.php?sesskey=$sesskey&info=core_calendar_get_action_events_by_timesort';
 
     final allDeadlines = <MoodleDeadline>[];
     final allEventsMap = <int, MoodleDeadline>{};
 
+    // 2. Fetch các sự kiện lịch quá hạn / sắp tới từ mốc 1700000000 (các học kỳ gần đây)
     try {
-      final resp = await apiClient.dio.post<dynamic>(url, data: payload);
+      final resp = await apiClient.dio.post<dynamic>(
+        url,
+        data: [
+          {
+            'index': 0,
+            'methodname': 'core_calendar_get_action_events_by_timesort',
+            'args': {
+              'timesortfrom': 1700000000,
+              'limitnum': limit,
+            },
+          }
+        ],
+      );
+
       if (resp.statusCode == 200) {
         dynamic rawData = resp.data;
         if (rawData is String) {
           rawData = jsonDecode(rawData);
         }
         if (rawData is List && rawData.isNotEmpty) {
-          for (final item in rawData) {
-            final mapItem = item as Map<String, dynamic>;
-            final data = mapItem['data'] as Map<String, dynamic>?;
-            final events = data?['events'] as List<dynamic>? ?? [];
+          final first = rawData.first as Map<String, dynamic>;
+          final data = first['data'] as Map<String, dynamic>?;
+          final events = data?['events'] as List<dynamic>? ?? [];
 
-            for (final e in events) {
-              final deadline =
-                  MoodleDeadline.fromJson(e as Map<String, dynamic>);
-              allEventsMap[deadline.id] = deadline;
-            }
+          for (final e in events) {
+            final deadline = MoodleDeadline.fromJson(e as Map<String, dynamic>);
+            allEventsMap[deadline.id] = deadline;
           }
         }
       }
@@ -76,7 +64,7 @@ class MoodleRepository {
 
     allDeadlines.addAll(allEventsMap.values);
 
-    // Quét thêm các bài tập đã nộp từ các khóa học gần đây
+    // 3. Quét thêm các bài tập đã nộp từ các khóa học gần đây
     try {
       final completedFromCourses = await _fetchCompletedAssignmentsFromRecentCourses(sesskey);
       for (final comp in completedFromCourses) {

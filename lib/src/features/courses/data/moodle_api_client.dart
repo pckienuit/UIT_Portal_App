@@ -31,8 +31,8 @@ class MoodleApiClient {
     final d = Dio(
       BaseOptions(
         baseUrl: 'https://courses.uit.edu.vn',
-        connectTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 25),
+        connectTimeout: const Duration(seconds: 25),
+        receiveTimeout: const Duration(seconds: 30),
         headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -48,7 +48,9 @@ class MoodleApiClient {
       createHttpClient: () {
         final client = HttpClient();
         client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-          return host.contains('courses.uit.edu.vn') || host.contains('uit.edu.vn');
+          return host.contains('courses.uit.edu.vn') ||
+              host.contains('sso.uit.edu.vn') ||
+              host.contains('uit.edu.vn');
         };
         return client;
       },
@@ -113,7 +115,6 @@ class MoodleApiClient {
         _sesskey = savedSesskey;
       }
 
-      // Kiểm tra lại tính hợp lệ của sesskey, nếu chưa có sesskey thì fetch nhanh từ trang /my/
       if (isAuthenticated && (_sesskey == null || _sesskey!.isEmpty)) {
         final myResp = await _dio.get<String>('/my/');
         final myHtml = myResp.data ?? '';
@@ -132,96 +133,91 @@ class MoodleApiClient {
       _cookieJar.clear();
       _sesskey = null;
 
-      // 1. Fetch login page to extract logintoken
+      // 1. Tải trang login Moodle để lấy đường link UIT SSO OAuth2
       final loginPageResp = await _dio.get<String>('/login/index.php');
-      final html = loginPageResp.data ?? '';
+      final loginHtml = loginPageResp.data ?? '';
 
-      final logintokenMatch = RegExp(r'name="logintoken"\s+value="([^"]+)"').firstMatch(html);
-      final logintoken = logintokenMatch?.group(1);
+      final ssoLinkMatch = RegExp(r'href="([^"]*auth\/oauth2\/login\.php[^"]*)"').firstMatch(loginHtml);
+      var ssoUrl = ssoLinkMatch?.group(1);
 
-      if (logintoken == null || logintoken.isEmpty) {
-        _lastErrorDetails = 'Không lấy được logintoken từ Moodle';
-        return false;
-      }
-
-      // 2. Submit URL-encoded form data (Moodle returns 303 See Other)
-      var postResp = await _dio.post<String>(
-        '/login/index.php',
-        data: {
-          'anchor': '',
-          'logintoken': logintoken,
-          'username': username.trim(),
-          'password': password.trim(),
-        },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          headers: {
-            'Origin': 'https://courses.uit.edu.vn',
-            'Referer': 'https://courses.uit.edu.vn/login/index.php',
-          },
-        ),
-      );
-
-      // 3. Follow redirect loop up to 5 times (manually preserving MoodleSession cookie)
-      var redirectCount = 0;
-      while ((postResp.statusCode == 302 || postResp.statusCode == 303 || postResp.statusCode == 301) &&
-          redirectCount < 5) {
-        redirectCount++;
-        var nextLoc = postResp.headers.value('location') ?? '/';
-        if (nextLoc.startsWith('https://courses.uit.edu.vn')) {
-          nextLoc = nextLoc.replaceFirst('https://courses.uit.edu.vn', '');
+      if (ssoUrl != null && ssoUrl.isNotEmpty) {
+        ssoUrl = ssoUrl.replaceAll('&amp;', '&');
+        if (ssoUrl.startsWith('/')) {
+          ssoUrl = 'https://courses.uit.edu.vn$ssoUrl';
         }
-        postResp = await _dio.get<String>(
-          nextLoc,
-          options: Options(
-            headers: {
-              'Referer': 'https://courses.uit.edu.vn/login/index.php',
+
+        // 2. Chuyển hướng sang Keycloak SSO của trường
+        var ssoResp = await _dio.get<String>(ssoUrl);
+        var redirectCount = 0;
+        while ((ssoResp.statusCode == 302 || ssoResp.statusCode == 303 || ssoResp.statusCode == 301) &&
+            redirectCount < 5) {
+          redirectCount++;
+          final nextLoc = ssoResp.headers.value('location') ?? '';
+          if (nextLoc.isEmpty) break;
+          ssoResp = await _dio.get<String>(nextLoc);
+        }
+
+        final kcHtml = ssoResp.data ?? '';
+        final formActionMatch = RegExp(r'<form[^>]+id="kc-form-login"[^>]+action="([^"]+)"', caseSensitive: false)
+            .firstMatch(kcHtml);
+        var kcAction = formActionMatch?.group(1);
+
+        if (kcAction != null && kcAction.isNotEmpty) {
+          kcAction = kcAction.replaceAll('&amp;', '&');
+
+          // 3. Đăng nhập qua UIT Keycloak SSO
+          var postKcResp = await _dio.post<String>(
+            kcAction,
+            data: {
+              'username': username.trim(),
+              'password': password.trim(),
+              'credentialId': '',
             },
-          ),
-        );
-      }
-
-      final postHtml = postResp.data ?? '';
-
-      // Check if error is present in response
-      if (postHtml.contains('Đăng nhập sai') || postHtml.contains('loginerrors')) {
-        _lastErrorDetails = 'Tài khoản hoặc mật khẩu Moodle không chính xác';
-        return false;
-      }
-
-      // 4. Extract sesskey from post response
-      final sesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(postHtml);
-      if (sesskeyMatch != null) {
-        _sesskey = sesskeyMatch.group(1);
-      } else {
-        final myResp = await _dio.get<String>('/my/');
-        final myHtml = myResp.data ?? '';
-        final mySesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(myHtml);
-        _sesskey = mySesskeyMatch?.group(1);
-      }
-
-      // 5. Check if we have a valid session cookie
-      final sessionCookieVal = _cookieJar['MoodleSession'];
-      if (sessionCookieVal != null && sessionCookieVal.isNotEmpty) {
-        try {
-          await _storage.write(
-            key: _storageMoodleSessionKey,
-            value: sessionCookieVal,
+            options: Options(
+              contentType: Headers.formUrlEncodedContentType,
+            ),
           );
-          if (_sesskey != null) {
-            await _storage.write(
-              key: _storageMoodleSesskey,
-              value: _sesskey!,
-            );
+
+          // 4. Theo dõi callback OAuth2 trả về lại Moodle
+          redirectCount = 0;
+          while ((postKcResp.statusCode == 302 || postKcResp.statusCode == 303 || postKcResp.statusCode == 301) &&
+              redirectCount < 6) {
+            redirectCount++;
+            final nextLoc = postKcResp.headers.value('location') ?? '';
+            if (nextLoc.isEmpty) break;
+            postKcResp = await _dio.get<String>(nextLoc);
           }
-        } catch (_) {}
-        return true;
+
+          final finalHtml = postKcResp.data ?? '';
+          if (finalHtml.contains('Kiên') || finalHtml.contains('usermenu') || finalHtml.contains('sesskey')) {
+            final sesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(finalHtml);
+            if (sesskeyMatch != null) {
+              _sesskey = sesskeyMatch.group(1);
+            } else {
+              final myResp = await _dio.get<String>('/my/');
+              final myHtml = myResp.data ?? '';
+              final mySesskeyMatch = RegExp(r'"sesskey":"([^"]+)"').firstMatch(myHtml);
+              _sesskey = mySesskeyMatch?.group(1);
+            }
+
+            final sessionCookieVal = _cookieJar['MoodleSession'];
+            if (sessionCookieVal != null && sessionCookieVal.isNotEmpty) {
+              try {
+                await _storage.write(key: _storageMoodleSessionKey, value: sessionCookieVal);
+                if (_sesskey != null) {
+                  await _storage.write(key: _storageMoodleSesskey, value: _sesskey!);
+                }
+              } catch (_) {}
+              return true;
+            }
+          }
+        }
       }
 
-      _lastErrorDetails = 'Không nhận được cookie phiên MoodleSession';
+      _lastErrorDetails = 'Đăng nhập Moodle qua SSO chưa thành công';
       return false;
     } catch (e) {
-      _lastErrorDetails = 'Lỗi kết nối: $e';
+      _lastErrorDetails = 'Lỗi kết nối Moodle: $e';
       return false;
     }
   }
